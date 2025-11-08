@@ -1,7 +1,19 @@
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
-import { createTicket } from '../lib/api'
-import { listSites, listUsers, listIssueTypes, listFieldDefinitions, type SiteOpt, type UserOpt, type IssueTypeOpt, type FieldDefOpt } from '../lib/directory'
+import {
+  Box,
+  TextField,
+  Button,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Alert,
+  Stack,
+} from '@mui/material'
+import { Modal } from './common'
+import { useSites, useUsers, useIssueTypes, useFieldDefinitions } from '../hooks/useDirectory'
+import { useCreateTicket } from '../hooks/useTickets'
 import CustomFieldsForm from './CustomFieldsForm'
 
 interface CreateTicketProps {
@@ -11,12 +23,11 @@ interface CreateTicketProps {
 
 export default function CreateTicket({ onClose, onSuccess }: CreateTicketProps) {
   const nav = useNavigate()
-  const [sites, setSites] = React.useState<SiteOpt[]>([])
-  const [users, setUsers] = React.useState<UserOpt[]>([])
-  const [types, setTypes] = React.useState<IssueTypeOpt[]>([])
-  const [fieldDefs, setFieldDefs] = React.useState<FieldDefOpt[]>([])
-  const [loading, setLoading] = React.useState(false)
-  const [error, setError] = React.useState<string | null>(null)
+  const { data: sites = [] } = useSites()
+  const { data: users = [] } = useUsers()
+  const { data: types = [] } = useIssueTypes()
+  const { data: fieldDefs = [] } = useFieldDefinitions()
+  const createTicketMutation = useCreateTicket()
   
   const [formData, setFormData] = React.useState({
     siteId: '',
@@ -30,32 +41,20 @@ export default function CreateTicket({ onClose, onSuccess }: CreateTicketProps) 
   })
 
   React.useEffect(() => {
-    Promise.all([
-      listSites(),
-      listUsers(),
-      listIssueTypes(),
-      listFieldDefinitions()
-    ]).then(([s, u, t, f]) => {
-      setSites(s)
-      setUsers(u)
-      setTypes(t)
-      setFieldDefs(f)
-      if (s.length > 0) setFormData(prev => ({ ...prev, siteId: s[0].id }))
-      if (t.length > 0) setFormData(prev => ({ ...prev, type: t[0].key }))
-    }).catch(e => {
-      setError('Failed to load form data: ' + (e?.message || 'Unknown error'))
-    })
-  }, [])
+    if (sites.length > 0 && !formData.siteId) {
+      setFormData(prev => ({ ...prev, siteId: sites[0].id }))
+    }
+    if (types.length > 0 && !formData.type) {
+      setFormData(prev => ({ ...prev, type: types[0].key }))
+    }
+  }, [sites, types])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!formData.siteId || !formData.type || !formData.description) {
-      setError('Please fill in all required fields')
       return
     }
 
-    setLoading(true)
-    setError(null)
     try {
       const payload: any = {
         siteId: formData.siteId,
@@ -70,144 +69,155 @@ export default function CreateTicket({ onClose, onSuccess }: CreateTicketProps) 
         payload.custom_fields = formData.custom_fields
       }
 
-      const ticket = await createTicket(payload)
+      const ticket = await createTicketMutation.mutateAsync(payload)
       onSuccess?.()
       nav(`/tickets/${ticket.id}`)
-    } catch (e: any) {
-      setError(e?.response?.data?.message || e?.message || 'Failed to create ticket')
-    } finally {
-      setLoading(false)
+    } catch (error) {
+      console.error('Failed to create ticket:', error)
     }
   }
 
   return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      background: 'rgba(0, 0, 0, 0.7)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 1000
-    }}>
-      <div className="panel" style={{ maxWidth: 600, width: '90%', maxHeight: '90vh', overflow: 'auto' }}>
-        <div className="row" style={{ justifyContent: 'space-between', marginBottom: 16 }}>
-          <div className="h1">Create New Ticket</div>
-          <button onClick={onClose}>✕</button>
-        </div>
-
-        {error && (
-          <div style={{ color: '#ffb3b3', marginBottom: 12, padding: 8, background: '#2a1a1a', borderRadius: 4 }}>
-            {error}
-          </div>
+    <Modal
+      open={true}
+      onClose={onClose}
+      title="Create New Ticket"
+      maxWidth="md"
+      actions={
+        <>
+          <Button onClick={onClose} disabled={createTicketMutation.isPending}>
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            form="create-ticket-form"
+            variant="contained"
+            disabled={createTicketMutation.isPending}
+          >
+            {createTicketMutation.isPending ? 'Creating...' : 'Create Ticket'}
+          </Button>
+        </>
+      }
+    >
+      <Box component="form" id="create-ticket-form" onSubmit={handleSubmit}>
+        {createTicketMutation.error && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            Failed to create ticket
+          </Alert>
         )}
 
-        <form onSubmit={handleSubmit}>
-          <div className="row" style={{ marginTop: 12 }}>
-            <label style={{ width: 150 }}>Site *</label>
-            <select
-              value={formData.siteId}
-              onChange={e => setFormData({ ...formData, siteId: e.target.value })}
-              style={{ flex: 1 }}
-              required
-            >
-              <option value="">Select a site</option>
-              {sites.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
-          </div>
+        <Stack spacing={2}>
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}>
+            <FormControl fullWidth size="small" required>
+              <InputLabel id="site-label">Site</InputLabel>
+              <Select
+                labelId="site-label"
+                value={formData.siteId}
+                onChange={e => setFormData({ ...formData, siteId: e.target.value })}
+                label="Site"
+                aria-label="Site"
+              >
+                {sites.map(s => <MenuItem key={s.id} value={s.id}>{s.name}</MenuItem>)}
+              </Select>
+            </FormControl>
 
-          <div className="row" style={{ marginTop: 12 }}>
-            <label style={{ width: 150 }}>Issue Type *</label>
-            <select
-              value={formData.type}
-              onChange={e => setFormData({ ...formData, type: e.target.value })}
-              style={{ flex: 1 }}
-              required
-            >
-              <option value="">Select issue type</option>
-              {types.map(t => <option key={t.key} value={t.key}>{t.label}</option>)}
-            </select>
-          </div>
+            <FormControl fullWidth size="small" required>
+              <InputLabel id="type-label">Issue Type</InputLabel>
+              <Select
+                labelId="type-label"
+                value={formData.type}
+                onChange={e => setFormData({ ...formData, type: e.target.value })}
+                label="Issue Type"
+                aria-label="Issue Type"
+              >
+                {types.map(t => <MenuItem key={t.key} value={t.key}>{t.label}</MenuItem>)}
+              </Select>
+            </FormControl>
+          </Box>
 
-          <div className="row" style={{ marginTop: 12 }}>
-            <label style={{ width: 150 }}>Description *</label>
-            <input
-              style={{ flex: 1 }}
-              value={formData.description}
-              onChange={e => setFormData({ ...formData, description: e.target.value })}
-              required
-              placeholder="Brief description of the issue"
-            />
-          </div>
+          <TextField
+            fullWidth
+            required
+            size="small"
+            label="Description"
+            value={formData.description}
+            onChange={e => setFormData({ ...formData, description: e.target.value })}
+            placeholder="Brief description of the issue"
+            inputProps={{ 'aria-label': 'Description' }}
+          />
 
-          <div className="row" style={{ marginTop: 12 }}>
-            <label style={{ width: 150 }}>Details</label>
-            <textarea
-              style={{ flex: 1, height: 100 }}
-              value={formData.details}
-              onChange={e => setFormData({ ...formData, details: e.target.value })}
-              placeholder="Additional details..."
-            />
-          </div>
+          <TextField
+            fullWidth
+            multiline
+            rows={3}
+            size="small"
+            label="Details"
+            value={formData.details}
+            onChange={e => setFormData({ ...formData, details: e.target.value })}
+            placeholder="Additional details..."
+            inputProps={{ 'aria-label': 'Details' }}
+          />
 
-          <div className="row" style={{ marginTop: 12 }}>
-            <label style={{ width: 150 }}>Status</label>
-            <select
-              value={formData.status}
-              onChange={e => setFormData({ ...formData, status: e.target.value as any })}
-            >
-              {['NEW', 'TRIAGE', 'IN_PROGRESS', 'PENDING', 'RESOLVED', 'CLOSED'].map(s => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </select>
-            <label style={{ width: 100, marginLeft: 12 }}>Priority</label>
-            <select
-              value={formData.priority}
-              onChange={e => setFormData({ ...formData, priority: e.target.value as any })}
-            >
-              {['P1', 'P2', 'P3', 'P4'].map(p => (
-                <option key={p} value={p}>{p}</option>
-              ))}
-            </select>
-          </div>
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}>
+            <FormControl fullWidth size="small">
+              <InputLabel id="status-label">Status</InputLabel>
+              <Select
+                labelId="status-label"
+                value={formData.status}
+                onChange={e => setFormData({ ...formData, status: e.target.value as any })}
+                label="Status"
+                aria-label="Status"
+              >
+                {['NEW', 'TRIAGE', 'IN_PROGRESS', 'PENDING', 'RESOLVED', 'CLOSED'].map(s => (
+                  <MenuItem key={s} value={s}>{s}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
 
-          <div className="row" style={{ marginTop: 12 }}>
-            <label style={{ width: 150 }}>Assigned User</label>
-            <select
+            <FormControl fullWidth size="small">
+              <InputLabel id="priority-label">Priority</InputLabel>
+              <Select
+                labelId="priority-label"
+                value={formData.priority}
+                onChange={e => setFormData({ ...formData, priority: e.target.value as any })}
+                label="Priority"
+                aria-label="Priority"
+              >
+                {['P1', 'P2', 'P3', 'P4'].map(p => (
+                  <MenuItem key={p} value={p}>{p}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Box>
+
+          <FormControl fullWidth size="small">
+            <InputLabel id="assigned-user-label">Assigned User</InputLabel>
+            <Select
+              labelId="assigned-user-label"
               value={formData.assignedUserId}
               onChange={e => setFormData({ ...formData, assignedUserId: e.target.value })}
-              style={{ flex: 1 }}
+              label="Assigned User"
+              aria-label="Assigned User"
             >
-              <option value="">Unassigned</option>
-              {users.map(u => (
-                <option key={u.id} value={u.id}>{u.name || u.email}</option>
-              ))}
-            </select>
-          </div>
+              <MenuItem value="">
+                <em>Unassigned</em>
+              </MenuItem>
+              {users.map(u => <MenuItem key={u.id} value={u.id}>{u.name || u.email}</MenuItem>)}
+            </Select>
+          </FormControl>
 
           {fieldDefs.length > 0 && (
-            <div style={{ marginTop: 16 }}>
-              <label style={{ display: 'block', marginBottom: 8, fontWeight: 600 }}>Custom Fields</label>
+            <Box sx={{ mt: 1 }}>
               <CustomFieldsForm
                 fieldDefs={fieldDefs}
                 values={formData.custom_fields}
                 onChange={(custom_fields) => setFormData({ ...formData, custom_fields })}
               />
-            </div>
+            </Box>
           )}
-
-          <div className="row" style={{ marginTop: 20, justifyContent: 'flex-end', gap: 8 }}>
-            <button type="button" onClick={onClose} disabled={loading}>Cancel</button>
-            <button type="submit" className="primary" disabled={loading}>
-              {loading ? 'Creating...' : 'Create Ticket'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        </Stack>
+      </Box>
+    </Modal>
   )
 }
 
