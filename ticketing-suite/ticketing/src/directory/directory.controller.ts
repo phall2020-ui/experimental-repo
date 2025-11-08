@@ -149,7 +149,7 @@ export class DirectoryController {
   @Roles('ADMIN')
   async deleteFieldDefinition(@Req() req: any, @Param('id') id: string) {
     return this.prisma.ticketFieldDef.delete({
-      where: { id }
+      where: { id, tenantId: this.tenant(req) }
     });
   }
 }
