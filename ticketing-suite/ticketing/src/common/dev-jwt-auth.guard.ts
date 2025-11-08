@@ -1,8 +1,8 @@
 import { Injectable, ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 
-@Injectable() 
-export class JwtAuthGuard extends AuthGuard('jwt') {
+@Injectable()
+export class DevJwtAuthGuard extends AuthGuard('jwt') {
   canActivate(context: ExecutionContext) {
     // In dev mode without OIDC, decode JWT manually without verification
     if (!process.env.OIDC_ISSUER) {

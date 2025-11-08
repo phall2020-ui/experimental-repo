@@ -7,5 +7,9 @@ import TicketView from './views/TicketView'
 const router = createBrowserRouter([{ path:'/', element:<App/>, children:[
   { index:true, element:<Dashboard/> },
   { path:'/tickets/:id', element:<TicketView/> }
-]}])
+]}], {
+  future: {
+    v7_startTransition: true,
+  },
+})
 ReactDOM.createRoot(document.getElementById('root')!).render(<React.StrictMode><RouterProvider router={router} /></React.StrictMode>)
