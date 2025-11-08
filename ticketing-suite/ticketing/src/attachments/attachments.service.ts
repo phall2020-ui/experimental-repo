@@ -6,6 +6,32 @@ import { randomUUID } from 'crypto';
   private s3 = new S3({ region: process.env.AWS_REGION });
   constructor(private prisma: PrismaService) {}
   private bucket() { const b = process.env.S3_BUCKET; if (!b) throw new Error('S3_BUCKET not configured'); return b; }
+  
+  async list(tenantId: string, ticketId: string) {
+    return this.prisma.withTenant(tenantId, async (tx) => {
+      const t = await tx.ticket.findFirst({ where: { id: ticketId, tenantId }});
+      if (!t) throw new BadRequestException('Invalid ticket');
+      const attachments = await tx.attachment.findMany({
+        where: { ticketId, tenantId },
+        orderBy: { createdAt: 'desc' }
+      });
+      // Generate presigned download URLs for each attachment
+      return attachments.map((att: any) => ({
+        id: att.id,
+        ticketId: att.ticketId,
+        filename: att.filename,
+        mimeType: att.mimeType,
+        sizeBytes: att.sizeBytes,
+        createdAt: att.createdAt,
+        downloadUrl: this.s3.getSignedUrl('getObject', {
+          Bucket: this.bucket(),
+          Key: att.objectKey,
+          Expires: 300 // 5 minutes
+        })
+      }));
+    });
+  }
+  
   async createPresigned(tenantId: string, ticketId: string, filename: string, mime: string) {
     return this.prisma.withTenant(tenantId, async (tx) => {
       const t = await tx.ticket.findFirst({ where: { id: ticketId, tenantId }});

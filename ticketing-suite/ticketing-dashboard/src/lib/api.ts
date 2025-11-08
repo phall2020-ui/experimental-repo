@@ -72,9 +72,10 @@ export interface Attachment {
   id: string
   ticketId: string
   filename: string
-  mime: string
-  size: number
+  mimeType: string
+  sizeBytes: number
   createdAt: string
+  downloadUrl: string
 }
 
 export interface PresignResponse {
@@ -82,6 +83,9 @@ export interface PresignResponse {
   attachmentId: string
   fields: Record<string, string>
 }
+
+export const listAttachments = async (ticketId: string) =>
+  (await client.get<Attachment[]>(`/tickets/${ticketId}/attachments`)).data
 
 export const presignAttachment = async (ticketId: string, filename: string, mime: string) =>
   (await client.post<PresignResponse>(`/tickets/${ticketId}/attachments/presign`, { filename, mime })).data
