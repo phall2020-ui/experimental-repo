@@ -1,160 +1,140 @@
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getHealth, getHealthDb, getHealthRedis, type HealthStatus } from '../lib/api'
-import { useNotifications } from '../lib/notifications'
+import {
+  Box,
+  Button,
+  Card,
+  CardContent,
+  Chip,
+  Grid,
+  Typography,
+  Stack,
+  IconButton,
+  Tooltip,
+  CircularProgress,
+} from '@mui/material'
+import {
+  CheckCircle as CheckIcon,
+  Error as ErrorIcon,
+  Warning as WarningIcon,
+  Refresh as RefreshIcon,
+  ArrowBack as BackIcon,
+} from '@mui/icons-material'
+import { useHealth, useHealthDb, useHealthRedis } from '../lib/hooks'
 
 export default function HealthDashboard() {
   const nav = useNavigate()
-  const [health, setHealth] = React.useState<HealthStatus | null>(null)
-  const [dbHealth, setDbHealth] = React.useState<HealthStatus | null>(null)
-  const [redisHealth, setRedisHealth] = React.useState<HealthStatus | null>(null)
-  const [loading, setLoading] = React.useState(true)
-  const [lastUpdate, setLastUpdate] = React.useState<Date | null>(null)
-  const { showNotification } = useNotifications()
+  const [lastUpdate, setLastUpdate] = React.useState<Date>(new Date())
+  
+  const { data: health, isLoading: healthLoading, refetch: refetchHealth } = useHealth()
+  const { data: dbHealth, isLoading: dbLoading, refetch: refetchDb } = useHealthDb()
+  const { data: redisHealth, isLoading: redisLoading, refetch: refetchRedis } = useHealthRedis()
 
-  const loadHealth = async () => {
-    setLoading(true)
-    try {
-      const [h, db, redis] = await Promise.all([
-        getHealth().catch(e => ({ status: 'error' as const, error: { system: { status: 'down', message: e.message } } })),
-        getHealthDb().catch(e => ({ status: 'error' as const, error: { db: { status: 'down', message: e.message } } })),
-        getHealthRedis().catch(e => ({ status: 'error' as const, error: { redis: { status: 'down', message: e.message } } }))
-      ])
-      setHealth(h)
-      setDbHealth(db)
-      setRedisHealth(redis)
-      setLastUpdate(new Date())
-    } catch (e) {
-      showNotification('error', 'Failed to load health status')
-    } finally {
-      setLoading(false)
-    }
+  const isLoading = healthLoading || dbLoading || redisLoading
+
+  const refreshAll = () => {
+    refetchHealth()
+    refetchDb()
+    refetchRedis()
+    setLastUpdate(new Date())
   }
 
-  React.useEffect(() => {
-    loadHealth()
-    const interval = setInterval(loadHealth, 30000) // Refresh every 30 seconds
-    return () => clearInterval(interval)
-  }, [])
-
-  const getStatusColor = (status: string) => {
-    if (status === 'ok' || status === 'up') return '#2ecc71'
-    if (status === 'error' || status === 'down') return '#e74c3c'
-    return '#f1c40f'
+  const getStatusColor = (status: string): 'success' | 'error' | 'warning' => {
+    if (status === 'ok' || status === 'up') return 'success'
+    if (status === 'error' || status === 'down') return 'error'
+    return 'warning'
   }
 
   const getStatusIcon = (status: string) => {
-    if (status === 'ok' || status === 'up') return '✓'
-    if (status === 'error' || status === 'down') return '✗'
-    return '⚠'
+    if (status === 'ok' || status === 'up') return <CheckIcon />
+    if (status === 'error' || status === 'down') return <ErrorIcon />
+    return <WarningIcon />
   }
 
+  const renderHealthCard = (title: string, health: any, loading: boolean) => (
+    <Card>
+      <CardContent>
+        <Stack spacing={2}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography variant="h6">{title}</Typography>
+            <Chip
+              icon={getStatusIcon(health?.status || 'error')}
+              label={health?.status?.toUpperCase() || 'UNKNOWN'}
+              color={getStatusColor(health?.status || 'error')}
+              size="small"
+            />
+          </Box>
+
+          {loading && <CircularProgress size={24} />}
+
+          {health?.info && Object.entries(health.info).map(([key, value]: [string, any]) => (
+            <Box key={key}>
+              <Typography variant="body2" fontWeight={600} gutterBottom>
+                {key}
+              </Typography>
+              <Typography variant="caption" component="pre" sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                {JSON.stringify(value, null, 2)}
+              </Typography>
+            </Box>
+          ))}
+
+          {health?.error && Object.entries(health.error).map(([key, value]: [string, any]) => (
+            <Box key={key}>
+              <Typography variant="body2" fontWeight={600} color="error" gutterBottom>
+                {key}
+              </Typography>
+              <Typography variant="caption" color="error">
+                {value.message || 'Unknown error'}
+              </Typography>
+            </Box>
+          ))}
+        </Stack>
+      </CardContent>
+    </Card>
+  )
+
   return (
-    <div className="container">
-      <div className="panel">
-        <div className="row" style={{ justifyContent: 'space-between', marginBottom: 16 }}>
-          <div className="h1">System Health Dashboard</div>
-          <div className="row" style={{ gap: 8 }}>
-            {lastUpdate && (
-              <div className="muted" style={{ fontSize: 12 }}>
-                Last updated: {lastUpdate.toLocaleTimeString()}
-              </div>
-            )}
-            <button onClick={loadHealth} disabled={loading}>
-              {loading ? 'Refreshing...' : 'Refresh'}
-            </button>
-            <button onClick={() => nav(-1)}>← Back</button>
-          </div>
-        </div>
+    <Box>
+      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
+        <Typography variant="h4" component="h1">
+          System Health Dashboard
+        </Typography>
+        
+        <Stack direction="row" spacing={1} alignItems="center">
+          <Typography variant="caption" color="text.secondary">
+            Last updated: {lastUpdate.toLocaleTimeString()}
+          </Typography>
+          
+          <Tooltip title="Refresh">
+            <IconButton onClick={refreshAll} disabled={isLoading} aria-label="Refresh health status">
+              <RefreshIcon />
+            </IconButton>
+          </Tooltip>
+          
+          <Button
+            startIcon={<BackIcon />}
+            onClick={() => nav(-1)}
+            variant="outlined"
+            size="small"
+          >
+            Back
+          </Button>
+        </Stack>
+      </Stack>
 
-        {loading && !health ? (
-          <div className="muted">Loading health status...</div>
-        ) : (
-          <div style={{ display: 'grid', gap: 16 }}>
-            {/* Overall Health */}
-            <div style={{ padding: 16, background: '#0e141c', borderRadius: 8, border: '1px solid #1c2532' }}>
-              <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <div style={{ fontSize: 18, fontWeight: 600 }}>Overall System</div>
-                <div style={{
-                  padding: '6px 12px',
-                  borderRadius: 6,
-                  background: getStatusColor(health?.status || 'error'),
-                  color: '#fff',
-                  fontWeight: 600,
-                  fontSize: 14
-                }}>
-                  {getStatusIcon(health?.status || 'error')} {health?.status?.toUpperCase() || 'UNKNOWN'}
-                </div>
-              </div>
-              {health?.info && Object.entries(health.info).map(([key, value]) => (
-                <div key={key} style={{ marginTop: 8, fontSize: 13 }}>
-                  <strong>{key}:</strong> {value.status}
-                </div>
-              ))}
-              {health?.error && Object.entries(health.error).map(([key, value]) => (
-                <div key={key} style={{ marginTop: 8, fontSize: 13, color: '#ffb3b3' }}>
-                  <strong>{key}:</strong> {value.status} - {value.message || 'Unknown error'}
-                </div>
-              ))}
-            </div>
-
-            {/* Database Health */}
-            <div style={{ padding: 16, background: '#0e141c', borderRadius: 8, border: '1px solid #1c2532' }}>
-              <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <div style={{ fontSize: 18, fontWeight: 600 }}>Database</div>
-                <div style={{
-                  padding: '6px 12px',
-                  borderRadius: 6,
-                  background: getStatusColor(dbHealth?.status || 'error'),
-                  color: '#fff',
-                  fontWeight: 600,
-                  fontSize: 14
-                }}>
-                  {getStatusIcon(dbHealth?.status || 'error')} {dbHealth?.status?.toUpperCase() || 'UNKNOWN'}
-                </div>
-              </div>
-              {dbHealth?.info && Object.entries(dbHealth.info).map(([key, value]) => (
-                <div key={key} style={{ marginTop: 8, fontSize: 13 }}>
-                  <strong>{key}:</strong> {JSON.stringify(value, null, 2)}
-                </div>
-              ))}
-              {dbHealth?.error && Object.entries(dbHealth.error).map(([key, value]) => (
-                <div key={key} style={{ marginTop: 8, fontSize: 13, color: '#ffb3b3' }}>
-                  <strong>{key}:</strong> {value.message || 'Unknown error'}
-                </div>
-              ))}
-            </div>
-
-            {/* Redis Health */}
-            <div style={{ padding: 16, background: '#0e141c', borderRadius: 8, border: '1px solid #1c2532' }}>
-              <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <div style={{ fontSize: 18, fontWeight: 600 }}>Redis</div>
-                <div style={{
-                  padding: '6px 12px',
-                  borderRadius: 6,
-                  background: getStatusColor(redisHealth?.status || 'error'),
-                  color: '#fff',
-                  fontWeight: 600,
-                  fontSize: 14
-                }}>
-                  {getStatusIcon(redisHealth?.status || 'error')} {redisHealth?.status?.toUpperCase() || 'UNKNOWN'}
-                </div>
-              </div>
-              {redisHealth?.info && Object.entries(redisHealth.info).map(([key, value]) => (
-                <div key={key} style={{ marginTop: 8, fontSize: 13 }}>
-                  <strong>{key}:</strong> {JSON.stringify(value, null, 2)}
-                </div>
-              ))}
-              {redisHealth?.error && Object.entries(redisHealth.error).map(([key, value]) => (
-                <div key={key} style={{ marginTop: 8, fontSize: 13, color: '#ffb3b3' }}>
-                  <strong>{key}:</strong> {value.message || 'Unknown error'}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
+      <Grid container spacing={3}>
+        <Grid item xs={12}>
+          {renderHealthCard('Overall System', health, healthLoading)}
+        </Grid>
+        
+        <Grid item xs={12} md={6}>
+          {renderHealthCard('Database', dbHealth, dbLoading)}
+        </Grid>
+        
+        <Grid item xs={12} md={6}>
+          {renderHealthCard('Redis', redisHealth, redisLoading)}
+        </Grid>
+      </Grid>
+    </Box>
   )
 }
-
