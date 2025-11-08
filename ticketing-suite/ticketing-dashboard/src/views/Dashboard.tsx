@@ -274,8 +274,8 @@ export default function Dashboard() {
   const sortedTickets = React.useMemo(() => {
     if (!sortColumn) return sortTickets(tickets, userId || undefined, cfg)
     const sorted = [...tickets].sort((a, b) => {
-      let aVal: any = a[sortColumn]
-      let bVal: any = b[sortColumn]
+      let aVal: any = (a as any)[sortColumn]
+      let bVal: any = (b as any)[sortColumn]
       if (sortColumn === 'createdAt' || sortColumn === 'updatedAt') {
         aVal = new Date(aVal).getTime()
         bVal = new Date(bVal).getTime()
