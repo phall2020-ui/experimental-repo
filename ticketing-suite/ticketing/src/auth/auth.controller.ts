@@ -28,8 +28,8 @@ export class UsersController {
 
   @Patch(':id')
   @Roles('ADMIN')
-  async update(@Param('id') id: string, @Body() body: { name?: string; email?: string; role?: 'USER' | 'ADMIN' }) {
-    return this.svc.updateUser(id, body);
+  async update(@Req() req: any, @Param('id') id: string, @Body() body: { name?: string; email?: string; role?: 'USER' | 'ADMIN' }) {
+    return this.svc.updateUser(id, req.user.tenantId, body);
   }
 
   @Delete(':id')
