@@ -6,6 +6,7 @@ import { ThemeProvider } from './theme/ThemeProvider'
 import { NotificationProvider } from './lib/notifications'
 import { I18nProvider } from './lib/i18n'
 import { queryClient } from './lib/queryClient'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import App from './views/App'
 import Dashboard from './views/Dashboard'
 import TicketView from './views/TicketView'
@@ -25,14 +26,16 @@ const router = createBrowserRouter([
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <I18nProvider>
-          <NotificationProvider>
-            <RouterProvider router={router} />
-          </NotificationProvider>
-        </I18nProvider>
-      </ThemeProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider>
+          <I18nProvider>
+            <NotificationProvider>
+              <RouterProvider router={router} />
+            </NotificationProvider>
+          </I18nProvider>
+        </ThemeProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   </React.StrictMode>
 )
