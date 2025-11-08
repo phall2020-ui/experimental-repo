@@ -17,6 +17,7 @@ model Tenant {
   comments  Comment[]
   attachments Attachment[]
   outboxEntries Outbox[]
+  types     IssueType[]
 }
 
 model Site {
@@ -33,11 +34,12 @@ model Site {
 model User {
   id       String @id @default(uuid())
   tenantId String
-  email    String
+  email    String   @unique
+  password String
   name     String
+  role     Role     @default(USER)
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  @@unique([tenantId, email])
+  tickets  Ticket[] @relation("UserTickets")
 }
 
 model Ticket {
@@ -49,7 +51,7 @@ model Ticket {
   status          TicketStatus
   priority        TicketPriority
   details         String?
-  assignedUserId  String?     // <— NEW
+  assignedUserId  String?
   customFields    Json      @default("{}")
   dueAt           DateTime?
   firstResponseAt DateTime?
@@ -58,6 +60,7 @@ model Ticket {
   updatedAt       DateTime  @updatedAt
   tenant          Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   site            Site      @relation(fields: [siteId], references: [id], onDelete: Restrict)
+  assignedUser    User?     @relation("UserTickets", fields: [assignedUserId], references: [id])
   comments        Comment[]
   attachments     Attachment[]
   outboxEntries   Outbox[]
@@ -84,6 +87,17 @@ model TicketFieldDef {
   @@unique([tenantId, key])
 }
 
+model IssueType {
+  id        String  @id @default(uuid())
+  tenantId  String
+  key       String
+  label     String
+  active    Boolean @default(true)
+  tenant    Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  
+  @@unique([tenantId, key])
+}
+
 enum TicketStatus {
   NEW
   TRIAGE
@@ -98,6 +112,11 @@ enum TicketPriority {
   P2
   P3
   P4
+}
+
+enum Role {
+  ADMIN
+  USER
 }
 
 enum FieldDatatype {

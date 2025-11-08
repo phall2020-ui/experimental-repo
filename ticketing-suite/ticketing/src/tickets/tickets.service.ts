@@ -53,6 +53,17 @@ export class TicketsService {
     return this.prisma.withTenant(tenantId, async (tx) => {
       const site = await tx.site.findFirst({ where: { id: dto.siteId, tenantId }});
       if (!site) throw new BadRequestException('Invalid siteId for tenant');
+      
+      // Validate typeKey exists and is active
+      const issueType = await tx.issueType.findFirst({ where: { tenantId, key: dto.type, active: true }});
+      if (!issueType) throw new BadRequestException('Invalid or inactive typeKey for tenant');
+      
+      // Validate assignedUserId if provided
+      if (dto.assignedUserId) {
+        const user = await tx.user.findFirst({ where: { id: dto.assignedUserId, tenantId }});
+        if (!user) throw new BadRequestException('Invalid assignedUserId for tenant');
+      }
+      
       const defs = await this.loadFieldDefs(tx, tenantId);
       this.validateCustomFields(dto.custom_fields ?? {}, defs);
       const t = await tx.ticket.create({
@@ -118,6 +129,19 @@ export class TicketsService {
         const ok = await tx.site.findFirst({ where: { id: patch.siteId, tenantId }});
         if (!ok) throw new BadRequestException('Invalid siteId for tenant');
       }
+      
+      // Validate typeKey if provided
+      if (patch.type) {
+        const issueType = await tx.issueType.findFirst({ where: { tenantId, key: patch.type, active: true }});
+        if (!issueType) throw new BadRequestException('Invalid or inactive typeKey for tenant');
+      }
+      
+      // Validate assignedUserId if provided (allow null/empty to unassign)
+      if (patch.assignedUserId !== undefined && patch.assignedUserId !== null && patch.assignedUserId !== '') {
+        const user = await tx.user.findFirst({ where: { id: patch.assignedUserId, tenantId }});
+        if (!user) throw new BadRequestException('Invalid assignedUserId for tenant');
+      }
+      
       if (patch.custom_fields) {
         const defs = await this.loadFieldDefs(tx, tenantId);
         this.validateCustomFields(patch.custom_fields, defs);

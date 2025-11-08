@@ -6,6 +6,7 @@ import { TicketsModule } from './tickets/tickets.module';
 import { CommentsModule } from './comments/comments.module';
 import { AttachmentsModule } from './attachments/attachments.module';
 import { HealthModule } from './health/health.module';
+import { DirectoryModule } from './directory/directory.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { HealthModule } from './health/health.module';
     CommentsModule,
     AttachmentsModule,
     HealthModule,
+    DirectoryModule,
   ],
   providers: [PrismaService],
 })

@@ -1,19 +1,38 @@
 import React from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { getTicket, updateTicket } from '../lib/api'
+import { listSites, listUsers, listIssueTypes, type SiteOpt, type UserOpt, type IssueTypeOpt } from '../lib/directory'
 export default function TicketView() {
   const { id } = useParams()
   const nav = useNavigate()
   const [t, setT] = React.useState<any>(null)
   const [saving, setSaving] = React.useState(false)
   const [err, setErr] = React.useState<string | null>(null)
+  const [sites, setSites] = React.useState<SiteOpt[]>([])
+  const [users, setUsers] = React.useState<UserOpt[]>([])
+  const [types, setTypes] = React.useState<IssueTypeOpt[]>([])
+  
   const load = async () => { if (!id) return; const data = await getTicket(id); setT(data) }
-  React.useEffect(()=>{ load() }, [id])
+  
+  React.useEffect(() => {
+    load()
+    Promise.all([listSites(), listUsers(), listIssueTypes()]).then(([s, u, ty]) => {
+      setSites(s); setUsers(u); setTypes(ty)
+    }).catch(e => console.error('Failed to load dropdowns', e))
+  }, [id])
+  
   const save = async () => {
     if (!id || !t) return
     setSaving(true); setErr(null)
     try {
-      const payload: any = { description: t.description, details: t.details, status: t.status, priority: t.priority }
+      const payload: any = { 
+        siteId: t.siteId,
+        type: t.typeKey,
+        description: t.description, 
+        details: t.details, 
+        status: t.status, 
+        priority: t.priority 
+      }
       if (t.assignedUserId !== undefined) payload.assignedUserId = t.assignedUserId
       await updateTicket(id, payload); await load()
     } catch (e:any) { setErr(e?.message || 'Failed to save') } finally { setSaving(false) }
@@ -27,6 +46,18 @@ export default function TicketView() {
           <button onClick={()=>nav(-1)}>← Back</button>
         </div>
         {err && <div className="row" style={{color:'#ffb3b3'}}>{err}</div>}
+        <div className="row" style={{marginTop:12}}>
+          <label style={{width:150}}>Site</label>
+          <select value={t.siteId} onChange={e=>setT({...t, siteId:e.target.value})} style={{flex:1}}>
+            {sites.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+        </div>
+        <div className="row" style={{marginTop:12}}>
+          <label style={{width:150}}>Issue Type</label>
+          <select value={t.typeKey} onChange={e=>setT({...t, typeKey:e.target.value})} style={{flex:1}}>
+            {types.map(x => <option key={x.key} value={x.key}>{x.label}</option>)}
+          </select>
+        </div>
         <div className="row" style={{marginTop:12}}>
           <label style={{width:150}}>Description</label>
           <input style={{flex:1}} value={t.description} onChange={e=>setT({...t, description:e.target.value})} />
@@ -46,8 +77,11 @@ export default function TicketView() {
           </select>
         </div>
         <div className="row" style={{marginTop:12}}>
-          <label style={{width:150}}>Assigned User ID</label>
-          <input style={{flex:1}} placeholder="user-id" value={t.assignedUserId || ''} onChange={e=>setT({...t, assignedUserId:e.target.value})} />
+          <label style={{width:150}}>Assigned User</label>
+          <select value={t.assignedUserId || ''} onChange={e=>setT({...t, assignedUserId:e.target.value || null})} style={{flex:1}}>
+            <option value="">Unassigned</option>
+            {users.map(u => <option key={u.id} value={u.id}>{u.name || u.email}</option>)}
+          </select>
         </div>
         <div className="row" style={{marginTop:16, justifyContent:'flex-end'}}>
           <button className="primary" disabled={saving} onClick={save}>{saving ? 'Saving…' : 'Save'}</button>
