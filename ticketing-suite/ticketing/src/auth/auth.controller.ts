@@ -40,8 +40,8 @@ export class UsersController {
 
   @Post(':id/reset-password')
   @Roles('ADMIN')
-  async resetPassword(@Param('id') id: string, @Body() body: { password: string }) {
-    return this.svc.resetPassword(id, body.password);
+  async resetPassword(@Req() req: any, @Param('id') id: string, @Body() body: { password: string }) {
+    return this.svc.resetPassword(id, req.user.tenantId, body.password);
   }
 
   @Patch('profile')
