@@ -71,7 +71,7 @@ export class DirectoryController {
   @Roles('ADMIN')
   async deleteIssueType(@Req() req: any, @Param('id') id: string) {
     return this.prisma.issueType.update({
-      where: { id },
+      where: { id, tenantId: this.tenant(req) },
       data: { active: false }
     });
   }
