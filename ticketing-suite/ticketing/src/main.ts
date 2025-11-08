@@ -11,7 +11,7 @@ async function bootstrap() {
   app.enableCors({ origin: true });
   app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
-  app.useGlobalGuards(new ThrottlerGuard(app.get(Reflector)));
+  // ThrottlerGuard is now applied via APP_GUARD provider in module
 
   const config = new DocumentBuilder()
     .setTitle('Ticketing API')

@@ -60,7 +60,7 @@ export class TicketsService {
           tenantId, siteId: dto.siteId, typeKey: dto.type, description: dto.description,
           status: dto.status, priority: dto.priority, details: dto.details ?? null,
           assignedUserId: dto.assignedUserId ?? null,
-          customFields: dto.custom_fields ?? {},
+          customFields: dto.custom_fields ?? {} as any,
         }
       });
       await tx.outbox.create({ data: { tenantId, type: 'ticket.created', entityId: t.id, payload: {} }});
@@ -122,18 +122,19 @@ export class TicketsService {
         const defs = await this.loadFieldDefs(tx, tenantId);
         this.validateCustomFields(patch.custom_fields, defs);
       }
+      const updateData: any = {};
+      if (patch.siteId) updateData.siteId = patch.siteId;
+      if (patch.type) updateData.typeKey = patch.type;
+      if (patch.description) updateData.description = patch.description;
+      if (patch.status) updateData.status = patch.status;
+      if (patch.priority) updateData.priority = patch.priority;
+      if (patch.details !== undefined) updateData.details = patch.details;
+      if (patch.assignedUserId !== undefined) updateData.assignedUserId = patch.assignedUserId || null;
+      if (patch.custom_fields) updateData.customFields = patch.custom_fields;
+      
       const updated = await tx.ticket.update({
         where: { id },
-        data: {
-          ...(patch.siteId ? { siteId: patch.siteId } : {}),
-          ...(patch.type ? { typeKey: patch.type } : {}),
-          ...(patch.description ? { description: patch.description } : {}),
-          ...(patch.status ? { status: patch.status } : {}),
-          ...(patch.priority ? { priority: patch.priority } : {}),
-          ...(patch.details !== undefined ? { details: patch.details } : {}),
-          ...(patch.assignedUserId !== undefined ? { assignedUserId: patch.assignedUserId || null } : {}),
-          ...(patch.custom_fields ? { customFields: patch.custom_fields } : {}),
-        }
+        data: updateData
       });
       await tx.outbox.create({ data: { tenantId, type: 'ticket.updated', entityId: id, payload: {} }});
       return updated;

@@ -2,7 +2,7 @@
 FROM node:20-bullseye-slim AS build
 WORKDIR /app
 COPY package.json package-lock.json* yarn.lock* .npmrc* ./
-RUN npm ci --omit=dev
+RUN npm ci --legacy-peer-deps
 COPY . .
 RUN npx prisma generate && npm run build
 

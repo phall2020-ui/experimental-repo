@@ -118,6 +118,7 @@ model Comment {
   createdAt   DateTime          @default(now())
   tenant      Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   ticket      Ticket            @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  attachments Attachment[]
 
   @@index([tenantId, ticketId, createdAt])
 }
@@ -148,6 +149,7 @@ model Attachment {
 model Outbox {
   id          String   @id @default(uuid())
   tenantId    String
+  ticketId    String?
   type        String
   entityId    String
   payload     Json
@@ -155,6 +157,7 @@ model Outbox {
   publishedAt DateTime?
   retryCount  Int      @default(0)
   tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  ticket      Ticket?  @relation(fields: [ticketId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, type, occurredAt])
 }

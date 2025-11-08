@@ -5,5 +5,5 @@ const endpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
 if (endpoint) {
   const exporter = new OTLPTraceExporter({ url: endpoint });
   const sdk = new NodeSDK({ traceExporter: exporter, instrumentations: [getNodeAutoInstrumentations()] });
-  sdk.start().catch((err) => console.error('OTel start error', err));
+  sdk.start();
 }
