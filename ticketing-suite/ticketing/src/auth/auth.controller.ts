@@ -47,7 +47,8 @@ export class UsersController {
   @Patch('profile')
   @Roles('ADMIN', 'USER')
   async updateMe(@Req() req: any, @Body() body: { name?: string; email?: string }) {
-    return this.svc.updateUser(req.user.sub, body);
+    const { name, email } = body;
+    return this.svc.updateUser(req.user.sub, { name, email });
   }
 
   @Post('profile/change-password')
