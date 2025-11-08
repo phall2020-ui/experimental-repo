@@ -19,6 +19,7 @@ import {
   Favorite as HealthIcon,
   Person as PersonIcon,
   People as PeopleIcon,
+  LocationOn as LocationIcon,
 } from '@mui/icons-material'
 import UserRegistration from '../components/UserRegistration'
 import { useNotifications } from '../lib/notifications'
@@ -105,6 +106,21 @@ export default function App() {
                 aria-label="Manage users"
               >
                 Users
+              </Button>
+            </Tooltip>
+          )}
+          
+          {userRole === 'ADMIN' && (
+            <Tooltip title="Manage Sites">
+              <Button
+                component={Link}
+                to="/sites"
+                startIcon={<LocationIcon />}
+                size="small"
+                sx={{ display: { xs: 'none', md: 'flex' } }}
+                aria-label="Manage sites"
+              >
+                Sites
               </Button>
             </Tooltip>
           )}

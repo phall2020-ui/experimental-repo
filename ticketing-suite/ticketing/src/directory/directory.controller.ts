@@ -19,7 +19,39 @@ export class DirectoryController {
   sites(@Req() req: any) {
     return this.prisma.site.findMany({
       where: { tenantId: this.tenant(req) },
-      select: { id: true, name: true }
+      select: { id: true, name: true, location: true }
+    });
+  }
+
+  @Post('sites')
+  @Roles('ADMIN')
+  async createSite(@Req() req: any, @Body() dto: { name: string; location?: string }) {
+    return this.prisma.site.create({
+      data: {
+        tenantId: this.tenant(req),
+        name: dto.name,
+        location: dto.location
+      }
+    });
+  }
+
+  @Patch('sites/:id')
+  @Roles('ADMIN')
+  async updateSite(@Req() req: any, @Param('id') id: string, @Body() dto: { name?: string; location?: string }) {
+    return this.prisma.site.update({
+      where: { id, tenantId: this.tenant(req) },
+      data: {
+        ...(dto.name !== undefined && { name: dto.name }),
+        ...(dto.location !== undefined && { location: dto.location })
+      }
+    });
+  }
+
+  @Delete('sites/:id')
+  @Roles('ADMIN')
+  async deleteSite(@Req() req: any, @Param('id') id: string) {
+    return this.prisma.site.delete({
+      where: { id, tenantId: this.tenant(req) }
     });
   }
 

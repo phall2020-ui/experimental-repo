@@ -13,6 +13,7 @@ import TicketView from './views/TicketView'
 import Login from './views/Login'
 import HealthDashboard from './views/HealthDashboard'
 import UserProfile from './views/UserProfile'
+import SiteManagement from './views/SiteManagement'
 
 const router = createBrowserRouter([
   { path: '/login', element: <Login/> },
@@ -20,7 +21,8 @@ const router = createBrowserRouter([
     { index:true, element:<Dashboard/> },
     { path:'/tickets/:id', element:<TicketView/> },
     { path:'/health', element:<HealthDashboard/> },
-    { path:'/profile', element:<UserProfile/> }
+    { path:'/profile', element:<UserProfile/> },
+    { path:'/sites', element:<SiteManagement/> }
   ]}
 ])
 
