@@ -14,7 +14,7 @@ export class TicketsController {
   private tenant(req: any) { return req.user.tenantId; }
 
   @Post()
-  @Roles('AssetManager','OandM')
+  @Roles('ADMIN', 'USER')
   async create(@Req() req: any, @Body() body: CreateTicketDto) {
     return this.svc.create(this.tenant(req), {
       siteId: body.siteId,
@@ -29,7 +29,7 @@ export class TicketsController {
   }
 
   @Get()
-  @Roles('AssetManager','OandM','Monitoring','Contractor')
+  @Roles('ADMIN', 'USER')
   async list(@Req() req: any, @Query() q: QueryTicketDto) {
     return this.svc.list(this.tenant(req), {
       siteId: q.siteId,
@@ -45,13 +45,13 @@ export class TicketsController {
   }
 
   @Get(':id')
-  @Roles('AssetManager','OandM','Monitoring','Contractor')
+  @Roles('ADMIN', 'USER')
   async get(@Req() req: any, @Param('id') id: string) {
     return this.svc.get(this.tenant(req), id);
   }
 
   @Patch(':id')
-  @Roles('AssetManager','OandM')
+  @Roles('ADMIN', 'USER')
   async update(@Req() req: any, @Param('id') id: string, @Body() patch: UpdateTicketDto) {
     return this.svc.update(this.tenant(req), id, {
       siteId: patch.siteId,
