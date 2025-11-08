@@ -1,6 +1,6 @@
 import React from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { getTicket, updateTicket } from '../lib/api'
+import { getTicket, updateTicket, listTicketHistory, type TicketHistoryEntry } from '../lib/api'
 import { listSites, listUsers, listIssueTypes, type SiteOpt, type UserOpt, type IssueTypeOpt } from '../lib/directory'
 export default function TicketView() {
   const { id } = useParams()
@@ -11,8 +11,15 @@ export default function TicketView() {
   const [sites, setSites] = React.useState<SiteOpt[]>([])
   const [users, setUsers] = React.useState<UserOpt[]>([])
   const [types, setTypes] = React.useState<IssueTypeOpt[]>([])
+  const [history, setHistory] = React.useState<TicketHistoryEntry[]>([])
   
-  const load = async () => { if (!id) return; const data = await getTicket(id); setT(data) }
+  const load = async () => {
+    if (!id) return
+    const data = await getTicket(id)
+    setT(data)
+    const h = await listTicketHistory(id)
+    setHistory(h)
+  }
   
   React.useEffect(() => {
     load()
@@ -86,6 +93,27 @@ export default function TicketView() {
         <div className="row" style={{marginTop:16, justifyContent:'flex-end'}}>
           <button className="primary" disabled={saving} onClick={save}>{saving ? 'Saving…' : 'Save'}</button>
         </div>
+      </div>
+      <div className="panel" style={{padding:16, marginTop:12}}>
+        <div style={{fontWeight:700, marginBottom:8}}>Update history</div>
+        {history.length === 0 ? (
+          <div className="subtle">No updates yet.</div>
+        ) : (
+          <div style={{display:'grid', gap:12}}>
+            {history.map(h => (
+              <div key={h.id} className="bar" style={{display:'grid', gap:6, padding:8, background:'#f5f5f5', borderRadius:4}}>
+                <div className="subtle">
+                  {new Date(h.at).toLocaleString()} · {h.actorUserId || 'System'}
+                </div>
+                <ul style={{margin:0, paddingLeft:18}}>
+                  {Object.entries(h.changes).map(([k, v]) => (
+                    <li key={k}><strong>{k}</strong>: {String(v.from ?? '—')} → {String(v.to ?? '—')}</li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )

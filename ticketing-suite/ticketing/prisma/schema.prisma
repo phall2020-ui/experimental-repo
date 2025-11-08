@@ -18,6 +18,7 @@ model Tenant {
   attachments Attachment[]
   outboxEntries Outbox[]
   types     IssueType[]
+  ticketHistory TicketHistory[]
 }
 
 model Site {
@@ -64,6 +65,7 @@ model Ticket {
   comments        Comment[]
   attachments     Attachment[]
   outboxEntries   Outbox[]
+  history         TicketHistory[]
 
   @@index([tenantId, status, priority, createdAt])
   @@index([tenantId, siteId, createdAt])
@@ -179,4 +181,17 @@ model Outbox {
   ticket      Ticket?  @relation(fields: [ticketId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, type, occurredAt])
+}
+
+model TicketHistory {
+  id          String   @id @default(uuid())
+  tenantId    String
+  ticketId    String
+  actorUserId String?
+  at          DateTime @default(now())
+  changes     Json
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  ticket      Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, ticketId, at])
 }

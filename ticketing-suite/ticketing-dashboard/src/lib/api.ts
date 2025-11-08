@@ -19,6 +19,15 @@ export interface Ticket {
   updatedAt: string
   assignedUserId?: string | null
 }
+export type TicketHistoryEntry = {
+  id: string
+  tenantId: string
+  ticketId: string
+  actorUserId?: string | null
+  at: string
+  changes: Record<string, { from: any; to: any }>
+}
 export const listTickets = async (params?: Record<string, any>) => (await client.get<Ticket[]>('/tickets', { params })).data
 export const getTicket = async (id: string) => (await client.get<Ticket>(`/tickets/${id}`)).data
 export const updateTicket = async (id: string, patch: Partial<Ticket> & { custom_fields?: any }) => (await client.patch<Ticket>(`/tickets/${id}`, patch)).data
+export const listTicketHistory = async (id: string) => (await client.get<TicketHistoryEntry[]>(`/tickets/${id}/history`)).data

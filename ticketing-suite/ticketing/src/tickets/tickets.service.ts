@@ -9,6 +9,19 @@ type CFDefs = Record<string, {
   validation?: Record<string, unknown>;
 }>;
 
+function buildChanges(before: any | null, after: any) {
+  const fields = ['status', 'details', 'priority', 'assignedUserId', 'typeKey', 'siteId'];
+  const changes: Record<string, { from: any; to: any }> = {};
+  for (const k of fields) {
+    const fromVal = before ? before[k] : undefined;
+    const toVal = after[k];
+    if (before === null || fromVal !== toVal) {
+      changes[k] = { from: before ? (fromVal ?? null) : null, to: toVal ?? null };
+    }
+  }
+  return changes;
+}
+
 @Injectable()
 export class TicketsService {
   constructor(private readonly prisma: PrismaService) {}
@@ -75,6 +88,17 @@ export class TicketsService {
         }
       });
       await tx.outbox.create({ data: { tenantId, type: 'ticket.created', entityId: t.id, payload: {} }});
+      
+      // Record history entry for creation
+      await tx.ticketHistory.create({
+        data: {
+          tenantId,
+          ticketId: t.id,
+          actorUserId: (global as any).__actorUserId ?? null,
+          changes: buildChanges(null, t),
+        }
+      });
+      
       return t;
     });
   }
@@ -125,6 +149,10 @@ export class TicketsService {
     custom_fields: Record<string, unknown>;
   }>) {
     return this.prisma.withTenant(tenantId, async (tx) => {
+      // Fetch the current state before update
+      const before = await tx.ticket.findFirst({ where: { id, tenantId } });
+      if (!before) throw new NotFoundException();
+      
       if (patch.siteId) {
         const ok = await tx.site.findFirst({ where: { id: patch.siteId, tenantId }});
         if (!ok) throw new BadRequestException('Invalid siteId for tenant');
@@ -161,7 +189,30 @@ export class TicketsService {
         data: updateData
       });
       await tx.outbox.create({ data: { tenantId, type: 'ticket.updated', entityId: id, payload: {} }});
+      
+      // Record history entry if there are changes
+      const changes = buildChanges(before, updated);
+      if (Object.keys(changes).length > 0) {
+        await tx.ticketHistory.create({
+          data: {
+            tenantId,
+            ticketId: updated.id,
+            actorUserId: (global as any).__actorUserId ?? null,
+            changes
+          }
+        });
+      }
+      
       return updated;
     });
+  }
+
+  async history(tenantId: string, ticketId: string) {
+    return this.prisma.withTenant(tenantId, (tx) =>
+      tx.ticketHistory.findMany({
+        where: { tenantId, ticketId },
+        orderBy: { at: 'desc' }
+      })
+    );
   }
 }
