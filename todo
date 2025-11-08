@@ -1,82 +1,98 @@
-Here’s a punchy, implementation-ready upgrade list to make the Tickets UI production-grade and fully exploit the backend.
+Excellent — here’s a prompt suite you can feed into AI agents (or separate tasks for tools like Claude, GPT, Copilot, etc.) to drive targeted improvements to your Tickets frontend.
 
-Product & UX
-	•	Add ticket creation, comments, attachments, and watchers/mentions with @user autocomplete.
-	•	Provide saved views (filters + columns + sort), shareable via URL query params; add pin to dashboard.
-	•	Bulk actions: status/priority changes, assign/unassign, label management, merge/clone tickets.
-	•	SLA indicators (due/elapsed, colour badges) and workload heatmaps per assignee/team.
-	•	Notifications centre with toasts + inbox (unread/read, per-event settings).
-	•	Responsive design with mobile-first layouts; add compact density toggle and dark mode.
-	•	Inline editing with optimistic updates and undo; show conflict banners when server version changes.
-	•	Data export (CSV/JSON) for current list or saved view.
+It’s split into six logical chunks that correspond to distinct scopes of work — each chunk is self-contained and written as an AI-ready instruction.
 
-Information Architecture & Navigation
-	•	Use React Router v7 data APIs (loaders/actions/defer) for route-level fetching/mutations and state preservation across routes.
-	•	Deep-link everything (ticket, filters, pagination, sort) to make UI shareable and back/forward friendly.
-	•	Add multi-tab awareness (e.g., BroadcastChannel) to sync auth/logout and saved views.
+⸻
 
-State, Data & Real-time
-	•	Adopt TypeScript across the app; generate types from the backend (OpenAPI/TS).
-	•	Introduce React Query (TanStack Query) for caching, retries, background refetch, and prefetch on hover.
-	•	Use WebSockets/Server-Sent Events for real-time ticket updates, presence (who’s viewing/editing), and comment streams.
-	•	Pagination + virtualisation (react-window) for large ticket lists; support cursor-based pagination if backend allows.
-	•	Implement advanced filtering UI that maps to backend search/DSL (e.g., status:open AND priority>=high AND assignee:me).
-	•	Add draft persistence (localStorage) for new/edit ticket forms.
+🧩 Prompt 1: Core Feature Completion
 
-Security & Permissions
-	•	Switch to httpOnly cookies for JWT where possible; implement refresh token rotation and silent refresh.
-	•	Enforce role-based access control in UI (component guards) mirroring backend scopes; hide/disable unauthorised actions.
-	•	Input sanitisation for rich text comments; render markdown safely (DOMPurify) to prevent XSS.
-	•	Add CSRF protection if using cookies; lock down CSP headers and use Subresource Integrity for 3rd-party scripts.
+Goal: Extend the Tickets UI to use 100% of backend functionality.
 
-Performance
-	•	Code-split by route and component-level (dynamic imports); enable Vite preload and prefetch hints.
-	•	Image/asset optimisation, HTTP/2, compression; serve immutable hashed assets.
-	•	Use Memoisation (useMemo/useCallback) and transitions for filter/search interactions.
-	•	Lazy-load heavy widgets (charts, rich editor) and defer non-critical data (Router defer).
-	•	Add web vitals tracking and budget: LCP ≤ 2.5s, INP ≤ 200ms, CLS ≤ 0.1.
+Instruction:
+Improve the existing React + Vite frontend by adding all missing core ticket management features. Implement:
+	•	Ticket creation (modal + full-page view).
+	•	Comments with markdown support, @mentions, edit/delete, and live updates via WebSocket.
+	•	File attachments for tickets and comments (drag & drop + preview).
+	•	Advanced search and filtering (by status, priority, assignee, keyword, custom fields).
+	•	Bulk actions for tickets (assign/unassign, status change, label edit).
+	•	Inline editing with optimistic updates and undo/redo.
 
-Observability & Quality
-	•	Integrate Sentry (errors + performance + session replay) and OpenTelemetry browser tracing tied to request IDs.
-	•	Feature flags (e.g., with ConfigCat/LaunchDarkly or a simple env-driven flag service) for safe rollouts.
-	•	Analytics (privacy-friendly) for funnel events: login, search, filter apply, ticket update, comment post.
-	•	Audit trail UI (who changed what, when), diff view for description/fields.
+Ensure full backend API integration, graceful error handling, and form validation. Use local storage to persist unsaved drafts.
 
-Accessibility & Internationalisation
-	•	Adopt a11y-first components (MUI/Ant Design or headless UI) and meet WCAG 2.2 AA.
-	•	Keyboard navigation, focus traps, ARIA roles, skip links, and high-contrast theme.
-	•	Add i18n (i18next), date/number localisation, and RTL support; keep copy in translation files.
+⸻
 
-Design System
-	•	Standardise on Material UI (or AntD) with theme tokens (spacing, colour, typography) and component docs via Storybook.
-	•	Build composable primitives (Button, Badge, Tag, Dropdown, EmptyState, Toolbar, DataGrid) and layout grid.
-	•	Provide chart primitives (Recharts/Chart.js) for dashboard KPIs: open vs closed, SLA breaches, backlog ageing.
+🧩 Prompt 2: UX & Design System
 
-Testing
-	•	Unit tests (Vitest + RTL) for components and hooks; snapshot minimal.
-	•	E2E: Playwright/Cypress for critical flows (auth, create/edit ticket, comment, filters, bulk changes).
-	•	Contract tests against backend (Pact or OpenAPI mocks).
-	•	Visual regression (Playwright trace or Chromatic if using Storybook).
-	•	Axe/pa11y accessibility tests in CI.
+Goal: Modernise UI with consistent visual language.
 
-Delivery & DevEx
-	•	CI/CD: type checks, lint (ESLint), format (Prettier), tests, build, bundle size guard.
-	•	Environment separation with .env schemas (zod validation) and config endpoint for runtime flags.
-	•	PWA (optional): service worker for offline list viewing and retry queue for mutations when back online.
-	•	Error boundaries per route + fallback UIs; centralised toast system.
+Instruction:
+Refactor the frontend to adopt a consistent design system (Material UI or Ant Design).
+	•	Replace ad-hoc components with reusable UI primitives (Button, Input, Modal, Tag, Dropdown, DataGrid).
+	•	Apply a global theme (light/dark modes, colour tokens, spacing).
+	•	Add responsive layouts for mobile and tablet.
+	•	Include empty states, skeleton loaders, and consistent icons.
+	•	Integrate accessibility (WCAG 2.2 AA): ARIA labels, keyboard navigation, focus management, screen reader support.
+	•	Document components with Storybook.
 
-Missing Feature Implementation Outline
-	•	Ticket creation: modal + full page; fields: title, description (markdown), priority, status, assignee, labels, attachments. Optimistic create with redirect.
-	•	Comments: markdown editor with preview, paste-to-upload, emoji, @mentions; live updates via WebSocket; edit/delete with audit logs.
-	•	Advanced search: query builder + power user input; persist to URL/saved view; server-side sort, filter, paginate; quick filters (My tickets, Breaching soon).
-	•	Admin: manage users/teams, roles, custom fields, SLAs, automation rules (e.g., auto-assign by label).
+⸻
 
-Migration Path (low risk)
-	1.	Introduce TypeScript + React Query behind feature flags.
-	2.	Swap UI to the design system incrementally (start with Button/Input/DataGrid).
-	3.	Add real-time layer for comments and ticket updates.
-	4.	Roll out advanced search + saved views.
-	5.	Enable PWA/offline and notifications.
-	6.	Harden security (cookies/refresh/CSRF) and observability.
+🧩 Prompt 3: State Management & Data Layer
 
-If helpful, I can draft a lightweight RFC (routes, components, API contracts) and a 2–3 sprint implementation plan next.
+Goal: Improve data flow and performance.
+
+Instruction:
+	•	Introduce TypeScript for full type safety.
+	•	Replace manual fetch calls with React Query (TanStack Query) for caching, retries, and background refetch.
+	•	Implement WebSocket or SSE connections for real-time updates.
+	•	Optimise ticket lists using virtualisation (react-window).
+	•	Add pagination and cursor-based navigation.
+	•	Use React Router v7 data APIs (loaders/actions/defer) for data fetching and mutations.
+	•	Centralise API configuration and error handling.
+
+⸻
+
+🧩 Prompt 4: Security & Authentication
+
+Goal: Harden the app against security vulnerabilities.
+
+Instruction:
+	•	Replace token storage in localStorage with httpOnly cookies where possible.
+	•	Add refresh token rotation and silent session renewal.
+	•	Implement role-based access control (UI visibility and feature gating).
+	•	Add CSRF protection, input sanitisation, and secure markdown rendering.
+	•	Configure strict CSP and Subresource Integrity for third-party scripts.
+	•	Log out on multiple tab updates using BroadcastChannel API.
+
+⸻
+
+🧩 Prompt 5: Observability, Performance & Testing
+
+Goal: Enhance reliability and monitoring.
+
+Instruction:
+	•	Integrate Sentry (error reporting + performance tracing).
+	•	Add Web Vitals and performance budgets (LCP ≤ 2.5s, INP ≤ 200ms, CLS ≤ 0.1).
+	•	Apply code splitting and lazy loading (route-based + component-level).
+	•	Use compression, hashed static assets, and image optimisation.
+	•	Add unit tests (Vitest + RTL) and end-to-end tests (Playwright or Cypress).
+	•	Add accessibility testing (axe-core) and visual regression (Chromatic).
+	•	Set up GitHub Actions or CI pipeline for lint, build, test, and deploy.
+
+⸻
+
+🧩 Prompt 6: Dashboard, Analytics & Extras
+
+Goal: Provide management insights and user personalisation.
+
+Instruction:
+	•	Add advanced dashboard widgets: open vs closed tickets, SLA breaches, workload by user/team, trend charts.
+	•	Allow users to save custom filter views and pin them to the dashboard.
+	•	Implement notifications (toast + inbox).
+	•	Add audit trail (who changed what, when).
+	•	Optional: Add PWA support for offline viewing and background sync.
+	•	Integrate feature flags for staged rollout (e.g., ConfigCat/LaunchDarkly).
+	•	Add analytics events for key flows (login, filter, update, comment).
+
+⸻
+
+Would you like me to combine these into a master AI task file (JSON or Markdown spec) that you can drop into a multi-agent system or task runner? It would include structured task names, dependencies, and expected outputs for each phase.
