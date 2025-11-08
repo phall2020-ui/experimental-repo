@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../infra/prisma.service';
 import { S3 } from 'aws-sdk';
 import { randomUUID } from 'crypto';
@@ -19,5 +19,36 @@ import { randomUUID } from 'crypto';
   }
   async finalize(tenantId: string, attachmentId: string, size: number, checksumSha256: string) {
     return this.prisma.withTenant(tenantId, async (tx) => tx.attachment.update({ where: { id: attachmentId }, data: { sizeBytes: size, checksumSha256 } }));
+  }
+  async list(tenantId: string, ticketId: string) {
+    return this.prisma.withTenant(tenantId, async (tx) => {
+      const t = await tx.ticket.findFirst({ where: { id: ticketId, tenantId }});
+      if (!t) throw new BadRequestException('Invalid ticket');
+      const attachments = await tx.attachment.findMany({
+        where: { tenantId, ticketId },
+        select: {
+          id: true,
+          filename: true,
+          mimeType: true,
+          sizeBytes: true,
+          createdAt: true,
+          objectKey: true
+        },
+        orderBy: { createdAt: 'desc' }
+      });
+      return attachments.map((att: any) => ({
+        ...att,
+        downloadUrl: this.s3.getSignedUrl('getObject', { Bucket: this.bucket(), Key: att.objectKey, Expires: 300 })
+      }));
+    });
+  }
+  async delete(tenantId: string, ticketId: string, id: string) {
+    return this.prisma.withTenant(tenantId, async (tx) => {
+      const attachment = await tx.attachment.findFirst({ where: { id, tenantId, ticketId }});
+      if (!attachment) throw new NotFoundException('Attachment not found');
+      await this.s3.deleteObject({ Bucket: this.bucket(), Key: attachment.objectKey }).promise();
+      await tx.attachment.delete({ where: { id }});
+      return { success: true };
+    });
   }
 }
