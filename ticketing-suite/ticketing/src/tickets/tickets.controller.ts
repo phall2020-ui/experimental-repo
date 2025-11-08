@@ -46,6 +46,12 @@ export class TicketsController {
     });
   }
 
+  @Get(':id/history')
+  @Roles('ADMIN', 'USER')
+  async history(@Req() req: any, @Param('id') id: string) {
+    return this.svc.history(this.tenant(req), id);
+  }
+
   @Get(':id')
   @Roles('ADMIN', 'USER')
   async get(@Req() req: any, @Param('id') id: string) {
@@ -66,11 +72,5 @@ export class TicketsController {
       assignedUserId: patch.assignedUserId,
       custom_fields: patch.custom_fields,
     });
-  }
-
-  @Get(':id/history')
-  @Roles('ADMIN', 'USER')
-  async history(@Req() req: any, @Param('id') id: string) {
-    return this.svc.history(this.tenant(req), id);
   }
 }
