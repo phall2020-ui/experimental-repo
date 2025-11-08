@@ -39,7 +39,7 @@ import { useTickets, useUpdateTicket } from '../lib/hooks'
 import { sortTickets, loadCfg, saveCfg, type PriorityCfg } from '../lib/prioritise'
 import CreateTicket from '../components/CreateTicket'
 import AdvancedSearch from '../components/AdvancedSearch'
-import { listSites, listUsers, listIssueTypes, type SiteOpt, type UserOpt, type IssueTypeOpt } from '../lib/directory'
+import { listSites, listUsers, listIssueTypes, listFieldDefinitions, type SiteOpt, type UserOpt, type IssueTypeOpt, type FieldDefOpt } from '../lib/directory'
 import { useNotifications } from '../lib/notifications'
 import { exportToCSV, exportToJSON } from '../lib/export'
 import { UserAvatar, EmptyState, Skeleton } from '../components/ui'
@@ -165,6 +165,9 @@ export default function Dashboard() {
   const [search, setSearch] = React.useState('')
   const [dateFrom, setDateFrom] = React.useState('')
   const [dateTo, setDateTo] = React.useState('')
+  const [customFieldKey, setCustomFieldKey] = React.useState('')
+  const [customFieldValue, setCustomFieldValue] = React.useState('')
+  const [loading, setLoading] = React.useState(false)
   const [showCreate, setShowCreate] = React.useState(false)
   const [showFilters, setShowFilters] = React.useState(false)
   const [showAdvancedSearch, setShowAdvancedSearch] = React.useState(false)
@@ -172,6 +175,7 @@ export default function Dashboard() {
   const [sites, setSites] = React.useState<SiteOpt[]>([])
   const [users, setUsers] = React.useState<UserOpt[]>([])
   const [types, setTypes] = React.useState<IssueTypeOpt[]>([])
+  const [fieldDefs, setFieldDefs] = React.useState<FieldDefOpt[]>([])
   const [sortColumn, setSortColumn] = React.useState<string>('')
   const [sortDirection, setSortDirection] = React.useState<'asc' | 'desc'>('desc')
   const userId = localStorage.getItem('userId') || ''
@@ -191,8 +195,8 @@ export default function Dashboard() {
   
   // Load dropdown data
   React.useEffect(() => {
-    Promise.all([listSites(), listUsers(), listIssueTypes()]).then(([s, u, t]) => {
-      setSites(s); setUsers(u); setTypes(t)
+    Promise.all([listSites(), listUsers(), listIssueTypes(), listFieldDefinitions()]).then(([s, u, t, f]) => {
+      setSites(s); setUsers(u); setTypes(t); setFieldDefs(f)
     }).catch(e => console.error('Failed to load filters', e))
   }, [])
 
@@ -210,6 +214,8 @@ export default function Dashboard() {
         setSearch(filters.search || '')
         setDateFrom(filters.dateFrom || '')
         setDateTo(filters.dateTo || '')
+        setCustomFieldKey(filters.customFieldKey || '')
+        setCustomFieldValue(filters.customFieldValue || '')
         setPageSize(filters.pageSize || 50)
       } catch {}
     }
@@ -218,7 +224,7 @@ export default function Dashboard() {
   // Save filters to localStorage
   React.useEffect(() => {
     localStorage.setItem('dashboardFilters', JSON.stringify({
-      status, priority, type, siteId, assignedUserId, search, pageSize, dateFrom, dateTo
+      status, priority, type, siteId, assignedUserId, search, pageSize, dateFrom, dateTo, customFieldKey, customFieldValue
     }))
   }, [status, priority, type, siteId, assignedUserId, search, pageSize, dateFrom, dateTo])
 
@@ -240,6 +246,57 @@ export default function Dashboard() {
     setSearch(query)
   }
 
+  const fetchList = async (resetCursor = false) => {
+    setLoading(true)
+    try {
+      const params: any = {
+        status: status || undefined,
+        priority: priority || undefined,
+        type: type || undefined,
+        siteId: siteId || undefined,
+        assignedUserId: assignedUserId || undefined,
+        search: search || undefined,
+        limit: pageSize,
+        cursor: resetCursor ? undefined : cursor
+      }
+      // Date filters are now supported by backend
+      if (dateFrom) params.createdFrom = dateFrom
+      if (dateTo) params.createdTo = dateTo
+      // Custom field filtering
+      if (customFieldKey && customFieldValue) {
+        params.cf_key = customFieldKey
+        params.cf_val = customFieldValue
+      }
+      
+      const data = await listTickets(params)
+      if (resetCursor) {
+        setTickets(data)
+        setCursor(data.length > 0 ? data[data.length - 1].id : undefined)
+      } else {
+        setTickets(prev => [...prev, ...data])
+        setCursor(data.length > 0 ? data[data.length - 1].id : undefined)
+      }
+      setHasMore(data.length === pageSize)
+    } catch (e: any) {
+      showNotification('error', e?.message || 'Failed to load tickets')
+    } finally { setLoading(false) }
+  }
+
+  React.useEffect(() => { 
+    setCursor(undefined)
+    fetchList(true)
+    saveFilters()
+  }, [status, priority, type, siteId, assignedUserId, pageSize, customFieldKey, customFieldValue])
+  
+  React.useEffect(() => { 
+    const id = setTimeout(() => {
+      setCursor(undefined)
+      fetchList(true)
+      saveFilters()
+    }, 350)
+    return () => clearTimeout(id) 
+  }, [search])
+
   const clearFilters = () => {
     setStatus('')
     setPriority('')
@@ -249,11 +306,14 @@ export default function Dashboard() {
     setSearch('')
     setDateFrom('')
     setDateTo('')
+    setCustomFieldKey('')
+    setCustomFieldValue('')
+    setCursor(undefined)
     localStorage.removeItem('dashboardFilters')
     showNotification('info', 'Filters cleared')
   }
 
-  const activeFilters = [status, priority, type, siteId, assignedUserId, search, dateFrom, dateTo].filter(Boolean).length
+  const activeFilters = [status, priority, type, siteId, assignedUserId, search, dateFrom, dateTo, customFieldKey && customFieldValue ? 'customField' : ''].filter(Boolean).length
 
   const sortedTickets = React.useMemo(() => {
     if (!sortColumn) return sortTickets(tickets, userId || undefined, cfg)
@@ -369,109 +429,142 @@ export default function Dashboard() {
               </Tooltip>
             </Stack>
 
-            <Collapse in={showFilters}>
-              <Paper variant="outlined" sx={{ p: 2 }}>
-                <Grid container spacing={2}>
-                  <Grid item xs={12} sm={6} md={3}>
-                    <FormControl fullWidth size="small">
-                      <InputLabel>Priority</InputLabel>
-                      <Select value={priority} onChange={e => setPriority(e.target.value)} label="Priority">
-                        <MenuItem value="">All priorities</MenuItem>
-                        {['P1','P2','P3','P4'].map(p => (
-                          <MenuItem key={p} value={p}>{p}</MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-                  </Grid>
-                  
-                  <Grid item xs={12} sm={6} md={3}>
-                    <FormControl fullWidth size="small">
-                      <InputLabel>Type</InputLabel>
-                      <Select value={type} onChange={e => setType(e.target.value)} label="Type">
-                        <MenuItem value="">All types</MenuItem>
-                        {types.map(t => (
-                          <MenuItem key={t.key} value={t.key}>{t.label}</MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-                  </Grid>
-                  
-                  <Grid item xs={12} sm={6} md={3}>
-                    <FormControl fullWidth size="small">
-                      <InputLabel>Site</InputLabel>
-                      <Select value={siteId} onChange={e => setSiteId(e.target.value)} label="Site">
-                        <MenuItem value="">All sites</MenuItem>
-                        {sites.map(s => (
-                          <MenuItem key={s.id} value={s.id}>{s.name}</MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-                  </Grid>
-                  
-                  <Grid item xs={12} sm={6} md={3}>
-                    <FormControl fullWidth size="small">
-                      <InputLabel>Assigned User</InputLabel>
-                      <Select value={assignedUserId} onChange={e => setAssignedUserId(e.target.value)} label="Assigned User">
-                        <MenuItem value="">All users</MenuItem>
-                        {users.map(u => (
-                          <MenuItem key={u.id} value={u.id}>{u.name || u.email}</MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-                  </Grid>
-                  
-                  <Grid item xs={12} sm={6} md={3}>
-                    <TextField
-                      fullWidth
-                      size="small"
-                      type="date"
-                      label="Created From"
-                      value={dateFrom}
-                      onChange={e => setDateFrom(e.target.value)}
-                      InputLabelProps={{ shrink: true }}
-                    />
-                  </Grid>
-                  
-                  <Grid item xs={12} sm={6} md={3}>
-                    <TextField
-                      fullWidth
-                      size="small"
-                      type="date"
-                      label="Created To"
-                      value={dateTo}
-                      onChange={e => setDateTo(e.target.value)}
-                      InputLabelProps={{ shrink: true }}
-                    />
-                  </Grid>
-                  
-                  <Grid item xs={12} sm={6} md={3}>
-                    <Button fullWidth variant="outlined" onClick={clearFilters}>
-                      Clear All
-                    </Button>
-                  </Grid>
-                </Grid>
-                
-                {activeFilters > 0 && (
-                  <Box sx={{ mt: 2, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                    {status && (
-                      <Chip label={`Status: ${status}`} onDelete={() => setStatus('')} size="small" />
-                    )}
-                    {priority && (
-                      <Chip label={`Priority: ${priority}`} onDelete={() => setPriority('')} size="small" />
-                    )}
-                    {type && (
-                      <Chip label={`Type: ${type}`} onDelete={() => setType('')} size="small" />
-                    )}
-                    {siteId && (
-                      <Chip label={`Site: ${sites.find(s => s.id === siteId)?.name}`} onDelete={() => setSiteId('')} size="small" />
-                    )}
-                    {assignedUserId && (
-                      <Chip label={`User: ${users.find(u => u.id === assignedUserId)?.name || users.find(u => u.id === assignedUserId)?.email}`} onDelete={() => setAssignedUserId('')} size="small" />
-                    )}
-                  </Box>
-                )}
-              </Paper>
-            </Collapse>
+        {showFilters && (
+          <div style={{padding: 12, background: '#1a1a1a', borderRadius: 4, marginBottom: 12, border: '1px solid #2a2a2a'}}>
+            <div className="row" style={{marginBottom: 8, flexWrap: 'wrap', gap: 8}}>
+              <div style={{display: 'flex', flexDirection: 'column', gap: 4}}>
+                <label style={{fontSize: 12}}>Priority</label>
+                <select value={priority} onChange={e=>setPriority(e.target.value)} style={{width: 120}} aria-label="Filter by priority">
+                  <option value="">All priorities</option>
+                  {['P1','P2','P3','P4'].map(p => <option key={p} value={p}>{p}</option>)}
+                </select>
+              </div>
+              <div style={{display: 'flex', flexDirection: 'column', gap: 4}}>
+                <label style={{fontSize: 12}}>Type</label>
+                <select value={type} onChange={e=>setType(e.target.value)} style={{width: 150}} aria-label="Filter by type">
+                  <option value="">All types</option>
+                  {types.map(t => <option key={t.key} value={t.key}>{t.label}</option>)}
+                </select>
+              </div>
+              <div style={{display: 'flex', flexDirection: 'column', gap: 4}}>
+                <label style={{fontSize: 12}}>Site</label>
+                <select value={siteId} onChange={e=>setSiteId(e.target.value)} style={{width: 150}} aria-label="Filter by site">
+                  <option value="">All sites</option>
+                  {sites.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              </div>
+              <div style={{display: 'flex', flexDirection: 'column', gap: 4}}>
+                <label style={{fontSize: 12}}>Assigned User</label>
+                <select value={assignedUserId} onChange={e=>setAssignedUserId(e.target.value)} style={{width: 180}} aria-label="Filter by assigned user">
+                  <option value="">All users</option>
+                  {users.map(u => <option key={u.id} value={u.id}>{u.name || u.email}</option>)}
+                </select>
+              </div>
+              <div style={{display: 'flex', flexDirection: 'column', gap: 4}}>
+                <label style={{fontSize: 12}}>Created From</label>
+                <input 
+                  type="date" 
+                  value={dateFrom} 
+                  onChange={e=>setDateFrom(e.target.value)} 
+                  style={{width: 150}}
+                  aria-label="Filter by created date from"
+                />
+              </div>
+              <div style={{display: 'flex', flexDirection: 'column', gap: 4}}>
+                <label style={{fontSize: 12}}>Created To</label>
+                <input 
+                  type="date" 
+                  value={dateTo} 
+                  onChange={e=>setDateTo(e.target.value)} 
+                  style={{width: 150}}
+                  aria-label="Filter by created date to"
+                />
+              </div>
+              {fieldDefs.length > 0 && (
+                <>
+                  <div style={{display: 'flex', flexDirection: 'column', gap: 4}}>
+                    <label style={{fontSize: 12}}>Custom Field</label>
+                    <select 
+                      value={customFieldKey} 
+                      onChange={e => {
+                        setCustomFieldKey(e.target.value)
+                        setCustomFieldValue('')
+                      }} 
+                      style={{width: 150}} 
+                      aria-label="Select custom field"
+                    >
+                      <option value="">No custom field filter</option>
+                      {fieldDefs.map(f => <option key={f.key} value={f.key}>{f.label}</option>)}
+                    </select>
+                  </div>
+                  {customFieldKey && (
+                    <div style={{display: 'flex', flexDirection: 'column', gap: 4}}>
+                      <label style={{fontSize: 12}}>
+                        {fieldDefs.find(f => f.key === customFieldKey)?.label || 'Value'}
+                      </label>
+                      {(() => {
+                        const field = fieldDefs.find(f => f.key === customFieldKey)
+                        if (field?.datatype === 'enum' && field.enumOptions) {
+                          return (
+                            <select 
+                              value={customFieldValue} 
+                              onChange={e => setCustomFieldValue(e.target.value)}
+                              style={{width: 150}}
+                              aria-label="Custom field value"
+                            >
+                              <option value="">Select value...</option>
+                              {field.enumOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                            </select>
+                          )
+                        } else if (field?.datatype === 'boolean') {
+                          return (
+                            <select 
+                              value={customFieldValue} 
+                              onChange={e => setCustomFieldValue(e.target.value)}
+                              style={{width: 150}}
+                              aria-label="Custom field value"
+                            >
+                              <option value="">Select value...</option>
+                              <option value="true">True</option>
+                              <option value="false">False</option>
+                            </select>
+                          )
+                        } else {
+                          return (
+                            <input 
+                              type={field?.datatype === 'number' ? 'number' : field?.datatype === 'date' ? 'date' : 'text'}
+                              value={customFieldValue}
+                              onChange={e => setCustomFieldValue(e.target.value)}
+                              style={{width: 150}}
+                              placeholder="Enter value..."
+                              aria-label="Custom field value"
+                            />
+                          )
+                        }
+                      })()}
+                    </div>
+                  )}
+                </>
+              )}
+              <div style={{display: 'flex', alignItems: 'flex-end'}}>
+                <button onClick={clearFilters} style={{height: 32}} aria-label="Clear all filters">Clear All</button>
+              </div>
+            </div>
+            {activeFilters > 0 && (
+              <div style={{marginTop: 8, display: 'flex', gap: 4, flexWrap: 'wrap'}}>
+                {status && <span className="chip" style={{fontSize: 11}}>Status: {status} <button onClick={() => setStatus('')} style={{marginLeft: 4, background: 'none', border: 'none', color: 'inherit', cursor: 'pointer'}} aria-label={`Remove status filter ${status}`}>×</button></span>}
+                {priority && <span className="chip" style={{fontSize: 11}}>Priority: {priority} <button onClick={() => setPriority('')} style={{marginLeft: 4, background: 'none', border: 'none', color: 'inherit', cursor: 'pointer'}} aria-label={`Remove priority filter ${priority}`}>×</button></span>}
+                {type && <span className="chip" style={{fontSize: 11}}>Type: {type} <button onClick={() => setType('')} style={{marginLeft: 4, background: 'none', border: 'none', color: 'inherit', cursor: 'pointer'}} aria-label={`Remove type filter ${type}`}>×</button></span>}
+                {siteId && <span className="chip" style={{fontSize: 11}}>Site: {sites.find(s => s.id === siteId)?.name} <button onClick={() => setSiteId('')} style={{marginLeft: 4, background: 'none', border: 'none', color: 'inherit', cursor: 'pointer'}} aria-label={`Remove site filter`}>×</button></span>}
+                {assignedUserId && <span className="chip" style={{fontSize: 11}}>Assigned: {users.find(u => u.id === assignedUserId)?.name || users.find(u => u.id === assignedUserId)?.email} <button onClick={() => setAssignedUserId('')} style={{marginLeft: 4, background: 'none', border: 'none', color: 'inherit', cursor: 'pointer'}} aria-label={`Remove assigned user filter`}>×</button></span>}
+                {dateFrom && <span className="chip" style={{fontSize: 11}}>From: {dateFrom} <button onClick={() => setDateFrom('')} style={{marginLeft: 4, background: 'none', border: 'none', color: 'inherit', cursor: 'pointer'}} aria-label={`Remove date from filter`}>×</button></span>}
+                {dateTo && <span className="chip" style={{fontSize: 11}}>To: {dateTo} <button onClick={() => setDateTo('')} style={{marginLeft: 4, background: 'none', border: 'none', color: 'inherit', cursor: 'pointer'}} aria-label={`Remove date to filter`}>×</button></span>}
+                {customFieldKey && customFieldValue && <span className="chip" style={{fontSize: 11}}>{fieldDefs.find(f => f.key === customFieldKey)?.label || customFieldKey}: {customFieldValue} <button onClick={() => { setCustomFieldKey(''); setCustomFieldValue('') }} style={{marginLeft: 4, background: 'none', border: 'none', color: 'inherit', cursor: 'pointer'}} aria-label="Remove custom field filter">×</button></span>}
+                {search && <span className="chip" style={{fontSize: 11}}>Search: "{search}" <button onClick={() => setSearch('')} style={{marginLeft: 4, background: 'none', border: 'none', color: 'inherit', cursor: 'pointer'}} aria-label="Remove search filter">×</button></span>}
+              </div>
+            )}
+          </div>
+        )}
 
             <Typography variant="body2" color="text.secondary">
               Showing {sortedTickets.length} ticket{sortedTickets.length !== 1 ? 's' : ''}

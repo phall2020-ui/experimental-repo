@@ -105,7 +105,8 @@ export class TicketsService {
 
   async list(tenantId: string, q: {
     siteId?: string; status?: TicketStatus; priority?: TicketPriority; type?: string;
-    search?: string; cf_key?: string; cf_val?: string; limit?: number; cursor?: string;
+    search?: string; cf_key?: string; cf_val?: string; assignedUserId?: string;
+    createdFrom?: string; createdTo?: string; limit?: number; cursor?: string;
   }) {
     return this.prisma.withTenant(tenantId, async (tx) => {
       const where: Prisma.TicketWhereInput = { tenantId };
@@ -113,6 +114,7 @@ export class TicketsService {
       if (q.status) where.status = q.status;
       if (q.priority) where.priority = q.priority;
       if (q.type) where.typeKey = q.type;
+      if (q.assignedUserId) where.assignedUserId = q.assignedUserId;
       if (q.search) {
         where.OR = [
           { description: { contains: q.search, mode: 'insensitive' } },
@@ -123,6 +125,12 @@ export class TicketsService {
       if (q.cf_key && q.cf_val) {
         // @ts-ignore Prisma JSON filter
         where.AND = [{ customFields: { path: [q.cf_key], equals: q.cf_val } }];
+      }
+      // Date range filtering
+      if (q.createdFrom || q.createdTo) {
+        where.createdAt = {};
+        if (q.createdFrom) where.createdAt.gte = new Date(q.createdFrom);
+        if (q.createdTo) where.createdAt.lte = new Date(q.createdTo);
       }
       const take = Math.min(Number(q.limit ?? 50), 200);
       const feed = await tx.ticket.findMany({

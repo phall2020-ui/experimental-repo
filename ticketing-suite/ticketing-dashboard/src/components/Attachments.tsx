@@ -1,5 +1,5 @@
 import React from 'react'
-import { presignAttachment, finalizeAttachment, type PresignResponse } from '../lib/api'
+import { presignAttachment, finalizeAttachment, listAttachments, type Attachment, type PresignResponse } from '../lib/api'
 
 interface AttachmentsProps {
   ticketId: string
@@ -15,7 +15,28 @@ interface FileUpload {
 
 export default function Attachments({ ticketId }: AttachmentsProps) {
   const [uploads, setUploads] = React.useState<FileUpload[]>([])
+  const [attachments, setAttachments] = React.useState<Attachment[]>([])
   const [error, setError] = React.useState<string | null>(null)
+  const [loading, setLoading] = React.useState(false)
+
+  // Load existing attachments
+  React.useEffect(() => {
+    loadAttachments()
+  }, [ticketId])
+
+  const loadAttachments = async () => {
+    setLoading(true)
+    try {
+      const data = await listAttachments(ticketId)
+      setAttachments(data)
+      setError(null)
+    } catch (e: any) {
+      console.error('Failed to load attachments:', e)
+      setError(e?.message || 'Failed to load attachments')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const calculateChecksum = async (file: File): Promise<string> => {
     const buffer = await file.arrayBuffer()
@@ -69,6 +90,9 @@ export default function Attachments({ ticketId }: AttachmentsProps) {
               setUploads(prev => prev.map(u => 
                 u.file === file ? { ...u, status: 'success', progress: 100 } : u
               ))
+              
+              // Reload attachments list
+              await loadAttachments()
               resolve()
             } catch (e: any) {
               setUploads(prev => prev.map(u => 
@@ -165,71 +189,130 @@ export default function Attachments({ ticketId }: AttachmentsProps) {
         </div>
       </div>
 
-      {uploads.length > 0 && (
-        <div style={{ display: 'grid', gap: 8 }}>
-          {uploads.map((upload, idx) => (
-            <div
-              key={idx}
-              style={{
-                padding: 12,
-                background: '#0e141c',
-                borderRadius: 8,
-                border: '1px solid #1c2532'
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <div>
-                  <div style={{ fontWeight: 600 }}>{upload.file.name}</div>
-                  <div className="muted" style={{ fontSize: 12 }}>
-                    {formatFileSize(upload.file.size)}
-                  </div>
-                </div>
-                <div style={{ fontSize: 12 }}>
-                  {upload.status === 'uploading' && (
-                    <span className="muted">Uploading... {Math.round(upload.progress)}%</span>
-                  )}
-                  {upload.status === 'success' && (
-                    <span style={{ color: '#2ecc71' }}>✓ Uploaded</span>
-                  )}
-                  {upload.status === 'error' && (
-                    <span style={{ color: '#e74c3c' }}>✗ Error</span>
-                  )}
-                  {upload.status === 'pending' && (
-                    <span className="muted">Pending...</span>
-                  )}
-                </div>
-              </div>
-              
-              {upload.status === 'uploading' && (
-                <div style={{
-                  width: '100%',
-                  height: 4,
-                  background: '#1c2532',
-                  borderRadius: 2,
-                  overflow: 'hidden'
-                }}>
-                  <div style={{
-                    width: `${upload.progress}%`,
-                    height: '100%',
-                    background: '#5b9cff',
-                    transition: 'width 0.3s'
-                  }} />
-                </div>
-              )}
-              
-              {upload.error && (
-                <div style={{ color: '#ffb3b3', fontSize: 12, marginTop: 4 }}>
-                  {upload.error}
-                </div>
-              )}
-            </div>
-          ))}
+      {/* Existing attachments */}
+      {loading && attachments.length === 0 && (
+        <div className="muted" style={{ fontSize: 13, marginBottom: 12 }}>
+          Loading attachments...
         </div>
       )}
 
-      {uploads.length === 0 && (
+      {attachments.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8 }}>
+            Existing Files ({attachments.length})
+          </div>
+          <div style={{ display: 'grid', gap: 8 }}>
+            {attachments.map((att) => (
+              <div
+                key={att.id}
+                style={{
+                  padding: 12,
+                  background: '#0e141c',
+                  borderRadius: 8,
+                  border: '1px solid #1c2532',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}
+              >
+                <div>
+                  <div style={{ fontWeight: 600 }}>{att.filename}</div>
+                  <div className="muted" style={{ fontSize: 12 }}>
+                    {formatFileSize(att.sizeBytes)} • {new Date(att.createdAt).toLocaleString()}
+                  </div>
+                </div>
+                <a
+                  href={att.downloadUrl}
+                  download={att.filename}
+                  style={{
+                    padding: '6px 12px',
+                    background: '#5b9cff',
+                    color: '#fff',
+                    borderRadius: 4,
+                    textDecoration: 'none',
+                    fontSize: 12,
+                    fontWeight: 600
+                  }}
+                >
+                  ⬇ Download
+                </a>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Upload progress */}
+      {uploads.length > 0 && (
+        <div>
+          <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8 }}>
+            Uploads in Progress
+          </div>
+          <div style={{ display: 'grid', gap: 8 }}>
+            {uploads.map((upload, idx) => (
+              <div
+                key={idx}
+                style={{
+                  padding: 12,
+                  background: '#0e141c',
+                  borderRadius: 8,
+                  border: '1px solid #1c2532'
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <div>
+                    <div style={{ fontWeight: 600 }}>{upload.file.name}</div>
+                    <div className="muted" style={{ fontSize: 12 }}>
+                      {formatFileSize(upload.file.size)}
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 12 }}>
+                    {upload.status === 'uploading' && (
+                      <span className="muted">Uploading... {Math.round(upload.progress)}%</span>
+                    )}
+                    {upload.status === 'success' && (
+                      <span style={{ color: '#2ecc71' }}>✓ Uploaded</span>
+                    )}
+                    {upload.status === 'error' && (
+                      <span style={{ color: '#e74c3c' }}>✗ Error</span>
+                    )}
+                    {upload.status === 'pending' && (
+                      <span className="muted">Pending...</span>
+                    )}
+                  </div>
+                </div>
+                
+                {upload.status === 'uploading' && (
+                  <div style={{
+                    width: '100%',
+                    height: 4,
+                    background: '#1c2532',
+                    borderRadius: 2,
+                    overflow: 'hidden'
+                  }}>
+                    <div style={{
+                      width: `${upload.progress}%`,
+                      height: '100%',
+                      background: '#5b9cff',
+                      transition: 'width 0.3s'
+                    }} />
+                  </div>
+                )}
+                
+                {upload.error && (
+                  <div style={{ color: '#ffb3b3', fontSize: 12, marginTop: 4 }}>
+                    {upload.error}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {!loading && attachments.length === 0 && uploads.length === 0 && (
         <div className="muted" style={{ fontSize: 13 }}>
-          No attachments uploaded yet. Click "Upload Files" to add attachments.
+          No attachments yet. Click "Upload Files" to add attachments.
         </div>
       )}
     </div>
