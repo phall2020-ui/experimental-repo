@@ -41,4 +41,3 @@ EXPOSE 3000
 CMD sh -c "npx prisma migrate deploy && PORT=${PORT:-3000} HOST=0.0.0.0 node dist/src/main.js"
 
 
-
