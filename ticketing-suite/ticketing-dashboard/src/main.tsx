@@ -19,10 +19,11 @@ const router = createBrowserRouter([
   { path: '/login', element: <Login/> },
   { path:'/', element:<App/>, children:[
     { index:true, element:<Dashboard/> },
-    { path:'/tickets/:id', element:<TicketView/> },
-    { path:'/health', element:<HealthDashboard/> },
-    { path:'/profile', element:<UserProfile/> },
-    { path:'/sites', element:<SiteManagement/> }
+    { path:'tickets/:id', element:<TicketView/> },
+    { path:'health', element:<HealthDashboard/> },
+    { path:'profile', element:<UserProfile/> },
+    { path:'sites', element:<SiteManagement/> },
+    { path:'*', element:<Dashboard/> } // Catch-all route
   ]}
 ])
 

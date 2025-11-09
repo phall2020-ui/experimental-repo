@@ -1,5 +1,20 @@
 import React from 'react'
-import { listUsers, updateUser, deleteUser, resetUserPassword, type UserOpt } from '../lib/directory'
+import {
+  Box,
+  Button,
+  Alert,
+  Stack,
+  TextField,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Divider,
+  Typography,
+} from '@mui/material'
+import { updateUser, deleteUser, resetUserPassword, type UserOpt } from '../lib/directory'
+import { useUsers } from '../hooks/useDirectory'
+import { Modal } from './common/Modal'
 import axios from 'axios'
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3000'
@@ -19,7 +34,6 @@ export default function UserRegistration({ onClose, onSuccess }: UserRegistratio
   const { data: users = [], refetch: refetchUsers } = useUsers()
   const [loading, setLoading] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
-  const [users, setUsers] = React.useState<UserOpt[]>([])
   const [editingId, setEditingId] = React.useState<string | null>(null)
   const [editData, setEditData] = React.useState<{ name: string; email: string; role: 'USER' | 'ADMIN' }>({ name: '', email: '', role: 'USER' })
   const [formData, setFormData] = React.useState({
@@ -79,7 +93,7 @@ export default function UserRegistration({ onClose, onSuccess }: UserRegistratio
     try {
       await updateUser(userId, editData)
       setEditingId(null)
-      await loadUsers()
+      refetchUsers()
       onSuccess?.()
     } catch (e: any) {
       setError(e?.response?.data?.message || e?.message || 'Failed to update user')
@@ -91,7 +105,7 @@ export default function UserRegistration({ onClose, onSuccess }: UserRegistratio
 
     try {
       await deleteUser(userId)
-      await loadUsers()
+      refetchUsers()
       onSuccess?.()
     } catch (e: any) {
       setError(e?.response?.data?.message || e?.message || 'Failed to delete user')

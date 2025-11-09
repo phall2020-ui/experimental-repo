@@ -1,13 +1,34 @@
 import React from 'react'
-import { listComments, addComment, updateComment, deleteComment, type Comment } from '../lib/api'
+import {
+  Card,
+  CardContent,
+  Typography,
+  Alert,
+  Box,
+  TextField,
+  FormControl,
+  FormLabel,
+  RadioGroup,
+  FormControlLabel,
+  Radio,
+  Button,
+  CircularProgress,
+} from '@mui/material'
+import { Send as SendIcon } from '@mui/icons-material'
+import { useQueryClient } from '@tanstack/react-query'
+import { updateComment, deleteComment, type Comment } from '../lib/api'
+import { useComments, useAddComment } from '../hooks/useTickets'
+import { useNotifications } from '../lib/notifications'
 
 interface CommentsProps {
   ticketId: string
 }
 
 export default function Comments({ ticketId }: CommentsProps) {
+  const queryClient = useQueryClient()
   const { data: comments = [], isLoading, error } = useComments(ticketId)
   const addCommentMutation = useAddComment(ticketId)
+  const { showNotification } = useNotifications()
   
   const [newComment, setNewComment] = React.useState('')
   const [visibility, setVisibility] = React.useState<'PUBLIC' | 'INTERNAL'>('INTERNAL')
@@ -44,9 +65,10 @@ export default function Comments({ ticketId }: CommentsProps) {
       await updateComment(ticketId, commentId, editText.trim())
       setEditingId(null)
       setEditText('')
-      await loadComments()
+      queryClient.invalidateQueries({ queryKey: ['comments', ticketId] })
+      showNotification('success', 'Comment updated')
     } catch (e: any) {
-      setError(e?.response?.data?.message || e?.message || 'Failed to update comment')
+      showNotification('error', e?.response?.data?.message || e?.message || 'Failed to update comment')
     }
   }
 
@@ -55,9 +77,10 @@ export default function Comments({ ticketId }: CommentsProps) {
 
     try {
       await deleteComment(ticketId, commentId)
-      await loadComments()
+      queryClient.invalidateQueries({ queryKey: ['comments', ticketId] })
+      showNotification('success', 'Comment deleted')
     } catch (e: any) {
-      setError(e?.response?.data?.message || e?.message || 'Failed to delete comment')
+      showNotification('error', e?.response?.data?.message || e?.message || 'Failed to delete comment')
     }
   }
 
@@ -74,7 +97,7 @@ export default function Comments({ ticketId }: CommentsProps) {
           </Alert>
         )}
 
-      {loading ? (
+      {isLoading ? (
         <div className="muted">Loading comments...</div>
       ) : comments.length === 0 ? (
         <div className="muted">No comments yet.</div>
