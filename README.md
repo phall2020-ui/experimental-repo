@@ -16,18 +16,31 @@ The system consists of three main components:
 
 ## Features
 
+### Core Functionality
 - 🏢 **Multi-tenancy**: Isolated data and operations per tenant
 - 🎫 **Ticket Management**: Full CRUD operations with status tracking and priority levels
 - 👥 **User Assignment**: Assign tickets to team members
-- 💬 **Comments**: Public and internal comments with attachment support
-- 📎 **Attachments**: S3-backed file storage with metadata tracking
-- 🔍 **Advanced Search**: OpenSearch-powered full-text search
-- 🏗️ **Custom Fields**: Flexible field definitions per tenant
+- 💬 **Comments**: Public and internal comments with edit/delete capabilities
+- 📎 **Attachments**: S3-backed file storage with upload, download, and delete operations
+- 🔍 **Advanced Search**: OpenSearch-powered full-text search with date range filtering
+- 🏗️ **Custom Fields**: Flexible field definitions per tenant with filtering support
 - 🏢 **Site Management**: Organize tickets by locations/sites
 - 🔐 **Authentication**: JWT-based authentication with Passport
 - 📊 **Health Checks**: Built-in health monitoring endpoints
 - 🚦 **Rate Limiting**: Protection against abuse
 - 📈 **Observability**: OpenTelemetry instrumentation
+
+### Admin Features
+- 👤 **User Management**: Create, update, delete users and reset passwords (admin only)
+- 🏷️ **Issue Type Management**: Create, edit, and deactivate issue types (admin only)
+- ⚙️ **Field Definition Management**: Create, update, and delete custom field definitions (admin only)
+
+### Filtering & Search
+- Filter tickets by status, priority, type, site, assigned user
+- Date range filtering (created date)
+- Custom field filtering (one field at a time)
+- Full-text search across descriptions, details, and types
+- Save and restore filter preferences
 
 ## Technology Stack
 
