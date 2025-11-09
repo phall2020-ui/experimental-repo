@@ -29,19 +29,19 @@ export class UsersController {
   @Patch(':id')
   @Roles('ADMIN')
   async update(@Req() req: any, @Param('id') id: string, @Body() body: { name?: string; email?: string; role?: 'USER' | 'ADMIN' }) {
-    return this.svc.updateUser(id, req.user.tenantId, body);
+    return this.svc.updateUser(id, body);
   }
 
   @Delete(':id')
   @Roles('ADMIN')
   async delete(@Req() req: any, @Param('id') id: string) {
-    return this.svc.deleteUser(id, req.user.tenantId);
+    return this.svc.deleteUser(id);
   }
 
   @Post(':id/reset-password')
   @Roles('ADMIN')
   async resetPassword(@Req() req: any, @Param('id') id: string, @Body() body: { password: string }) {
-    return this.svc.resetPassword(id, req.user.tenantId, body.password);
+    return this.svc.resetPassword(id, body.password);
   }
 
   @Patch('profile')
