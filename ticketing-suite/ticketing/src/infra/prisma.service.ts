@@ -8,8 +8,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
 
   async withTenant<T>(tenantId: string, fn: (tx: any) => Promise<T>): Promise<T> {
     return this.$transaction(async (tx) => {
-      const sanitized = tenantId.replace(/'/g, "''");
-      await tx.$executeRawUnsafe(`SELECT set_config('app.tenant_id', '${sanitized}', true)`);
+      await tx.$executeRaw`SELECT set_config('app.tenant_id', ${tenantId}, true)`;
       return fn(tx);
     });
   }
