@@ -1,26 +1,20 @@
-import { NestFactory, Reflector } from '@nestjs/core';
+import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { ValidationPipe } from '@nestjs/common';
-import helmet from 'helmet';
-import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
-import { ThrottlerGuard } from '@nestjs/throttler';
-import './otel';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  app.enableCors({ origin: true });
-  app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
-  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
-  // ThrottlerGuard is now applied via APP_GUARD provider in module
 
-  const config = new DocumentBuilder()
-    .setTitle('Ticketing API')
-    .setVersion('1.0')
-    .addBearerAuth()
-    .build();
-  const doc = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('docs', app, doc);
+  // ✅ Enable CORS for frontend access
+  const origins = process.env.CORS_ORIGIN
+    ? process.env.CORS_ORIGIN.split(',').map((s) => s.trim())
+    : ['*'];
+  app.enableCors({ origin: origins, credentials: true });
 
-  await app.listen(process.env.PORT || 3000);
+  // ✅ Listen on Railway's injected port (or 3000 locally)
+  const port = Number(process.env.PORT) || 3000;
+  await app.listen(port, '0.0.0.0');
+
+  console.log(`✅ Server listening on http://0.0.0.0:${port}`);
 }
+
 bootstrap();
