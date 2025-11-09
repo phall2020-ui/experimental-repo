@@ -1,12 +1,22 @@
 import React from 'react'
-import { listTickets, type Ticket } from '../lib/api'
+import { listTickets, updateTicket, type Ticket } from '../lib/api'
 import { sortTickets, loadCfg, saveCfg, type PriorityCfg } from '../lib/prioritise'
 import { Link, useNavigate } from 'react-router-dom'
 import CreateTicket from '../components/CreateTicket'
 import AdvancedSearch from '../components/AdvancedSearch'
+import SavedViews from '../components/SavedViews'
+import BulkOperations from '../components/BulkOperations'
+import TicketQuickView from '../components/TicketQuickView'
+import TicketTemplates from '../components/TicketTemplates'
+import KeyboardShortcutsHelp from '../components/KeyboardShortcutsHelp'
+import { PriorityBadge } from '../components/ui/PriorityBadge'
+import { EmptyState } from '../components/ui/EmptyState'
 import { listSites, listUsers, listIssueTypes, listFieldDefinitions, type SiteOpt, type UserOpt, type IssueTypeOpt, type FieldDefOpt } from '../lib/directory'
 import { useNotifications } from '../lib/notifications'
 import { exportToCSV, exportToJSON } from '../lib/export'
+import { useKeyboardShortcuts, SHORTCUT_CATEGORIES, type KeyboardShortcut } from '../hooks/useKeyboardShortcuts'
+import { useSavedViews, type SavedView } from '../hooks/useSavedViews'
+import { useTicketTemplates } from '../hooks/useTicketTemplates'
 
 const StatusFilter: React.FC<{value:string,onChange:(v:string)=>void}> = ({value,onChange}) => (
   <select value={value} onChange={e=>onChange(e.target.value)}>
@@ -45,7 +55,10 @@ const TicketRow: React.FC<{
   ticket: Ticket
   users: UserOpt[]
   onUpdate: () => void
-}> = ({ ticket, users, onUpdate }) => {
+  isSelected?: boolean
+  onToggleSelect?: () => void
+  onQuickView?: () => void
+}> = ({ ticket, users, onUpdate, isSelected = false, onToggleSelect, onQuickView }) => {
   const [quickSaving, setQuickSaving] = React.useState(false)
   const { showNotification } = useNotifications()
   const assignedUser = users.find(u => u.id === ticket.assignedUserId)
@@ -68,7 +81,17 @@ const TicketRow: React.FC<{
   const isDueSoon = ticket.dueAt && !isOverdue && (new Date(ticket.dueAt).getTime() - Date.now()) < 24 * 60 * 60 * 1000
   
   return (
-    <tr>
+    <tr style={{ backgroundColor: isSelected ? 'rgba(25, 118, 210, 0.08)' : undefined }}>
+      {onToggleSelect && (
+        <td style={{ width: 40 }}>
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={onToggleSelect}
+            aria-label={`Select ticket ${ticket.id}`}
+          />
+        </td>
+      )}
       <td>
         <select 
           value={ticket.priority} 
@@ -125,7 +148,18 @@ const TicketRow: React.FC<{
         </div>
       </td>
       <td>{new Date(ticket.createdAt).toLocaleString()}</td>
-      <td><Link to={`/tickets/${ticket.id}`} aria-label={`Open ticket ${ticket.id}`}>Open →</Link></td>
+      <td>
+        {onQuickView && (
+          <button 
+            onClick={onQuickView} 
+            style={{ marginRight: 8, fontSize: 11, padding: '2px 6px' }}
+            aria-label={`Quick view ticket ${ticket.id}`}
+          >
+            👁️ View
+          </button>
+        )}
+        <Link to={`/tickets/${ticket.id}`} aria-label={`Open ticket ${ticket.id}`}>Open →</Link>
+      </td>
     </tr>
   )
 }
@@ -158,6 +192,12 @@ export default function Dashboard() {
   const [sortDirection, setSortDirection] = React.useState<'asc' | 'desc'>('desc')
   const userId = localStorage.getItem('userId') || ''
   const [cfg, setCfg] = React.useState<PriorityCfg>(() => loadCfg(userId || 'default'))
+  
+  // Phase 1 & 2 Features
+  const [selectedTicketIds, setSelectedTicketIds] = React.useState<Set<string>>(new Set())
+  const [quickViewTicketId, setQuickViewTicketId] = React.useState<string | null>(null)
+  const [showTemplates, setShowTemplates] = React.useState(false)
+  const [showShortcutsHelp, setShowShortcutsHelp] = React.useState(false)
   
   // Load dropdown data
   React.useEffect(() => {
@@ -326,6 +366,146 @@ export default function Dashboard() {
     return { byStatus, byPriority, total: sortedTickets.length }
   }, [sortedTickets])
 
+  // Phase 1 & 2 Feature Handlers
+  const handleToggleSelect = (ticketId: string) => {
+    setSelectedTicketIds(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(ticketId)) {
+        newSet.delete(ticketId)
+      } else {
+        newSet.add(ticketId)
+      }
+      return newSet
+    })
+  }
+
+  const handleSelectAll = () => {
+    if (selectedTicketIds.size === sortedTickets.length) {
+      setSelectedTicketIds(new Set())
+    } else {
+      setSelectedTicketIds(new Set(sortedTickets.map(t => t.id)))
+    }
+  }
+
+  const handleBulkUpdate = async (updates: any) => {
+    const selectedTickets = sortedTickets.filter(t => selectedTicketIds.has(t.id))
+    const promises = selectedTickets.map(ticket => updateTicket(ticket.id, updates))
+    
+    try {
+      await Promise.all(promises)
+      showNotification('success', `Updated ${selectedTickets.length} tickets`)
+      setSelectedTicketIds(new Set())
+      fetchList(true)
+    } catch (error: any) {
+      throw new Error(error?.message || 'Failed to update tickets')
+    }
+  }
+
+  const handleQuickView = (ticketId: string) => {
+    setQuickViewTicketId(ticketId)
+  }
+
+  const handleQuickViewNavigate = (direction: 'prev' | 'next') => {
+    if (!quickViewTicketId) return
+    const currentIndex = sortedTickets.findIndex(t => t.id === quickViewTicketId)
+    if (currentIndex === -1) return
+    
+    const newIndex = direction === 'prev' ? currentIndex - 1 : currentIndex + 1
+    if (newIndex >= 0 && newIndex < sortedTickets.length) {
+      setQuickViewTicketId(sortedTickets[newIndex].id)
+    }
+  }
+
+  const handleApplyView = (view: SavedView) => {
+    const filters = view.filters
+    setStatus(filters.status || '')
+    setPriority(filters.priority || '')
+    setType(filters.type || '')
+    setSiteId(filters.siteId || '')
+    
+    // Handle special markers
+    if (filters.assignedUserId === 'current-user') {
+      setAssignedUserId(userId)
+    } else if (filters.assignedUserId === 'unassigned') {
+      setAssignedUserId('')
+    } else {
+      setAssignedUserId(filters.assignedUserId || '')
+    }
+    
+    setSearch(filters.search || '')
+    setDateFrom(filters.dateFrom || '')
+    setDateTo(filters.dateTo || '')
+    setCustomFieldFilters(filters.customFieldFilters || {})
+    
+    if (view.sortColumn) {
+      setSortColumn(view.sortColumn)
+      setSortDirection(view.sortDirection || 'desc')
+    }
+    
+    showNotification('info', `Applied view: ${view.name}`)
+  }
+
+  const handleApplyTemplate = (template: any) => {
+    // This will be handled by CreateTicket component
+    setShowTemplates(false)
+    setShowCreate(true)
+  }
+
+  // Keyboard Shortcuts
+  const shortcuts: KeyboardShortcut[] = [
+    {
+      key: 'c',
+      description: 'Create new ticket',
+      action: () => setShowCreate(true),
+      category: SHORTCUT_CATEGORIES.ACTIONS
+    },
+    {
+      key: '/',
+      description: 'Focus search',
+      action: () => document.querySelector<HTMLInputElement>('input[placeholder*="Search"]')?.focus(),
+      category: SHORTCUT_CATEGORIES.NAVIGATION
+    },
+    {
+      key: '?',
+      description: 'Show keyboard shortcuts',
+      action: () => setShowShortcutsHelp(true),
+      category: SHORTCUT_CATEGORIES.GENERAL
+    },
+    {
+      key: 'r',
+      description: 'Refresh tickets',
+      action: () => fetchList(true),
+      category: SHORTCUT_CATEGORIES.ACTIONS
+    },
+    {
+      key: 'Escape',
+      description: 'Clear selection / Close dialogs',
+      action: () => {
+        setSelectedTicketIds(new Set())
+        setQuickViewTicketId(null)
+      },
+      category: SHORTCUT_CATEGORIES.GENERAL
+    },
+    {
+      key: 'a',
+      ctrl: true,
+      description: 'Select all tickets',
+      action: () => handleSelectAll(),
+      category: SHORTCUT_CATEGORIES.ACTIONS
+    },
+    {
+      key: 't',
+      description: 'Open templates',
+      action: () => setShowTemplates(true),
+      category: SHORTCUT_CATEGORIES.ACTIONS
+    }
+  ]
+
+  useKeyboardShortcuts(shortcuts)
+
+  const selectedTickets = sortedTickets.filter(t => selectedTicketIds.has(t.id))
+  const quickViewIndex = quickViewTicketId ? sortedTickets.findIndex(t => t.id === quickViewTicketId) : -1
+
   return (
     <div className="grid">
       <div className="panel">
@@ -356,6 +536,19 @@ export default function Dashboard() {
           <button onClick={() => handleExport('json')} aria-label="Export to JSON">📥 JSON</button>
           <button className="primary" onClick={() => setShowCreate(true)}>+ Create Ticket</button>
           <button onClick={() => fetchList(true)} aria-label="Refresh tickets">Refresh</button>
+          <button onClick={() => setShowTemplates(true)} aria-label="Open templates">📋 Templates</button>
+          <button onClick={() => setShowShortcutsHelp(true)} aria-label="Show keyboard shortcuts" title="Press ? for shortcuts">⌨️</button>
+        </div>
+
+        {/* Saved Views */}
+        <div style={{marginBottom: 12}}>
+          <SavedViews
+            currentFilters={{
+              status, priority, type, siteId, assignedUserId, search,
+              dateFrom, dateTo, customFieldFilters
+            }}
+            onApplyView={handleApplyView}
+          />
         </div>
 
         {showFilters && (
@@ -509,6 +702,14 @@ export default function Dashboard() {
         <table>
           <thead>
             <tr>
+              <th style={{width: 40}}>
+                <input
+                  type="checkbox"
+                  checked={selectedTicketIds.size > 0 && selectedTicketIds.size === sortedTickets.length}
+                  onChange={handleSelectAll}
+                  aria-label="Select all tickets"
+                />
+              </th>
               <th style={{cursor: 'pointer'}} onClick={() => handleSort('priority')}>
                 Priority <SortIcon col="priority" />
               </th>
@@ -531,10 +732,38 @@ export default function Dashboard() {
             </tr>
           </thead>
           <tbody>
-            {loading && sortedTickets.length === 0 ? <tr><td colSpan={7}>Loading…</td></tr>
-            : sortedTickets.length === 0 ? <tr><td colSpan={7}>No tickets found.</td></tr>
+            {loading && sortedTickets.length === 0 ? <tr><td colSpan={8}>Loading…</td></tr>
+            : sortedTickets.length === 0 ? (
+              <tr><td colSpan={8}>
+                <EmptyState
+                  icon="filter"
+                  title="No tickets found"
+                  description={activeFilters > 0 ? "No tickets match your current filters." : "No tickets have been created yet."}
+                  action={activeFilters > 0 ? {
+                    label: "Clear Filters",
+                    onClick: clearFilters
+                  } : {
+                    label: "Create First Ticket",
+                    onClick: () => setShowCreate(true)
+                  }}
+                  suggestions={activeFilters > 0 ? [
+                    "Try adjusting your filter criteria",
+                    "Clear some filters to see more results",
+                    "Check if the date range is too narrow"
+                  ] : undefined}
+                />
+              </td></tr>
+            )
             : sortedTickets.map(t => (
-                <TicketRow key={t.id} ticket={t} users={users} onUpdate={() => fetchList(true)} />
+                <TicketRow 
+                  key={t.id} 
+                  ticket={t} 
+                  users={users} 
+                  onUpdate={() => fetchList(true)}
+                  isSelected={selectedTicketIds.has(t.id)}
+                  onToggleSelect={() => handleToggleSelect(t.id)}
+                  onQuickView={() => handleQuickView(t.id)}
+                />
               ))}
           </tbody>
         </table>
@@ -633,6 +862,42 @@ export default function Dashboard() {
           initialQuery={search}
         />
       )}
+
+      {/* Phase 1 & 2 Features */}
+      <BulkOperations
+        selectedTickets={selectedTickets}
+        onClearSelection={() => setSelectedTicketIds(new Set())}
+        onBulkUpdate={handleBulkUpdate}
+        users={users}
+      />
+
+      <TicketQuickView
+        ticketId={quickViewTicketId}
+        open={!!quickViewTicketId}
+        onClose={() => setQuickViewTicketId(null)}
+        onNavigate={handleQuickViewNavigate}
+        canNavigate={{
+          prev: quickViewIndex > 0,
+          next: quickViewIndex < sortedTickets.length - 1
+        }}
+        users={users}
+        sites={sites}
+        types={types}
+      />
+
+      {showTemplates && (
+        <TicketTemplates
+          open={showTemplates}
+          onClose={() => setShowTemplates(false)}
+          onSelectTemplate={handleApplyTemplate}
+        />
+      )}
+
+      <KeyboardShortcutsHelp
+        open={showShortcutsHelp}
+        onClose={() => setShowShortcutsHelp(false)}
+        shortcuts={shortcuts}
+      />
     </div>
   )
 }
