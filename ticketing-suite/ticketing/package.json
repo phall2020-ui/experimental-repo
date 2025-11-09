@@ -12,6 +12,7 @@
     "prisma:deploy": "prisma migrate deploy",
     "prisma:generate": "prisma generate",
     "seed": "ts-node prisma/seed.ts",
+    "seed:test": "ts-node prisma/seed-test-data.ts",
     "test": "jest",
     "test:e2e": "jest --config jest.e2e.config.js --runInBand"
   },

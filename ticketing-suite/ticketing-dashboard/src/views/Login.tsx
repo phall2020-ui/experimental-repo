@@ -38,34 +38,58 @@ export default function Login() {
   }
 
   return (
-    <Container maxWidth="sm">
-      <Box
-        sx={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          minHeight: '100vh',
-          py: 4,
-        }}
-      >
+    <Box
+      sx={{
+        minHeight: '100vh',
+        display: 'flex',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        position: 'relative',
+        '&::before': {
+          content: '""',
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'radial-gradient(circle at 20% 50%, rgba(255, 255, 255, 0.1) 0%, transparent 50%)',
+        },
+      }}
+    >
+      <Container maxWidth="sm" sx={{ display: 'flex', alignItems: 'center', position: 'relative', zIndex: 1 }}>
         <Paper
           elevation={0}
-          variant="outlined"
           sx={{
-            p: 4,
+            p: 5,
             width: '100%',
-            maxWidth: 400,
+            maxWidth: 440,
+            borderRadius: 3,
+            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
+            background: 'rgba(255, 255, 255, 0.98)',
+            backdropFilter: 'blur(10px)',
           }}
         >
           <Stack spacing={3}>
             <Box sx={{ textAlign: 'center' }}>
-              <LoginIcon sx={{ fontSize: 48, color: 'primary.main', mb: 2 }} />
-              <Typography variant="h4" component="h1" gutterBottom>
-                Login
+              <Box
+                sx={{
+                  width: 64,
+                  height: 64,
+                  borderRadius: 2,
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  margin: '0 auto 24px',
+                  boxShadow: '0 8px 16px rgba(102, 126, 234, 0.4)',
+                }}
+              >
+                <LoginIcon sx={{ fontSize: 32, color: '#fff' }} />
+              </Box>
+              <Typography variant="h4" component="h1" gutterBottom sx={{ fontWeight: 700, color: '#1A1A1A' }}>
+                Welcome Back
               </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Sign in to access the ticketing dashboard
+              <Typography variant="body1" color="text.secondary">
+                Sign in to access your ticketing dashboard
               </Typography>
             </Box>
 
@@ -112,15 +136,24 @@ export default function Login() {
                   size="large"
                   fullWidth
                   disabled={loading}
-                  sx={{ mt: 2 }}
+                  sx={{
+                    mt: 2,
+                    py: 1.5,
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    fontSize: '1rem',
+                    fontWeight: 600,
+                    '&:hover': {
+                      background: 'linear-gradient(135deg, #5568d3 0%, #6a3f8f 100%)',
+                    },
+                  }}
                 >
-                  {loading ? 'Logging in...' : 'Login'}
+                  {loading ? 'Signing in...' : 'Sign In'}
                 </Button>
               </Stack>
             </form>
           </Stack>
         </Paper>
-      </Box>
-    </Container>
+      </Container>
+    </Box>
   )
 }
