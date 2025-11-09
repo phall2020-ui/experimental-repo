@@ -38,6 +38,14 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=5 \
 EXPOSE 3000
 
 # ✅ Run migrations, then start the server on the injected port
-CMD sh -c "npx prisma migrate deploy && node dist/src/main.js"
+CMD sh -c '\
+  echo "🔧 Starting container. PORT=${PORT} NODE_ENV=${NODE_ENV}"; \
+  echo "Checking for dist/main.js"; \
+  [ -f dist/main.js ] || { echo "❌ dist/main.js not found (did build fail?)"; ls -R . | head -100; exit 1; }; \
+  echo "✅ Build artifact present"; \
+  npx prisma migrate deploy; \
+  echo "🚀 Launching app..."; \
+  node dist/main.js \
+'
 
 

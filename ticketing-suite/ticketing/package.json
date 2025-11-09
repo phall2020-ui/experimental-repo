@@ -10,6 +10,7 @@
     "check:env": "node scripts/check-env.js",
     "build": "nest build",
     "start": "node dist/main.js",
+    "start:prod": "node dist/main.js",
     "prisma:dev": "prisma migrate dev --preview-feature",
     "prisma:deploy": "prisma migrate deploy",
     "prisma:generate": "prisma generate",
