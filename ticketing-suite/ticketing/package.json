@@ -6,6 +6,8 @@
   "license": "MIT",
   "scripts": {
     "dev": "nest start --watch",
+    "dev:neon": "node scripts/check-env.js && nest start --watch",
+    "check:env": "node scripts/check-env.js",
     "build": "nest build",
     "start": "node dist/main.js",
     "prisma:dev": "prisma migrate dev --preview-feature",

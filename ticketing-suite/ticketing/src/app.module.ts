@@ -7,6 +7,7 @@ import { CommentsModule } from './comments/comments.module';
 import { AttachmentsModule } from './attachments/attachments.module';
 import { HealthModule } from './health/health.module';
 import { DirectoryModule } from './directory/directory.module';
+import { FeaturesModule } from './features/features.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { DirectoryModule } from './directory/directory.module';
     AttachmentsModule,
     HealthModule,
     DirectoryModule,
+    FeaturesModule,
   ],
   providers: [PrismaService],
 })
