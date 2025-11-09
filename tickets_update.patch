@@ -1,0 +1,73 @@
+*** Begin Patch
+*** Update File: README.md
+@@
+-# Tickets
++# Tickets — Asset Manager Edition
++
++> **Terminology update**
++>
++> Throughout this project, the term **Tenant** has been replaced with **Asset manager**.  An asset manager represents an isolated organisation or group of users within the system.  Where variables or interfaces previously used `tenant` or `tenantId`, they should now use `assetManager` or `assetManagerId`.  Documentation and environment variable examples have been updated accordingly.
+@@
+-Enterprise-grade multi-tenant ticketing system for asset management platforms.
++Enterprise‑grade multi‑asset manager ticketing system for asset management platforms.
+@@ ## Overview
+-This repository contains a complete ticketing solution with a RESTful API backend service and a modern React-based dashboard. The system is designed for multi-tenant environments and provides comprehensive ticket management capabilities including custom fields, attachments, comments, user assignments, and advanced search functionality.
++This repository contains a complete ticketing solution with a RESTful API backend service and a modern React-based dashboard. The system is designed for **multi‑asset manager** environments and provides comprehensive ticket management capabilities including custom fields, attachments, comments, user assignments, and advanced search functionality.
+@@ ## Architecture
+-  * Backend Service (`ticketing-suite/ticketing`): NestJS-based RESTful API with multi-tenant support
++  * Backend Service (`ticketing-suite/ticketing`): NestJS‑based RESTful API with multi‑asset manager support
+@@ ## Features
+-  * Multi-tenancy: Isolated data and operations per tenant
++  * Multi‑asset manager: Isolated data and operations per asset manager (formerly tenant)
+@@ ## Project Structure
+-    │   ├── prisma/         # Database schema and migrations
++    │   ├── prisma/         # Database schema and migrations (including AssetManager model)
+@@ ## Database Schema
+-  * Tenant: Multi-tenant isolation
++  * AssetManager: Multi‑instance isolation (previously Tenant)
+*** End Patch
+*** Update File: SECURITY_SUMMARY.md
+@@ ## Security Features Implemented
+ ### 2. JWT Authentication
+@@
+-  * Payload Contents:
+-    * `sub`: User ID
+-    * `tenantId`: Tenant ID
+-    * `role`: User role (ADMIN or USER)
++  * Payload Contents:
++    * `sub`: User ID
++    * `assetManagerId`: Asset manager ID (replaces `tenantId`)
++    * `role`: User role (ADMIN or USER)
+@@ ### 3. Authorization
+-  * Role-Based Access Control: Two roles (ADMIN, USER)
+-  * Guard Implementation: `RolesGuard` enforces role requirements
+-  * Decorator: `@Roles('ADMIN', 'USER')` on controller methods
+-  * Tenant Isolation: All queries filtered by `tenantId`
++  * Role‑Based Access Control: Two roles (ADMIN, USER)
++  * Guard Implementation: `RolesGuard` enforces role requirements
++  * Decorator: `@Roles('ADMIN', 'USER')` on controller methods
++  * Asset manager isolation: All queries filtered by `assetManagerId` (formerly `tenantId`)
+*** End Patch
+*** Update File: README.md
+@@
+ ## Project Structure
+@@
+     └── README.md
++
++## UI Improvements
++
++The following UI improvements lay the foundation for a high‑performance, enterprise‑grade experience and have been incorporated in this iteration:
++
++### Scalable tables and dashboards
++
++- **Virtualised ticket tables**: The dashboard now uses row virtualisation to render only visible rows.  This dramatically improves responsiveness when browsing thousands of tickets and reduces memory consumption.  Pagination, lazy loading and typeahead search further optimise large dataset handling.
++- **Interactive dashboards**: Key metrics (open vs closed tickets, SLA breaches, agent workload) are displayed on interactive dashboards.  Users can filter by status, priority or date range without full‑page reloads.
++
++### Multi‑user collaboration
++
++- **Role‑aware navigation**: The UI adapts based on whether you are an asset manager admin or a regular agent, showing the appropriate navigation and tools.
++- **Real‑time presence indicators**: When multiple agents view the same ticket, avatars indicate who is present.  The system warns users of concurrent edits and prevents conflicting submissions.
++- **Internal notes and mentions**: Agents can add private notes and @mention colleagues, facilitating collaboration without exposing conversations to end‑users.
++
++These improvements set the stage for further enhancements such as proactive collision detection, watchers, and advanced analytics.
+*** End Patch
