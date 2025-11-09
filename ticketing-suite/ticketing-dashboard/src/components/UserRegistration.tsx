@@ -16,6 +16,7 @@ interface UserRegistrationProps {
 }
 
 export default function UserRegistration({ onClose, onSuccess }: UserRegistrationProps) {
+  const { data: users = [], refetch: refetchUsers } = useUsers()
   const [loading, setLoading] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
   const [users, setUsers] = React.useState<UserOpt[]>([])
@@ -26,11 +27,10 @@ export default function UserRegistration({ onClose, onSuccess }: UserRegistratio
     password: '',
     name: '',
     role: 'USER' as 'USER' | 'ADMIN',
-    tenantId: '' // This should come from the current user's tenant
+    tenantId: ''
   })
 
   React.useEffect(() => {
-    loadUsers()
     // Try to get tenantId from JWT token (if available)
     const token = localStorage.getItem('token')
     if (token) {
@@ -42,15 +42,6 @@ export default function UserRegistration({ onClose, onSuccess }: UserRegistratio
       } catch {}
     }
   }, [])
-
-  const loadUsers = async () => {
-    try {
-      const data = await listUsers()
-      setUsers(data)
-    } catch (e) {
-      console.error('Failed to load users', e)
-    }
-  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -70,7 +61,7 @@ export default function UserRegistration({ onClose, onSuccess }: UserRegistratio
         tenantId: formData.tenantId
       })
       onSuccess?.()
-      loadUsers()
+      refetchUsers()
       setFormData({ email: '', password: '', name: '', role: 'USER', tenantId: formData.tenantId })
     } catch (e: any) {
       setError(e?.response?.data?.message || e?.message || 'Failed to register user')
@@ -124,103 +115,107 @@ export default function UserRegistration({ onClose, onSuccess }: UserRegistratio
   }
 
   return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      background: 'rgba(0, 0, 0, 0.7)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 1000
-    }}>
-      <div className="panel" style={{ maxWidth: 600, width: '90%', maxHeight: '90vh', overflow: 'auto' }}>
-        <div className="row" style={{ justifyContent: 'space-between', marginBottom: 16 }}>
-          <div className="h1">Register New User (Admin Only)</div>
-          <button onClick={onClose}>✕</button>
-        </div>
-
+    <Modal
+      open={true}
+      onClose={onClose}
+      title="Register New User (Admin Only)"
+      maxWidth="md"
+      actions={
+        <>
+          <Button onClick={onClose} disabled={loading}>
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            form="user-registration-form"
+            variant="contained"
+            disabled={loading}
+          >
+            {loading ? 'Registering...' : 'Register User'}
+          </Button>
+        </>
+      }
+    >
+      <Box>
         {error && (
-          <div style={{ color: '#ffb3b3', marginBottom: 12, padding: 8, background: '#2a1a1a', borderRadius: 4 }}>
+          <Alert severity="error" sx={{ mb: 2 }}>
             {error}
-          </div>
+          </Alert>
         )}
 
-        <form onSubmit={handleSubmit}>
-          <div className="row" style={{ marginTop: 12 }}>
-            <label style={{ width: 150 }}>Email *</label>
-            <input
+        <Box component="form" id="user-registration-form" onSubmit={handleSubmit}>
+          <Stack spacing={2}>
+            <TextField
+              fullWidth
+              required
               type="email"
-              style={{ flex: 1 }}
+              size="small"
+              label="Email"
               value={formData.email}
               onChange={e => setFormData({ ...formData, email: e.target.value })}
-              required
               placeholder="user@example.com"
+              inputProps={{ 'aria-label': 'Email' }}
             />
-          </div>
 
-          <div className="row" style={{ marginTop: 12 }}>
-            <label style={{ width: 150 }}>Password *</label>
-            <input
+            <TextField
+              fullWidth
+              required
               type="password"
-              style={{ flex: 1 }}
+              size="small"
+              label="Password"
               value={formData.password}
               onChange={e => setFormData({ ...formData, password: e.target.value })}
-              required
               placeholder="Minimum 6 characters"
-              minLength={6}
+              inputProps={{ minLength: 6, 'aria-label': 'Password' }}
             />
-          </div>
 
-          <div className="row" style={{ marginTop: 12 }}>
-            <label style={{ width: 150 }}>Name *</label>
-            <input
-              style={{ flex: 1 }}
+            <TextField
+              fullWidth
+              required
+              size="small"
+              label="Name"
               value={formData.name}
               onChange={e => setFormData({ ...formData, name: e.target.value })}
-              required
               placeholder="Full name"
+              inputProps={{ 'aria-label': 'Name' }}
             />
-          </div>
 
-          <div className="row" style={{ marginTop: 12 }}>
-            <label style={{ width: 150 }}>Role *</label>
-            <select
-              value={formData.role}
-              onChange={e => setFormData({ ...formData, role: e.target.value as 'USER' | 'ADMIN' })}
-              style={{ flex: 1 }}
-            >
-              <option value="USER">USER</option>
-              <option value="ADMIN">ADMIN</option>
-            </select>
-          </div>
+            <FormControl fullWidth size="small" required>
+              <InputLabel id="role-label">Role</InputLabel>
+              <Select
+                labelId="role-label"
+                value={formData.role}
+                onChange={e => setFormData({ ...formData, role: e.target.value as 'USER' | 'ADMIN' })}
+                label="Role"
+                aria-label="Role"
+              >
+                <MenuItem value="USER">USER</MenuItem>
+                <MenuItem value="ADMIN">ADMIN</MenuItem>
+              </Select>
+            </FormControl>
 
-          {formData.tenantId && (
-            <div className="row" style={{ marginTop: 12 }}>
-              <label style={{ width: 150 }}>Tenant ID</label>
-              <input
-                style={{ flex: 1 }}
+            {formData.tenantId && (
+              <TextField
+                fullWidth
+                size="small"
+                label="Tenant ID"
                 value={formData.tenantId}
                 onChange={e => setFormData({ ...formData, tenantId: e.target.value })}
                 placeholder="Tenant ID (auto-filled from token)"
+                inputProps={{ 'aria-label': 'Tenant ID' }}
               />
-            </div>
-          )}
+            )}
+          </Stack>
+        </Box>
 
-          <div className="row" style={{ marginTop: 20, justifyContent: 'flex-end', gap: 8 }}>
-            <button type="button" onClick={onClose} disabled={loading}>Cancel</button>
-            <button type="submit" className="primary" disabled={loading}>
-              {loading ? 'Registering...' : 'Register User'}
-            </button>
-          </div>
-        </form>
+        <Divider sx={{ my: 3 }} />
 
-        <div style={{ marginTop: 24, paddingTop: 16, borderTop: '1px solid #1c2532' }}>
-          <div className="h2" style={{ marginBottom: 12 }}>Existing Users</div>
+        <Box>
+          <Typography variant="h6" gutterBottom>
+            Existing Users
+          </Typography>
           {users.length === 0 ? (
-            <div className="muted">No users found.</div>
+            <Typography color="text.secondary">No users found.</Typography>
           ) : (
             <table style={{ width: '100%', fontSize: 14 }}>
               <thead>
@@ -291,9 +286,8 @@ export default function UserRegistration({ onClose, onSuccess }: UserRegistratio
               </tbody>
             </table>
           )}
-        </div>
-      </div>
-    </div>
+        </Box>
+      </Box>
+    </Modal>
   )
 }
-

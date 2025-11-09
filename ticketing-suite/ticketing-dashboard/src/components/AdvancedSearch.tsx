@@ -1,4 +1,14 @@
 import React from 'react'
+import {
+  Box,
+  TextField,
+  Button,
+  Typography,
+  Chip,
+  Stack,
+} from '@mui/material'
+import SearchIcon from '@mui/icons-material/Search'
+import { Modal } from './common'
 import { useNotifications } from '../lib/notifications'
 
 interface AdvancedSearchProps {
@@ -35,79 +45,65 @@ export default function AdvancedSearch({ isOpen, onClose, onSearch, initialQuery
     setQuery(item)
   }
 
-  if (!isOpen) return null
-
   return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      background: 'rgba(0, 0, 0, 0.7)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 1000
-    }}>
-      <div className="panel" style={{ maxWidth: 700, width: '90%', maxHeight: '90vh', overflow: 'auto' }}>
-        <div className="row" style={{ justifyContent: 'space-between', marginBottom: 16 }}>
-          <div className="h1">Advanced Search</div>
-          <button onClick={onClose}>✕</button>
-        </div>
-
-        <div style={{ marginBottom: 16 }}>
-          <label style={{ display: 'block', marginBottom: 8, fontWeight: 600 }}>Search Query</label>
-          <input
-            type="text"
-            value={query}
-            onChange={e => setQuery(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleSearch()}
-            placeholder="Search tickets by description, details, type..."
-            style={{ width: '100%', padding: 12, fontSize: 16 }}
-            autoFocus
-          />
-        </div>
+    <Modal
+      open={isOpen}
+      onClose={onClose}
+      title="Advanced Search"
+      maxWidth="md"
+      actions={
+        <Button
+          variant="contained"
+          onClick={handleSearch}
+          startIcon={<SearchIcon />}
+        >
+          Search
+        </Button>
+      }
+    >
+      <Box>
+        <TextField
+          fullWidth
+          value={query}
+          onChange={e => setQuery(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && handleSearch()}
+          placeholder="Search tickets by description, details, type..."
+          autoFocus
+          inputProps={{
+            'aria-label': 'Search query',
+          }}
+        />
 
         {searchHistory.length > 0 && (
-          <div style={{ marginBottom: 16 }}>
-            <label style={{ display: 'block', marginBottom: 8, fontWeight: 600 }}>Recent Searches</label>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          <Box sx={{ mt: 3 }}>
+            <Typography variant="subtitle2" gutterBottom fontWeight={600}>
+              Recent Searches
+            </Typography>
+            <Stack direction="row" flexWrap="wrap" gap={1}>
               {searchHistory.map((item, idx) => (
-                <button
+                <Chip
                   key={idx}
+                  label={item}
                   onClick={() => useHistoryItem(item)}
-                  style={{
-                    padding: '6px 12px',
-                    background: '#0e141c',
-                    border: '1px solid #1c2532',
-                    borderRadius: 6,
-                    fontSize: 12,
-                    cursor: 'pointer'
-                  }}
-                >
-                  {item}
-                </button>
+                  size="small"
+                />
               ))}
-            </div>
-          </div>
+            </Stack>
+          </Box>
         )}
 
-        <div style={{ marginBottom: 16, padding: 12, background: '#0e141c', borderRadius: 8, fontSize: 13 }}>
-          <div style={{ fontWeight: 600, marginBottom: 8 }}>Search Tips:</div>
-          <ul style={{ margin: 0, paddingLeft: 20, color: '#999' }}>
+        <Box sx={{ mt: 3, p: 2, bgcolor: 'background.default', borderRadius: 1 }}>
+          <Typography variant="subtitle2" gutterBottom fontWeight={600}>
+            Search Tips:
+          </Typography>
+          <Box component="ul" sx={{ m: 0, pl: 2.5, color: 'text.secondary', '& li': { mb: 0.5 } }}>
             <li>Search across ticket descriptions, details, and types</li>
             <li>Use multiple words to narrow results</li>
-            <li>Combine with filters in the dashboard for precise results</li>
-          </ul>
-        </div>
-
-        <div className="row" style={{ justifyContent: 'flex-end', gap: 8 }}>
-          <button onClick={onClose}>Cancel</button>
-          <button className="primary" onClick={handleSearch}>Search</button>
-        </div>
-      </div>
-    </div>
+            <li>Search is case-insensitive</li>
+            <li>Results update in real-time as you type</li>
+          </Box>
+        </Box>
+      </Box>
+    </Modal>
   )
 }
-

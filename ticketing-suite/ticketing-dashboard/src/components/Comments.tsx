@@ -6,47 +6,24 @@ interface CommentsProps {
 }
 
 export default function Comments({ ticketId }: CommentsProps) {
-  const [comments, setComments] = React.useState<Comment[]>([])
-  const [loading, setLoading] = React.useState(false)
-  const [submitting, setSubmitting] = React.useState(false)
-  const [error, setError] = React.useState<string | null>(null)
+  const { data: comments = [], isLoading, error } = useComments(ticketId)
+  const addCommentMutation = useAddComment(ticketId)
+  
   const [newComment, setNewComment] = React.useState('')
   const [visibility, setVisibility] = React.useState<'PUBLIC' | 'INTERNAL'>('INTERNAL')
   const [editingId, setEditingId] = React.useState<string | null>(null)
   const [editText, setEditText] = React.useState('')
 
-  const loadComments = async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const data = await listComments(ticketId)
-      setComments(data)
-    } catch (e: any) {
-      setError(e?.message || 'Failed to load comments')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  React.useEffect(() => {
-    loadComments()
-  }, [ticketId])
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!newComment.trim()) return
 
-    setSubmitting(true)
-    setError(null)
     try {
-      await addComment(ticketId, newComment.trim(), visibility)
+      await addCommentMutation.mutateAsync({ body: newComment.trim(), visibility })
       setNewComment('')
       setVisibility('INTERNAL')
-      await loadComments()
-    } catch (e: any) {
-      setError(e?.response?.data?.message || e?.message || 'Failed to add comment')
-    } finally {
-      setSubmitting(false)
+    } catch (error) {
+      console.error('Failed to add comment:', error)
     }
   }
 
@@ -85,14 +62,17 @@ export default function Comments({ ticketId }: CommentsProps) {
   }
 
   return (
-    <div className="panel" style={{ marginTop: 12 }}>
-      <div style={{ fontWeight: 700, marginBottom: 12 }}>Comments ({comments.length})</div>
-      
-      {error && (
-        <div style={{ color: '#ffb3b3', marginBottom: 12, padding: 8, background: '#2a1a1a', borderRadius: 4 }}>
-          {error}
-        </div>
-      )}
+    <Card sx={{ mt: 2 }}>
+      <CardContent>
+        <Typography variant="h6" gutterBottom>
+          Comments ({comments.length})
+        </Typography>
+        
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error instanceof Error ? error.message : 'Failed to load comments'}
+          </Alert>
+        )}
 
       {loading ? (
         <div className="muted">Loading comments...</div>
@@ -168,34 +148,56 @@ export default function Comments({ ticketId }: CommentsProps) {
         </div>
       )}
 
-      <form onSubmit={handleSubmit}>
-        <div style={{ marginBottom: 8 }}>
-          <textarea
+        <Box component="form" onSubmit={handleSubmit}>
+          <TextField
+            fullWidth
+            multiline
+            rows={3}
             value={newComment}
-            onChange={e => setNewComment(e.target.value)}
+            onChange={(e) => setNewComment(e.target.value)}
             placeholder="Add a comment..."
-            style={{ width: '100%', minHeight: 80, marginBottom: 8 }}
-            disabled={submitting}
+            disabled={addCommentMutation.isPending}
+            sx={{ mb: 2 }}
+            inputProps={{
+              'aria-label': 'Comment text',
+            }}
           />
-        </div>
-        <div className="row" style={{ justifyContent: 'space-between' }}>
-          <div className="row">
-            <label style={{ marginRight: 8, fontSize: 13 }}>Visibility:</label>
-            <select
+          
+          <FormControl component="fieldset" sx={{ mb: 2 }}>
+            <FormLabel component="legend">Visibility</FormLabel>
+            <RadioGroup
+              row
               value={visibility}
-              onChange={e => setVisibility(e.target.value as 'PUBLIC' | 'INTERNAL')}
-              style={{ width: 120 }}
+              onChange={(e) => setVisibility(e.target.value as 'PUBLIC' | 'INTERNAL')}
+              aria-label="Comment visibility"
             >
-              <option value="INTERNAL">Internal</option>
-              <option value="PUBLIC">Public</option>
-            </select>
-          </div>
-          <button type="submit" className="primary" disabled={submitting || !newComment.trim()}>
-            {submitting ? 'Adding...' : 'Add Comment'}
-          </button>
-        </div>
-      </form>
-    </div>
+              <FormControlLabel
+                value="INTERNAL"
+                control={<Radio />}
+                label="Internal"
+                disabled={addCommentMutation.isPending}
+              />
+              <FormControlLabel
+                value="PUBLIC"
+                control={<Radio />}
+                label="Public"
+                disabled={addCommentMutation.isPending}
+              />
+            </RadioGroup>
+          </FormControl>
+          
+          <Button
+            type="submit"
+            variant="contained"
+            disabled={!newComment.trim() || addCommentMutation.isPending}
+            startIcon={addCommentMutation.isPending ? <CircularProgress size={20} /> : <SendIcon />}
+            fullWidth
+          >
+            {addCommentMutation.isPending ? 'Adding Comment...' : 'Add Comment'}
+          </Button>
+        </Box>
+      </CardContent>
+    </Card>
   )
 }
 
