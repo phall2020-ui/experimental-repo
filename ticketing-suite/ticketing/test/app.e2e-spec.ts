@@ -177,7 +177,7 @@ describe('Ticketing System E2E Tests', () => {
           type: 'TEST_TYPE',
           description: 'Test ticket description',
           status: 'NEW',
-          priority: 'MEDIUM',
+          priority: 'P2',
           details: 'Test ticket details',
           assignedUserId: testUserId,
           custom_fields: { testField: 'testValue' },
@@ -187,7 +187,7 @@ describe('Ticketing System E2E Tests', () => {
           expect(res.body).toHaveProperty('id');
           expect(res.body.description).toBe('Test ticket description');
           expect(res.body.status).toBe('NEW');
-          expect(res.body.priority).toBe('MEDIUM');
+          expect(res.body.priority).toBe('P2');
           testTicketId = res.body.id;
         });
     });
@@ -218,15 +218,15 @@ describe('Ticketing System E2E Tests', () => {
         });
     });
 
-    it('GET /tickets?priority=MEDIUM - should filter tickets by priority', () => {
+    it('GET /tickets?priority=P2 - should filter tickets by priority', () => {
       return request(app.getHttpServer())
-        .get('/tickets?priority=MEDIUM')
+        .get('/tickets?priority=P2')
         .set('Authorization', `Bearer ${authToken}`)
         .expect(200)
         .expect((res) => {
           expect(Array.isArray(res.body)).toBe(true);
           if (res.body.length > 0) {
-            expect(res.body[0].priority).toBe('MEDIUM');
+            expect(res.body[0].priority).toBe('P2');
           }
         });
     });
@@ -261,14 +261,14 @@ describe('Ticketing System E2E Tests', () => {
         .send({
           description: 'Updated test ticket description',
           status: 'IN_PROGRESS',
-          priority: 'HIGH',
+          priority: 'P1',
         })
         .expect(200)
         .expect((res) => {
           expect(res.body.id).toBe(testTicketId);
           expect(res.body.description).toBe('Updated test ticket description');
           expect(res.body.status).toBe('IN_PROGRESS');
-          expect(res.body.priority).toBe('HIGH');
+          expect(res.body.priority).toBe('P1');
         });
     });
 
@@ -290,7 +290,7 @@ describe('Ticketing System E2E Tests', () => {
           type: 'TEST_TYPE',
           description: 'Test ticket',
           status: 'NEW',
-          priority: 'MEDIUM',
+          priority: 'P2',
         })
         .expect(401);
     });
@@ -815,7 +815,7 @@ describe('Ticketing System E2E Tests', () => {
           type: 'TEST_TYPE',
           description: 'Lifecycle test ticket',
           status: 'NEW',
-          priority: 'HIGH',
+          priority: 'P1',
           details: 'Testing complete lifecycle',
         })
         .expect(201);
