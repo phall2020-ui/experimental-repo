@@ -4,7 +4,7 @@ import { sortTickets, loadCfg, saveCfg, type PriorityCfg } from '../lib/prioriti
 import { Link, useNavigate } from 'react-router-dom'
 import CreateTicket from '../components/CreateTicket'
 import AdvancedSearch from '../components/AdvancedSearch'
-import { listSites, listUsers, listIssueTypes, type SiteOpt, type UserOpt, type IssueTypeOpt } from '../lib/directory'
+import { listSites, listUsers, listIssueTypes, listFieldDefinitions, type SiteOpt, type UserOpt, type IssueTypeOpt, type FieldDefOpt } from '../lib/directory'
 import { useNotifications } from '../lib/notifications'
 import { exportToCSV, exportToJSON } from '../lib/export'
 
@@ -152,6 +152,8 @@ export default function Dashboard() {
   const [sites, setSites] = React.useState<SiteOpt[]>([])
   const [users, setUsers] = React.useState<UserOpt[]>([])
   const [types, setTypes] = React.useState<IssueTypeOpt[]>([])
+  const [fieldDefs, setFieldDefs] = React.useState<FieldDefOpt[]>([])
+  const [customFieldFilters, setCustomFieldFilters] = React.useState<Record<string, string>>({})
   const [sortColumn, setSortColumn] = React.useState<string>('')
   const [sortDirection, setSortDirection] = React.useState<'asc' | 'desc'>('desc')
   const userId = localStorage.getItem('userId') || ''
@@ -159,8 +161,8 @@ export default function Dashboard() {
   
   // Load dropdown data
   React.useEffect(() => {
-    Promise.all([listSites(), listUsers(), listIssueTypes()]).then(([s, u, t]) => {
-      setSites(s); setUsers(u); setTypes(t)
+    Promise.all([listSites(), listUsers(), listIssueTypes(), listFieldDefinitions()]).then(([s, u, t, f]) => {
+      setSites(s); setUsers(u); setTypes(t); setFieldDefs(f)
     }).catch(e => console.error('Failed to load filters', e))
   }, [])
 
@@ -221,10 +223,17 @@ export default function Dashboard() {
         limit: pageSize,
         cursor: resetCursor ? undefined : cursor
       }
-      // Note: Date filters would need backend support for createdAt filtering
-      // This is a placeholder for when backend supports it
+      // Date filters
       if (dateFrom) params.createdFrom = dateFrom
       if (dateTo) params.createdTo = dateTo
+      
+      // Custom field filters
+      // Backend supports one cf_key/cf_val pair at a time
+      const cfKeys = Object.keys(customFieldFilters).filter(k => customFieldFilters[k])
+      if (cfKeys.length > 0) {
+        params.cf_key = cfKeys[0]
+        params.cf_val = customFieldFilters[cfKeys[0]]
+      }
       
       const data = await listTickets(params)
       if (resetCursor) {
@@ -244,7 +253,7 @@ export default function Dashboard() {
     setCursor(undefined)
     fetchList(true)
     saveFilters()
-  }, [status, priority, type, siteId, assignedUserId, pageSize])
+  }, [status, priority, type, siteId, assignedUserId, pageSize, customFieldFilters])
   
   React.useEffect(() => { 
     const id = setTimeout(() => {
@@ -264,12 +273,13 @@ export default function Dashboard() {
     setSearch('')
     setDateFrom('')
     setDateTo('')
+    setCustomFieldFilters({})
     setCursor(undefined)
     localStorage.removeItem('dashboardFilters')
     showNotification('info', 'Filters cleared')
   }
 
-  const activeFilters = [status, priority, type, siteId, assignedUserId, search, dateFrom, dateTo].filter(Boolean).length
+  const activeFilters = [status, priority, type, siteId, assignedUserId, search, dateFrom, dateTo, ...Object.values(customFieldFilters)].filter(Boolean).length
 
   const sortedTickets = React.useMemo(() => {
     if (!sortColumn) return sortTickets(tickets, userId || undefined, cfg)
@@ -399,6 +409,61 @@ export default function Dashboard() {
                   aria-label="Filter by created date to"
                 />
               </div>
+              {fieldDefs.length > 0 && (
+                <div style={{display: 'flex', flexDirection: 'column', gap: 4}}>
+                  <label style={{fontSize: 12}}>Custom Field</label>
+                  <select 
+                    value={Object.keys(customFieldFilters)[0] || ''} 
+                    onChange={e => {
+                      const key = e.target.value
+                      if (!key) {
+                        setCustomFieldFilters({})
+                      } else {
+                        const field = fieldDefs.find(f => f.key === key)
+                        if (field?.enumOptions && field.enumOptions.length > 0) {
+                          setCustomFieldFilters({ [key]: field.enumOptions[0] })
+                        } else {
+                          setCustomFieldFilters({ [key]: '' })
+                        }
+                      }
+                    }}
+                    style={{width: 180}}
+                    aria-label="Select custom field to filter"
+                  >
+                    <option value="">No custom field filter</option>
+                    {fieldDefs.map(f => <option key={f.key} value={f.key}>{f.label}</option>)}
+                  </select>
+                </div>
+              )}
+              {Object.keys(customFieldFilters).length > 0 && (() => {
+                const cfKey = Object.keys(customFieldFilters)[0]
+                const field = fieldDefs.find(f => f.key === cfKey)
+                if (!field) return null
+                
+                return (
+                  <div style={{display: 'flex', flexDirection: 'column', gap: 4}}>
+                    <label style={{fontSize: 12}}>Value</label>
+                    {field.datatype === 'enum' && field.enumOptions ? (
+                      <select
+                        value={customFieldFilters[cfKey] || ''}
+                        onChange={e => setCustomFieldFilters({ [cfKey]: e.target.value })}
+                        style={{width: 150}}
+                        aria-label={`Filter by ${field.label}`}
+                      >
+                        {field.enumOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                      </select>
+                    ) : (
+                      <input
+                        type={field.datatype === 'number' ? 'number' : field.datatype === 'date' ? 'date' : 'text'}
+                        value={customFieldFilters[cfKey] || ''}
+                        onChange={e => setCustomFieldFilters({ [cfKey]: e.target.value })}
+                        style={{width: 150}}
+                        aria-label={`Filter by ${field.label}`}
+                      />
+                    )}
+                  </div>
+                )
+              })()}
               <div style={{display: 'flex', alignItems: 'flex-end'}}>
                 <button onClick={clearFilters} style={{height: 32}} aria-label="Clear all filters">Clear All</button>
               </div>
@@ -412,6 +477,25 @@ export default function Dashboard() {
                 {assignedUserId && <span className="chip" style={{fontSize: 11}}>Assigned: {users.find(u => u.id === assignedUserId)?.name || users.find(u => u.id === assignedUserId)?.email} <button onClick={() => setAssignedUserId('')} style={{marginLeft: 4, background: 'none', border: 'none', color: 'inherit', cursor: 'pointer'}} aria-label={`Remove assigned user filter`}>×</button></span>}
                 {dateFrom && <span className="chip" style={{fontSize: 11}}>From: {dateFrom} <button onClick={() => setDateFrom('')} style={{marginLeft: 4, background: 'none', border: 'none', color: 'inherit', cursor: 'pointer'}} aria-label={`Remove date from filter`}>×</button></span>}
                 {dateTo && <span className="chip" style={{fontSize: 11}}>To: {dateTo} <button onClick={() => setDateTo('')} style={{marginLeft: 4, background: 'none', border: 'none', color: 'inherit', cursor: 'pointer'}} aria-label={`Remove date to filter`}>×</button></span>}
+                {Object.keys(customFieldFilters).map(cfKey => {
+                  const field = fieldDefs.find(f => f.key === cfKey)
+                  return customFieldFilters[cfKey] && (
+                    <span key={cfKey} className="chip" style={{fontSize: 11}}>
+                      {field?.label || cfKey}: {customFieldFilters[cfKey]} 
+                      <button 
+                        onClick={() => setCustomFieldFilters(prev => {
+                          const newFilters = { ...prev }
+                          delete newFilters[cfKey]
+                          return newFilters
+                        })} 
+                        style={{marginLeft: 4, background: 'none', border: 'none', color: 'inherit', cursor: 'pointer'}} 
+                        aria-label={`Remove custom field filter ${field?.label || cfKey}`}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  )
+                })}
                 {search && <span className="chip" style={{fontSize: 11}}>Search: "{search}" <button onClick={() => setSearch('')} style={{marginLeft: 4, background: 'none', border: 'none', color: 'inherit', cursor: 'pointer'}} aria-label="Remove search filter">×</button></span>}
               </div>
             )}

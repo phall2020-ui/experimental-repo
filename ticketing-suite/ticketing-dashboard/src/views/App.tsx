@@ -19,8 +19,13 @@ import {
   Favorite as HealthIcon,
   Person as PersonIcon,
   People as PeopleIcon,
+  Settings as SettingsIcon,
+  Label as LabelIcon,
+  ViewList as FieldIcon,
 } from '@mui/icons-material'
 import UserRegistration from '../components/UserRegistration'
+import IssueTypeManagement from '../components/IssueTypeManagement'
+import FieldDefinitionManagement from '../components/FieldDefinitionManagement'
 import { useNotifications } from '../lib/notifications'
 import { useThemeMode } from '../theme/ThemeProvider'
 
@@ -31,6 +36,8 @@ export default function App() {
   const [token, setToken] = React.useState(localStorage.getItem('token') || '')
   const [user, setUser] = React.useState(localStorage.getItem('userId') || '')
   const [showUserReg, setShowUserReg] = React.useState(false)
+  const [showIssueTypes, setShowIssueTypes] = React.useState(false)
+  const [showFieldDefs, setShowFieldDefs] = React.useState(false)
   const [userRole, setUserRole] = React.useState<'ADMIN' | 'USER' | null>(null)
   
   const save = () => { 
@@ -109,6 +116,34 @@ export default function App() {
             </Tooltip>
           )}
           
+          {userRole === 'ADMIN' && (
+            <Tooltip title="Manage Issue Types">
+              <Button
+                onClick={() => setShowIssueTypes(true)}
+                startIcon={<LabelIcon />}
+                size="small"
+                sx={{ display: { xs: 'none', md: 'flex' } }}
+                aria-label="Manage issue types"
+              >
+                Types
+              </Button>
+            </Tooltip>
+          )}
+          
+          {userRole === 'ADMIN' && (
+            <Tooltip title="Manage Custom Fields">
+              <Button
+                onClick={() => setShowFieldDefs(true)}
+                startIcon={<FieldIcon />}
+                size="small"
+                sx={{ display: { xs: 'none', md: 'flex' } }}
+                aria-label="Manage custom fields"
+              >
+                Fields
+              </Button>
+            </Tooltip>
+          )}
+          
           <Tooltip title={mode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}>
             <IconButton onClick={toggleTheme} color="inherit" aria-label="Toggle theme">
               {mode === 'dark' ? <LightModeIcon /> : <DarkModeIcon />}
@@ -168,6 +203,24 @@ export default function App() {
           onClose={() => setShowUserReg(false)}
           onSuccess={() => {
             setShowUserReg(false)
+          }}
+        />
+      )}
+      
+      {showIssueTypes && (
+        <IssueTypeManagement
+          onClose={() => setShowIssueTypes(false)}
+          onSuccess={() => {
+            showNotification('success', 'Issue types updated')
+          }}
+        />
+      )}
+      
+      {showFieldDefs && (
+        <FieldDefinitionManagement
+          onClose={() => setShowFieldDefs(false)}
+          onSuccess={() => {
+            showNotification('success', 'Field definitions updated')
           }}
         />
       )}
