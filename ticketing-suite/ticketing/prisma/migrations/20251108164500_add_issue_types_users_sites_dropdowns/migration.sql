@@ -1,12 +1,20 @@
 -- CreateEnum
-CREATE TYPE "Role" AS ENUM ('ADMIN', 'USER');
+DO $$ BEGIN
+  CREATE TYPE "Role" AS ENUM ('ADMIN', 'USER');
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
 
 -- AlterTable: Add password and role to User
-ALTER TABLE "User" ADD COLUMN "password" TEXT NOT NULL DEFAULT '';
-ALTER TABLE "User" ADD COLUMN "role" "Role" NOT NULL DEFAULT 'USER';
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "password" TEXT NOT NULL DEFAULT '';
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "role" "Role" NOT NULL DEFAULT 'USER';
 
 -- AlterTable: Change User email from unique per tenant to globally unique
-ALTER TABLE "User" DROP CONSTRAINT "User_tenantId_email_key";
+DO $$ BEGIN
+  ALTER TABLE "User" DROP CONSTRAINT IF EXISTS "User_tenantId_email_key";
+EXCEPTION
+  WHEN undefined_object THEN null;
+END $$;
 ALTER TABLE "User" ADD CONSTRAINT "User_email_key" UNIQUE ("email");
 
 -- CreateTable: IssueType

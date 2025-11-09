@@ -45,6 +45,7 @@ import { randomUUID } from 'crypto';
   async finalize(tenantId: string, attachmentId: string, size: number, checksumSha256: string) {
     return this.prisma.withTenant(tenantId, async (tx) => tx.attachment.update({ where: { id: attachmentId }, data: { sizeBytes: size, checksumSha256 } }));
   }
+
   async delete(tenantId: string, ticketId: string, id: string) {
     return this.prisma.withTenant(tenantId, async (tx) => {
       const attachment = await tx.attachment.findFirst({ where: { id, tenantId, ticketId }});

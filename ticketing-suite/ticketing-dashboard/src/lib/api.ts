@@ -111,3 +111,17 @@ export interface HealthStatus {
 export const getHealth = async () => (await client.get<HealthStatus>('/health')).data
 export const getHealthDb = async () => (await client.get<HealthStatus>('/health/db')).data
 export const getHealthRedis = async () => (await client.get<HealthStatus>('/health/redis')).data
+
+// Site Management API
+export interface Site {
+  id: string
+  name: string
+  location?: string | null
+}
+
+export const listSitesDetailed = async () => (await client.get<Site[]>('/directory/sites')).data
+export const createSite = async (data: { name: string; location?: string }) =>
+  (await client.post<Site>('/directory/sites', data)).data
+export const updateSite = async (id: string, data: { name?: string; location?: string }) =>
+  (await client.patch<Site>(`/directory/sites/${id}`, data)).data
+export const deleteSite = async (id: string) => (await client.delete(`/directory/sites/${id}`)).data

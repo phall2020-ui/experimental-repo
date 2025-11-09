@@ -26,6 +26,7 @@ export class AttachmentsController {
   async finalize(@Req() req: any, @Param('attachmentId') attachmentId: string, @Body() dto: { size: number; checksumSha256: string }) {
     return this.svc.finalize(this.tenant(req), attachmentId, dto.size, dto.checksumSha256);
   }
+
   @Delete(':id')
   @Roles('ADMIN', 'USER')
   async delete(@Req() req: any, @Param('ticketId') ticketId: string, @Param('id') id: string) {

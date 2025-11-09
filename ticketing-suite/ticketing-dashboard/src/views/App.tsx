@@ -19,9 +19,7 @@ import {
   Favorite as HealthIcon,
   Person as PersonIcon,
   People as PeopleIcon,
-  Settings as SettingsIcon,
-  Label as LabelIcon,
-  ViewList as FieldIcon,
+  LocationOn as LocationIcon,
 } from '@mui/icons-material'
 import UserRegistration from '../components/UserRegistration'
 import IssueTypeManagement from '../components/IssueTypeManagement'
@@ -117,29 +115,16 @@ export default function App() {
           )}
           
           {userRole === 'ADMIN' && (
-            <Tooltip title="Manage Issue Types">
+            <Tooltip title="Manage Sites">
               <Button
-                onClick={() => setShowIssueTypes(true)}
-                startIcon={<LabelIcon />}
+                component={Link}
+                to="/sites"
+                startIcon={<LocationIcon />}
                 size="small"
                 sx={{ display: { xs: 'none', md: 'flex' } }}
-                aria-label="Manage issue types"
+                aria-label="Manage sites"
               >
-                Types
-              </Button>
-            </Tooltip>
-          )}
-          
-          {userRole === 'ADMIN' && (
-            <Tooltip title="Manage Custom Fields">
-              <Button
-                onClick={() => setShowFieldDefs(true)}
-                startIcon={<FieldIcon />}
-                size="small"
-                sx={{ display: { xs: 'none', md: 'flex' } }}
-                aria-label="Manage custom fields"
-              >
-                Fields
+                Sites
               </Button>
             </Tooltip>
           )}
