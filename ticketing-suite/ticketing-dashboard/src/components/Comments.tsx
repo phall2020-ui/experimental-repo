@@ -1,5 +1,5 @@
 import React from 'react'
-import { listComments, addComment, type Comment } from '../lib/api'
+import { listComments, addComment, updateComment, deleteComment, type Comment } from '../lib/api'
 
 interface CommentsProps {
   ticketId: string
@@ -12,6 +12,8 @@ export default function Comments({ ticketId }: CommentsProps) {
   const [error, setError] = React.useState<string | null>(null)
   const [newComment, setNewComment] = React.useState('')
   const [visibility, setVisibility] = React.useState<'PUBLIC' | 'INTERNAL'>('INTERNAL')
+  const [editingId, setEditingId] = React.useState<string | null>(null)
+  const [editText, setEditText] = React.useState('')
 
   const loadComments = async () => {
     setLoading(true)
@@ -48,6 +50,40 @@ export default function Comments({ ticketId }: CommentsProps) {
     }
   }
 
+  const handleEdit = (comment: Comment) => {
+    setEditingId(comment.id)
+    setEditText(comment.body)
+  }
+
+  const handleCancelEdit = () => {
+    setEditingId(null)
+    setEditText('')
+  }
+
+  const handleSaveEdit = async (commentId: string) => {
+    if (!editText.trim()) return
+
+    try {
+      await updateComment(ticketId, commentId, editText.trim())
+      setEditingId(null)
+      setEditText('')
+      await loadComments()
+    } catch (e: any) {
+      setError(e?.response?.data?.message || e?.message || 'Failed to update comment')
+    }
+  }
+
+  const handleDelete = async (commentId: string) => {
+    if (!confirm('Are you sure you want to delete this comment?')) return
+
+    try {
+      await deleteComment(ticketId, commentId)
+      await loadComments()
+    } catch (e: any) {
+      setError(e?.response?.data?.message || e?.message || 'Failed to delete comment')
+    }
+  }
+
   return (
     <div className="panel" style={{ marginTop: 12 }}>
       <div style={{ fontWeight: 700, marginBottom: 12 }}>Comments ({comments.length})</div>
@@ -79,22 +115,54 @@ export default function Comments({ ticketId }: CommentsProps) {
                   {new Date(comment.createdAt).toLocaleString()}
                   {comment.userId && ` · User ${comment.userId}`}
                 </div>
-                <span
-                  style={{
-                    padding: '2px 8px',
-                    borderRadius: 4,
-                    fontSize: 11,
-                    background: comment.visibility === 'PUBLIC' ? '#14311d' : '#2a1a1a',
-                    color: comment.visibility === 'PUBLIC' ? '#a6f0c2' : '#8ca0b3',
-                    border: `1px solid ${comment.visibility === 'PUBLIC' ? '#1d4b2c' : '#3a2c0d'}`
-                  }}
-                >
-                  {comment.visibility}
-                </span>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <span
+                    style={{
+                      padding: '2px 8px',
+                      borderRadius: 4,
+                      fontSize: 11,
+                      background: comment.visibility === 'PUBLIC' ? '#14311d' : '#2a1a1a',
+                      color: comment.visibility === 'PUBLIC' ? '#a6f0c2' : '#8ca0b3',
+                      border: `1px solid ${comment.visibility === 'PUBLIC' ? '#1d4b2c' : '#3a2c0d'}`
+                    }}
+                  >
+                    {comment.visibility}
+                  </span>
+                  <button
+                    onClick={() => handleEdit(comment)}
+                    style={{ fontSize: 11, padding: '2px 8px' }}
+                    title="Edit comment"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => handleDelete(comment.id)}
+                    style={{ fontSize: 11, padding: '2px 8px', background: '#5a1a1a', borderColor: '#7a2a2a' }}
+                    title="Delete comment"
+                  >
+                    Delete
+                  </button>
+                </div>
               </div>
-              <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
-                {comment.body}
-              </div>
+              {editingId === comment.id ? (
+                <div>
+                  <textarea
+                    value={editText}
+                    onChange={e => setEditText(e.target.value)}
+                    style={{ width: '100%', minHeight: 60, marginBottom: 8 }}
+                  />
+                  <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                    <button onClick={handleCancelEdit} style={{ fontSize: 11 }}>Cancel</button>
+                    <button onClick={() => handleSaveEdit(comment.id)} className="primary" style={{ fontSize: 11 }}>
+                      Save
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
+                  {comment.body}
+                </div>
+              )}
             </div>
           ))}
         </div>

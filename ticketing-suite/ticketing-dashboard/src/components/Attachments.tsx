@@ -1,5 +1,5 @@
 import React from 'react'
-import { presignAttachment, finalizeAttachment, listAttachments, type Attachment, type PresignResponse } from '../lib/api'
+import { presignAttachment, finalizeAttachment, listAttachments, deleteAttachment, type Attachment, type PresignResponse } from '../lib/api'
 
 interface AttachmentsProps {
   ticketId: string
@@ -18,6 +18,7 @@ export default function Attachments({ ticketId }: AttachmentsProps) {
   const [attachments, setAttachments] = React.useState<Attachment[]>([])
   const [error, setError] = React.useState<string | null>(null)
   const [loading, setLoading] = React.useState(false)
+  const [deleting, setDeleting] = React.useState<string | null>(null)
 
   // Load existing attachments
   React.useEffect(() => {
@@ -156,6 +157,20 @@ export default function Attachments({ ticketId }: AttachmentsProps) {
     return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i]
   }
 
+  const handleDelete = async (attachmentId: string) => {
+    if (!confirm('Are you sure you want to delete this attachment?')) return
+
+    setDeleting(attachmentId)
+    try {
+      await deleteAttachment(ticketId, attachmentId)
+      await loadAttachments()
+    } catch (e: any) {
+      setError(e?.response?.data?.message || e?.message || 'Failed to delete attachment')
+    } finally {
+      setDeleting(null)
+    }
+  }
+
   return (
     <div className="panel" style={{ marginTop: 12 }}>
       <div style={{ fontWeight: 700, marginBottom: 12 }}>Attachments</div>
@@ -221,21 +236,37 @@ export default function Attachments({ ticketId }: AttachmentsProps) {
                     {formatFileSize(att.sizeBytes)} • {new Date(att.createdAt).toLocaleString()}
                   </div>
                 </div>
-                <a
-                  href={att.downloadUrl}
-                  download={att.filename}
-                  style={{
-                    padding: '6px 12px',
-                    background: '#5b9cff',
-                    color: '#fff',
-                    borderRadius: 4,
-                    textDecoration: 'none',
-                    fontSize: 12,
-                    fontWeight: 600
-                  }}
-                >
-                  ⬇ Download
-                </a>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <a
+                    href={att.downloadUrl}
+                    download={att.filename}
+                    style={{
+                      padding: '6px 12px',
+                      background: '#5b9cff',
+                      color: '#fff',
+                      borderRadius: 4,
+                      textDecoration: 'none',
+                      fontSize: 12,
+                      fontWeight: 600
+                    }}
+                  >
+                    ⬇ Download
+                  </a>
+                  <button
+                    onClick={() => handleDelete(att.id)}
+                    disabled={deleting === att.id}
+                    style={{
+                      padding: '6px 12px',
+                      background: '#5a1a1a',
+                      borderColor: '#7a2a2a',
+                      fontSize: 12,
+                      fontWeight: 600
+                    }}
+                    title="Delete attachment"
+                  >
+                    {deleting === att.id ? 'Deleting...' : '🗑 Delete'}
+                  </button>
+                </div>
               </div>
             ))}
           </div>

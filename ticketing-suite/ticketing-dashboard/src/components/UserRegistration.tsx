@@ -1,5 +1,5 @@
 import React from 'react'
-import { listUsers, type UserOpt } from '../lib/directory'
+import { listUsers, updateUser, deleteUser, resetUserPassword, type UserOpt } from '../lib/directory'
 import axios from 'axios'
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3000'
@@ -19,6 +19,8 @@ export default function UserRegistration({ onClose, onSuccess }: UserRegistratio
   const [loading, setLoading] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
   const [users, setUsers] = React.useState<UserOpt[]>([])
+  const [editingId, setEditingId] = React.useState<string | null>(null)
+  const [editData, setEditData] = React.useState<{ name: string; email: string; role: 'USER' | 'ADMIN' }>({ name: '', email: '', role: 'USER' })
   const [formData, setFormData] = React.useState({
     email: '',
     password: '',
@@ -74,6 +76,50 @@ export default function UserRegistration({ onClose, onSuccess }: UserRegistratio
       setError(e?.response?.data?.message || e?.message || 'Failed to register user')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleEdit = (user: UserOpt) => {
+    setEditingId(user.id)
+    setEditData({ name: user.name, email: user.email, role: user.role })
+  }
+
+  const handleSaveEdit = async (userId: string) => {
+    try {
+      await updateUser(userId, editData)
+      setEditingId(null)
+      await loadUsers()
+      onSuccess?.()
+    } catch (e: any) {
+      setError(e?.response?.data?.message || e?.message || 'Failed to update user')
+    }
+  }
+
+  const handleDelete = async (userId: string) => {
+    if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) return
+
+    try {
+      await deleteUser(userId)
+      await loadUsers()
+      onSuccess?.()
+    } catch (e: any) {
+      setError(e?.response?.data?.message || e?.message || 'Failed to delete user')
+    }
+  }
+
+  const handleResetPassword = async (userId: string) => {
+    const newPassword = prompt('Enter new password (minimum 6 characters):')
+    if (!newPassword || newPassword.length < 6) {
+      alert('Password must be at least 6 characters')
+      return
+    }
+
+    try {
+      await resetUserPassword(userId, newPassword)
+      alert('Password reset successfully')
+      onSuccess?.()
+    } catch (e: any) {
+      setError(e?.response?.data?.message || e?.message || 'Failed to reset password')
     }
   }
 
@@ -182,14 +228,64 @@ export default function UserRegistration({ onClose, onSuccess }: UserRegistratio
                   <th style={{ textAlign: 'left' }}>Name</th>
                   <th style={{ textAlign: 'left' }}>Email</th>
                   <th style={{ textAlign: 'left' }}>Role</th>
+                  <th style={{ textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {users.map(u => (
                   <tr key={u.id}>
-                    <td>{u.name}</td>
-                    <td>{u.email}</td>
-                    <td><span className={`badge ${u.role === 'ADMIN' ? 'P1' : 'P3'}`}>{u.role}</span></td>
+                    <td>
+                      {editingId === u.id ? (
+                        <input
+                          type="text"
+                          value={editData.name}
+                          onChange={e => setEditData({ ...editData, name: e.target.value })}
+                          style={{ width: '100%' }}
+                        />
+                      ) : (
+                        u.name
+                      )}
+                    </td>
+                    <td>
+                      {editingId === u.id ? (
+                        <input
+                          type="email"
+                          value={editData.email}
+                          onChange={e => setEditData({ ...editData, email: e.target.value })}
+                          style={{ width: '100%' }}
+                        />
+                      ) : (
+                        u.email
+                      )}
+                    </td>
+                    <td>
+                      {editingId === u.id ? (
+                        <select
+                          value={editData.role}
+                          onChange={e => setEditData({ ...editData, role: e.target.value as 'USER' | 'ADMIN' })}
+                          style={{ width: '100%' }}
+                        >
+                          <option value="USER">USER</option>
+                          <option value="ADMIN">ADMIN</option>
+                        </select>
+                      ) : (
+                        <span className={`badge ${u.role === 'ADMIN' ? 'P1' : 'P3'}`}>{u.role}</span>
+                      )}
+                    </td>
+                    <td style={{ textAlign: 'right' }}>
+                      {editingId === u.id ? (
+                        <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+                          <button onClick={() => handleSaveEdit(u.id)} style={{ fontSize: 11 }}>Save</button>
+                          <button onClick={() => setEditingId(null)} style={{ fontSize: 11 }}>Cancel</button>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+                          <button onClick={() => handleEdit(u)} style={{ fontSize: 11 }}>Edit</button>
+                          <button onClick={() => handleResetPassword(u.id)} style={{ fontSize: 11 }}>Reset PW</button>
+                          <button onClick={() => handleDelete(u.id)} style={{ fontSize: 11, background: '#5a1a1a', borderColor: '#7a2a2a' }}>Delete</button>
+                        </div>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>

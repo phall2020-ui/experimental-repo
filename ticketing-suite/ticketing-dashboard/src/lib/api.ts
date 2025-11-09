@@ -66,6 +66,10 @@ export interface Comment {
 export const listComments = async (ticketId: string) => (await client.get<Comment[]>(`/tickets/${ticketId}/comments`)).data
 export const addComment = async (ticketId: string, body: string, visibility: 'PUBLIC' | 'INTERNAL' = 'INTERNAL') => 
   (await client.post<Comment>(`/tickets/${ticketId}/comments`, { body, visibility })).data
+export const updateComment = async (ticketId: string, commentId: string, body: string) =>
+  (await client.patch<Comment>(`/tickets/${ticketId}/comments/${commentId}`, { body })).data
+export const deleteComment = async (ticketId: string, commentId: string) =>
+  (await client.delete(`/tickets/${ticketId}/comments/${commentId}`)).data
 
 // Attachments API
 export interface Attachment {
@@ -92,6 +96,9 @@ export const presignAttachment = async (ticketId: string, filename: string, mime
 
 export const finalizeAttachment = async (ticketId: string, attachmentId: string, size: number, checksumSha256: string) =>
   (await client.post<Attachment>(`/tickets/${ticketId}/attachments/${attachmentId}/finalize`, { size, checksumSha256 })).data
+
+export const deleteAttachment = async (ticketId: string, attachmentId: string) =>
+  (await client.delete(`/tickets/${ticketId}/attachments/${attachmentId}`)).data
 
 // Health API
 export interface HealthStatus {
