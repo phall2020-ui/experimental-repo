@@ -5,6 +5,13 @@
  * Verifies environment variables at startup and provides actionable hints
  */
 
+// Try to load .env file if it exists
+try {
+  require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') });
+} catch (e) {
+  // dotenv not available or .env doesn't exist, that's ok
+}
+
 const REQUIRED_VARS = [
   { name: 'DATABASE_URL', hint: 'PostgreSQL connection string (e.g., postgresql://user:pass@host:5432/db?sslmode=require for Neon)' },
   { name: 'REDIS_URL', hint: 'Redis connection string (e.g., redis://localhost:6379 or rediss://... for Upstash)' },
