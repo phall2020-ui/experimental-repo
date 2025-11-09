@@ -125,3 +125,11 @@ export const createSite = async (data: { name: string; location?: string }) =>
 export const updateSite = async (id: string, data: { name?: string; location?: string }) =>
   (await client.patch<Site>(`/directory/sites/${id}`, data)).data
 export const deleteSite = async (id: string) => (await client.delete(`/directory/sites/${id}`)).data
+
+// Features API
+export interface Features {
+  search: boolean
+  attachments: boolean
+}
+
+export const getFeatures = async () => (await client.get<Features>('/features')).data

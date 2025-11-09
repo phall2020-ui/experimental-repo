@@ -1,5 +1,6 @@
 import React from 'react'
 import { presignAttachment, finalizeAttachment, listAttachments, deleteAttachment, type Attachment, type PresignResponse } from '../lib/api'
+import { useFeatures } from '../contexts/FeaturesContext'
 
 interface AttachmentsProps {
   ticketId: string
@@ -14,16 +15,22 @@ interface FileUpload {
 }
 
 export default function Attachments({ ticketId }: AttachmentsProps) {
+  const { features } = useFeatures()
   const [uploads, setUploads] = React.useState<FileUpload[]>([])
   const [attachments, setAttachments] = React.useState<Attachment[]>([])
   const [error, setError] = React.useState<string | null>(null)
   const [loading, setLoading] = React.useState(false)
   const [deleting, setDeleting] = React.useState<string | null>(null)
 
+  // Don't load attachments if feature is disabled
+  const attachmentsEnabled = features?.attachments ?? false
+
   // Load existing attachments
   React.useEffect(() => {
-    loadAttachments()
-  }, [ticketId])
+    if (attachmentsEnabled) {
+      loadAttachments()
+    }
+  }, [ticketId, attachmentsEnabled])
 
   const loadAttachments = async () => {
     setLoading(true)
@@ -175,32 +182,50 @@ export default function Attachments({ ticketId }: AttachmentsProps) {
     <div className="panel" style={{ marginTop: 12 }}>
       <div style={{ fontWeight: 700, marginBottom: 12 }}>Attachments</div>
       
-      {error && (
-        <div style={{ color: '#ffb3b3', marginBottom: 12, padding: 8, background: '#2a1a1a', borderRadius: 4 }}>
-          {error}
+      {!attachmentsEnabled && (
+        <div style={{ 
+          padding: 12, 
+          background: '#2a2a2a', 
+          borderRadius: 4, 
+          color: '#aaa',
+          borderLeft: '3px solid #666'
+        }}>
+          <div style={{ fontWeight: 600, marginBottom: 4 }}>Attachments Unavailable</div>
+          <div style={{ fontSize: 13 }}>
+            The attachments feature is not enabled in this environment. 
+            To enable attachments, configure S3 storage credentials.
+          </div>
         </div>
       )}
 
-      <div style={{ marginBottom: 16 }}>
-        <label style={{ display: 'block', marginBottom: 8 }}>
-          <input
-            type="file"
-            onChange={handleFileSelect}
-            multiple
-            style={{ display: 'none' }}
-            id="file-upload"
-          />
-          <button
-            type="button"
-            className="primary"
-            onClick={() => document.getElementById('file-upload')?.click()}
-            style={{ cursor: 'pointer' }}
-          >
-            📎 Upload Files
-          </button>
-        </label>
-        <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
-          Select one or more files to upload
+      {attachmentsEnabled && (
+        <>
+          {error && (
+            <div style={{ color: '#ffb3b3', marginBottom: 12, padding: 8, background: '#2a1a1a', borderRadius: 4 }}>
+              {error}
+            </div>
+          )}
+
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ display: 'block', marginBottom: 8 }}>
+              <input
+                type="file"
+                onChange={handleFileSelect}
+                multiple
+                style={{ display: 'none' }}
+                id="file-upload"
+              />
+              <button
+                type="button"
+                className="primary"
+                onClick={() => document.getElementById('file-upload')?.click()}
+                style={{ cursor: 'pointer' }}
+              >
+                📎 Upload Files
+              </button>
+            </label>
+            <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+              Select one or more files to upload
         </div>
       </div>
 
@@ -345,6 +370,8 @@ export default function Attachments({ ticketId }: AttachmentsProps) {
         <div className="muted" style={{ fontSize: 13 }}>
           No attachments yet. Click "Upload Files" to add attachments.
         </div>
+      )}
+        </>
       )}
     </div>
   )

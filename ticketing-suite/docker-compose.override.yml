@@ -1,0 +1,49 @@
+# Docker Compose Override for Free Managed Services
+# This file removes local Postgres/Redis/OpenSearch services and uses external managed services
+# 
+# Usage:
+#   1. Set environment variables in a .env file:
+#      DATABASE_URL=postgresql://user:pass@your-neon-host.neon.tech:5432/db?sslmode=require
+#      REDIS_URL=rediss://default:pass@your-upstash-host.upstash.io:6379
+#      (Optional) OPENSEARCH_NODE, S3_BUCKET, AWS_REGION
+#   
+#   2. Run with: docker-compose up
+#      (Docker Compose automatically applies override files)
+
+version: "3.9"
+services:
+  # Remove local database service (using Neon instead)
+  db:
+    deploy:
+      replicas: 0
+
+  # Remove local Redis service (using Upstash instead)
+  redis:
+    deploy:
+      replicas: 0
+
+  # Remove local OpenSearch service (optional feature)
+  opensearch:
+    deploy:
+      replicas: 0
+
+  # Update ticketing service to use external services
+  ticketing:
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      OPENSEARCH_NODE: ${OPENSEARCH_NODE:-}
+      OPENSEARCH_USER: ${OPENSEARCH_USER:-}
+      OPENSEARCH_PASS: ${OPENSEARCH_PASS:-}
+      S3_BUCKET: ${S3_BUCKET:-}
+      AWS_REGION: ${AWS_REGION:-}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: 3000
+    depends_on: []
+
+  # Dashboard remains the same
+  dashboard:
+    depends_on:
+      - ticketing

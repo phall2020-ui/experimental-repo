@@ -6,10 +6,12 @@ import {
   Typography,
   Chip,
   Stack,
+  Alert,
 } from '@mui/material'
 import SearchIcon from '@mui/icons-material/Search'
 import { Modal } from './common'
 import { useNotifications } from '../lib/notifications'
+import { useFeatures } from '../contexts/FeaturesContext'
 
 interface AdvancedSearchProps {
   isOpen: boolean
@@ -19,12 +21,17 @@ interface AdvancedSearchProps {
 }
 
 export default function AdvancedSearch({ isOpen, onClose, onSearch, initialQuery = '' }: AdvancedSearchProps) {
+  const { features } = useFeatures()
   const [query, setQuery] = React.useState(initialQuery)
   const [searchHistory, setSearchHistory] = React.useState<string[]>(() => {
     const saved = localStorage.getItem('searchHistory')
     return saved ? JSON.parse(saved) : []
   })
   const { showNotification } = useNotifications()
+
+  // Search is always available via database filtering
+  // The feature flag indicates whether advanced OpenSearch features are available
+  const hasAdvancedSearch = features?.search ?? false
 
   const handleSearch = () => {
     if (!query.trim()) {
@@ -62,6 +69,12 @@ export default function AdvancedSearch({ isOpen, onClose, onSearch, initialQuery
       }
     >
       <Box>
+        {!hasAdvancedSearch && (
+          <Alert severity="info" sx={{ mb: 2 }}>
+            Advanced search features are not available. Basic database search is enabled.
+          </Alert>
+        )}
+        
         <TextField
           fullWidth
           value={query}
