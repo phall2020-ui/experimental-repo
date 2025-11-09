@@ -25,6 +25,9 @@ build/
 
 # Prisma
 prisma/migrations/
+prisma/**/*.js
+prisma/**/*.d.ts
+prisma/**/*.js.map
 
 # Testing
 coverage/
