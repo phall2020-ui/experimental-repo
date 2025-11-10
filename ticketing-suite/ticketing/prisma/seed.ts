@@ -34,7 +34,6 @@ async function main() {
       name: 'Admin User',
       password: ADMIN_HASH,          // <-- field name is `password`
       role: 'ADMIN',
-      isActive: true,
     },
   });
 
@@ -46,7 +45,6 @@ async function main() {
       name: 'Standard User',
       password: USER_HASH,           // <-- field name is `password`
       role: 'USER',
-      isActive: true,
     },
   });
 
