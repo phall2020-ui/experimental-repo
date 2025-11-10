@@ -1,5 +1,5 @@
 import React from 'react'
-import { bulkDeleteTickets, bulkUpdateTickets, listTickets, updateTicket, type Ticket } from '../lib/api'
+import { bulkDeleteTickets, bulkUpdateTickets, listTickets, type Ticket } from '../lib/api'
 import { sortTickets, loadCfg, saveCfg, type PriorityCfg } from '../lib/prioritise'
 import { Link, useNavigate } from 'react-router-dom'
 import CreateTicket from '../components/CreateTicket'
@@ -57,28 +57,11 @@ const TicketRow: React.FC<{
   ticket: Ticket
   users: UserOpt[]
   sites: SiteOpt[]
-  onUpdate: () => void
   isSelected?: boolean
   onToggleSelect?: () => void
   onQuickView?: () => void
-}> = ({ ticket, users, sites, onUpdate, isSelected = false, onToggleSelect, onQuickView }) => {
-  const [quickSaving, setQuickSaving] = React.useState(false)
-  const { showNotification } = useNotifications()
+}> = ({ ticket, users, sites, isSelected = false, onToggleSelect, onQuickView }) => {
   const assignedUser = users.find(u => u.id === ticket.assignedUserId)
-  
-  const quickUpdate = async (field: string, value: any) => {
-    setQuickSaving(true)
-    try {
-      const { updateTicket } = await import('../lib/api')
-      await updateTicket(ticket.id, { [field]: value })
-      showNotification('success', 'Ticket updated')
-      onUpdate()
-    } catch (e: any) {
-      showNotification('error', e?.message || 'Failed to update ticket')
-    } finally {
-      setQuickSaving(false)
-    }
-  }
 
   // RAG color coding for due dates
   const getDueDateColor = () => {
@@ -128,15 +111,6 @@ const TicketRow: React.FC<{
         <div className="status">{ticket.details || ''}</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
           <PriorityBadge priority={ticket.priority} />
-          <select 
-            value={ticket.priority} 
-            onChange={e => quickUpdate('priority', e.target.value)}
-            style={{fontSize: 11, padding: 2}}
-            disabled={quickSaving}
-            aria-label={`Priority for ticket ${ticket.id}`}
-          >
-            {['P1','P2','P3','P4'].map(p => <option key={p} value={p}>{p}</option>)}
-          </select>
         </div>
       </td>
       <td>
@@ -821,12 +795,11 @@ export default function Dashboard() {
               </td></tr>
             )
             : sortedTickets.map(t => (
-                <TicketRow 
-                  key={t.id} 
-                  ticket={t} 
+                <TicketRow
+                  key={t.id}
+                  ticket={t}
                   users={users}
                   sites={sites}
-                  onUpdate={() => fetchList(true)}
                   isSelected={selectedTicketIds.has(t.id)}
                   onToggleSelect={() => handleToggleSelect(t.id)}
                   onQuickView={() => handleQuickView(t.id)}
