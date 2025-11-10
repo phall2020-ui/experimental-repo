@@ -24,7 +24,7 @@ export class DirectoryController {
   }
 
   @Post('sites')
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'USER')
   async createSite(@Req() req: any, @Body() dto: { name: string; location?: string }) {
     return this.prisma.site.create({
       data: {

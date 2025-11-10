@@ -258,6 +258,13 @@ npm install
 VITE_API_BASE=http://localhost:3000
 ```
 
+#### Hide debug controls in the header
+
+```
+# Hide debug controls in the header
+VITE_SHOW_DEBUG_CONTROLS=false  # default
+```
+
 4. Start the development server:
 ```bash
 npm run dev

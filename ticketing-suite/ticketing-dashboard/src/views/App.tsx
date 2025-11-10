@@ -27,6 +27,8 @@ import FieldDefinitionManagement from '../components/FieldDefinitionManagement'
 import { useNotifications } from '../lib/notifications'
 import { useThemeMode } from '../theme/ThemeProvider'
 
+const SHOW_DEBUG = import.meta.env.VITE_SHOW_DEBUG_CONTROLS === 'true'
+
 export default function App() {
   const navigate = useNavigate()
   const { showNotification } = useNotifications()
@@ -134,31 +136,33 @@ export default function App() {
           </Tooltip>
         </Toolbar>
         
-        <Toolbar sx={{ flexWrap: 'wrap', gap: 1, py: 1 }}>
-          <TextField
-            size="small"
-            placeholder="Bearer token"
-            value={token}
-            onChange={e => setToken(e.target.value)}
-            sx={{ flex: { xs: '1 1 100%', sm: '1 1 250px' }, minWidth: 200 }}
-            inputProps={{ 'aria-label': 'Bearer token' }}
-          />
-          <TextField
-            size="small"
-            placeholder="Your User ID"
-            value={user}
-            onChange={e => setUser(e.target.value)}
-            sx={{ flex: { xs: '1 1 100%', sm: '0 1 150px' }, minWidth: 150 }}
-            inputProps={{ 'aria-label': 'User ID' }}
-          />
-          <Button 
-            variant="contained" 
-            onClick={save}
-            aria-label="Save settings"
-          >
-            Save
-          </Button>
-        </Toolbar>
+        {SHOW_DEBUG && (
+          <Toolbar sx={{ flexWrap: 'wrap', gap: 1, py: 1 }} data-testid="debug-controls">
+            <TextField
+              size="small"
+              placeholder="Bearer token"
+              value={token}
+              onChange={e => setToken(e.target.value)}
+              sx={{ flex: { xs: '1 1 100%', sm: '1 1 250px' }, minWidth: 200 }}
+              inputProps={{ 'aria-label': 'Bearer token' }}
+            />
+            <TextField
+              size="small"
+              placeholder="Your User ID"
+              value={user}
+              onChange={e => setUser(e.target.value)}
+              sx={{ flex: { xs: '1 1 100%', sm: '0 1 150px' }, minWidth: 150 }}
+              inputProps={{ 'aria-label': 'User ID' }}
+            />
+            <Button 
+              variant="contained" 
+              onClick={save}
+              aria-label="Save settings"
+            >
+              Save
+            </Button>
+          </Toolbar>
+        )}
       </AppBar>
       
       <Container maxWidth="xl" sx={{ flexGrow: 1, py: 3 }}>

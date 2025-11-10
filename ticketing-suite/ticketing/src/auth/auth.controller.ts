@@ -38,12 +38,6 @@ export class UsersController {
     return this.svc.deleteUser(id);
   }
 
-  @Post(':id/reset-password')
-  @Roles('ADMIN')
-  async resetPassword(@Req() req: any, @Param('id') id: string, @Body() body: { password: string }) {
-    return this.svc.resetPassword(id, body.password);
-  }
-
   @Patch('profile')
   @Roles('ADMIN', 'USER')
   async updateMe(@Req() req: any, @Body() body: { name?: string; email?: string }) {
