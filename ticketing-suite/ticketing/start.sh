@@ -24,15 +24,12 @@ echo "✅ Using entry: $ENTRY"
 echo "🗃️  Running prisma migrate deploy…"
 npx prisma migrate deploy
 
-if [ "${RUN_SEED}" = "1" ]; then
-  echo "🌱 Seeding base data (RUN_SEED=1)..."
-  npm run seed || { echo "❌ seed failed"; exit 1; }
+if [ "$RUN_MIN_SEED" = "1" ]; then
+  echo "Running minimal seed…"
+  node prisma/seed.js 2>/dev/null || node --loader ts-node/esm prisma/seed.ts || true
 fi
 
-if [ "${RUN_TEST_SEED}" = "1" ]; then
-  echo "🌱 Seeding test data (RUN_TEST_SEED=1)..."
-  npm run seed:test || { echo "❌ seed:test failed"; exit 1; }
-fi
+node dist/main.js
 
 echo "🚀 Launching app…"
 exec node "$ENTRY"
