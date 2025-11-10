@@ -1,8 +1,9 @@
-import { Outlet, Link } from 'react-router-dom'
+import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom'
 import React from 'react'
 import { AppBar, Toolbar, Typography, Button, Box, Container, Tooltip } from '@mui/material'
 import {
   ConfirmationNumber as TicketIcon,
+  Add as AddIcon,
   Person as PersonIcon,
   People as PeopleIcon,
   LocationOn as LocationIcon,
@@ -13,6 +14,8 @@ import FieldDefinitionManagement from '../components/FieldDefinitionManagement'
 import { useNotifications } from '../lib/notifications'
 
 export default function App() {
+  const navigate = useNavigate()
+  const location = useLocation()
   const { showNotification } = useNotifications()
   const [showUserReg, setShowUserReg] = React.useState(false)
   const [showIssueTypes, setShowIssueTypes] = React.useState(false)
@@ -33,6 +36,16 @@ export default function App() {
       setUserRole(null)
     }
   }, [])
+
+  const handleOpenCreateTicket = React.useCallback(() => {
+    const open = () => window.dispatchEvent(new Event('open-create-ticket'))
+    if (location.pathname !== '/') {
+      navigate('/')
+      setTimeout(open, 0)
+    } else {
+      open()
+    }
+  }, [location.pathname, navigate])
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
@@ -55,6 +68,20 @@ export default function App() {
               aria-label="User profile"
             >
               Profile
+            </Button>
+          </Tooltip>
+
+          <Tooltip title="Create Ticket">
+            <Button
+              onClick={handleOpenCreateTicket}
+              startIcon={<AddIcon />}
+              size="small"
+              variant="contained"
+              color="primary"
+              sx={{ display: { xs: 'none', md: 'flex' } }}
+              aria-label="Create ticket"
+            >
+              New Ticket
             </Button>
           </Tooltip>
           
