@@ -471,7 +471,7 @@ describe('New Filtering Features E2E Tests', () => {
       const today = new Date().toISOString().split('T')[0];
       
       const response = await request(app.getHttpServer())
-        .get(`/tickets?status=NEW&priority=Medium&assignedUserId=${testUserId}&createdFrom=${today}`)
+        .get(`/tickets?status=NEW&priority=P2&assignedUserId=${testUserId}&createdFrom=${today}`)
         .set('Authorization', `Bearer ${authToken}`)
         .expect(200);
 
