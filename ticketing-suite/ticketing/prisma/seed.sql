@@ -6,11 +6,11 @@
 
 INSERT INTO "IssueType" (id, "tenantId", key, label, active)
 VALUES
-  (gen_random_uuid(), 'tenant-1', 'SAFETY', 'Safety', true),
-  (gen_random_uuid(), 'tenant-1', 'FAULT', 'Fault', true),
-  (gen_random_uuid(), 'tenant-1', 'SECURITY', 'Security', true),
-  (gen_random_uuid(), 'tenant-1', 'MAINTENANCE', 'Maintenance', true),
-  (gen_random_uuid(), 'tenant-1', 'OTHER', 'Other', true)
+  (gen_random_uuid(), 'tenant-1', 'PPA_TOP', 'PPA TOP', true),
+  (gen_random_uuid(), 'tenant-1', 'PPA_OTHER', 'PPA Other', true),
+  (gen_random_uuid(), 'tenant-1', 'EPC', 'EPC', true),
+  (gen_random_uuid(), 'tenant-1', 'O_AND_M', 'O&M', true),
+  (gen_random_uuid(), 'tenant-1', 'HSE', 'HSE', true)
 ON CONFLICT ("tenantId", key) DO NOTHING;
 
 -- To use this script:

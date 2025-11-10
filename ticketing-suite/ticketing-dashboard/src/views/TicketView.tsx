@@ -2,6 +2,7 @@ import React from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { getTicket, updateTicket, listTicketHistory, type TicketHistoryEntry } from '../lib/api'
 import { listSites, listUsers, listIssueTypes, listFieldDefinitions, type SiteOpt, type UserOpt, type IssueTypeOpt, type FieldDefOpt } from '../lib/directory'
+import { STATUS_OPTIONS } from '../lib/statuses'
 import Comments from '../components/Comments'
 import Attachments from '../components/Attachments'
 import CustomFieldsForm from '../components/CustomFieldsForm'
@@ -121,7 +122,7 @@ export default function TicketView() {
         <div className="row" style={{marginTop:12}}>
           <label style={{width:150}}>Status</label>
           <select value={t.status} onChange={e=>setT({...t, status:e.target.value})}>
-            {['NEW','TRIAGE','IN_PROGRESS','PENDING','RESOLVED','CLOSED'].map(s => <option key={s} value={s}>{s}</option>)}
+            {STATUS_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
           </select>
           <label style={{width:100}}>Priority</label>
           <select value={t.priority} onChange={e=>setT({...t, priority:e.target.value})}>

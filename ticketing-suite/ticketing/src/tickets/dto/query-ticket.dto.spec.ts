@@ -57,7 +57,7 @@ describe('QueryTicketDto', () => {
 
   it('should accept all filters together', async () => {
     const dto = new QueryTicketDto();
-    dto.status = 'NEW';
+    dto.status = 'AWAITING_RESPONSE';
     dto.priority = 'P1';
     dto.siteId = '550e8400-e29b-41d4-a716-446655440000';
     dto.assignedUserId = '550e8400-e29b-41d4-a716-446655440001';

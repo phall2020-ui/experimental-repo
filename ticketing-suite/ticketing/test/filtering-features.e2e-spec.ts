@@ -145,7 +145,7 @@ describe('New Filtering Features E2E Tests', () => {
           siteId: testSiteId,
           typeKey: 'FILTER_TEST',
           description: 'Ticket created yesterday',
-          status: 'NEW',
+          status: 'AWAITING_RESPONSE',
           priority: 'P2',
           createdAt: yesterday,
         },
@@ -157,7 +157,7 @@ describe('New Filtering Features E2E Tests', () => {
           siteId: testSiteId,
           typeKey: 'FILTER_TEST',
           description: 'Ticket created today',
-          status: 'NEW',
+          status: 'AWAITING_RESPONSE',
           priority: 'P2',
         },
       }).then(t => t.id);
@@ -216,7 +216,7 @@ describe('New Filtering Features E2E Tests', () => {
           siteId: testSiteId,
           typeKey: 'FILTER_TEST',
           description: 'Ticket assigned to user 1',
-          status: 'NEW',
+          status: 'AWAITING_RESPONSE',
           priority: 'P2',
           assignedUserId: testUserId,
         },
@@ -228,7 +228,7 @@ describe('New Filtering Features E2E Tests', () => {
           siteId: testSiteId,
           typeKey: 'FILTER_TEST',
           description: 'Ticket assigned to user 2',
-          status: 'NEW',
+          status: 'AWAITING_RESPONSE',
           priority: 'P2',
           assignedUserId: testUserId2,
         },
@@ -240,7 +240,7 @@ describe('New Filtering Features E2E Tests', () => {
           siteId: testSiteId,
           typeKey: 'FILTER_TEST',
           description: 'Unassigned ticket',
-          status: 'NEW',
+          status: 'AWAITING_RESPONSE',
           priority: 'P2',
           assignedUserId: null,
         },
@@ -293,7 +293,7 @@ describe('New Filtering Features E2E Tests', () => {
           siteId: testSiteId,
           typeKey: 'FILTER_TEST',
           description: 'Ticket with custom field value A',
-          status: 'NEW',
+          status: 'AWAITING_RESPONSE',
           priority: 'P2',
           customFields: { test_custom_field: 'value_a' },
         },
@@ -305,7 +305,7 @@ describe('New Filtering Features E2E Tests', () => {
           siteId: testSiteId,
           typeKey: 'FILTER_TEST',
           description: 'Ticket with custom field value B',
-          status: 'NEW',
+          status: 'AWAITING_RESPONSE',
           priority: 'P2',
           customFields: { test_custom_field: 'value_b' },
         },
@@ -317,7 +317,7 @@ describe('New Filtering Features E2E Tests', () => {
           siteId: testSiteId,
           typeKey: 'FILTER_TEST',
           description: 'Ticket without custom field',
-          status: 'NEW',
+          status: 'AWAITING_RESPONSE',
           priority: 'P2',
           customFields: {},
         },
@@ -378,7 +378,7 @@ describe('New Filtering Features E2E Tests', () => {
           siteId: testSiteId,
           typeKey: 'FILTER_TEST',
           description: 'Ticket for attachment listing test',
-          status: 'NEW',
+          status: 'AWAITING_RESPONSE',
           priority: 'P2',
         },
       }).then(t => t.id);
@@ -438,7 +438,7 @@ describe('New Filtering Features E2E Tests', () => {
           siteId: testSiteId,
           typeKey: 'FILTER_TEST',
           description: 'Ticket without attachments',
-          status: 'NEW',
+          status: 'AWAITING_RESPONSE',
           priority: 'P2',
         },
       });
@@ -478,7 +478,7 @@ describe('New Filtering Features E2E Tests', () => {
       expect(Array.isArray(response.body)).toBe(true);
       // All returned tickets should match all filters
       response.body.forEach((ticket: any) => {
-        expect(ticket.status).toBe('NEW');
+        expect(ticket.status).toBe('AWAITING_RESPONSE');
         expect(ticket.priority).toBe('P2');
         expect(ticket.assignedUserId).toBe(testUserId);
       });

@@ -33,6 +33,7 @@ import { getTicket, updateTicket, type Ticket } from '../lib/api'
 import { PriorityBadge } from './ui/PriorityBadge'
 import { StatusChip } from './ui/StatusChip'
 import { useNavigate } from 'react-router-dom'
+import { STATUS_OPTIONS } from '../lib/statuses'
 
 interface TicketQuickViewProps {
   ticketId: string | null
@@ -269,12 +270,11 @@ export default function TicketQuickView({
                       onChange={(e) => setEditedTicket({ ...editedTicket, status: e.target.value as any })}
                       label="Status"
                     >
-                      <MenuItem value="NEW">NEW</MenuItem>
-                      <MenuItem value="TRIAGE">TRIAGE</MenuItem>
-                      <MenuItem value="IN_PROGRESS">IN_PROGRESS</MenuItem>
-                      <MenuItem value="PENDING">PENDING</MenuItem>
-                      <MenuItem value="RESOLVED">RESOLVED</MenuItem>
-                      <MenuItem value="CLOSED">CLOSED</MenuItem>
+                      {STATUS_OPTIONS.map(option => (
+                        <MenuItem key={option.value} value={option.value}>
+                          {option.label}
+                        </MenuItem>
+                      ))}
                     </Select>
                   </FormControl>
 

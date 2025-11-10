@@ -8,7 +8,7 @@ export type PriorityCfg = {
 export const defaultCfg: PriorityCfg = {
   boostAssignedToMe: 20,
   weightPriority: { P1: 50, P2: 20, P3: 5, P4: 1 },
-  weightStatus: { NEW: 10, TRIAGE: 6, IN_PROGRESS: 3, PENDING: 1 },
+  weightStatus: { AWAITING_RESPONSE: 10, ADE_TO_RESPOND: 6, ON_HOLD: 2, CLOSED: 0 },
   typeBoosts: {}
 }
 export function loadCfg(userKey: string): PriorityCfg {

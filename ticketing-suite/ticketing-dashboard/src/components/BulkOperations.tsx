@@ -24,6 +24,7 @@ import {
   Done as DoneIcon
 } from '@mui/icons-material'
 import { Ticket } from '../lib/api'
+import { STATUS_OPTIONS } from '../lib/statuses'
 
 interface BulkOperationsProps {
   selectedTickets: Ticket[]
@@ -210,12 +211,11 @@ export default function BulkOperations({
               >
                 {dialogType === 'status' && (
                   <>
-                    <MenuItem value="NEW">NEW</MenuItem>
-                    <MenuItem value="TRIAGE">TRIAGE</MenuItem>
-                    <MenuItem value="IN_PROGRESS">IN_PROGRESS</MenuItem>
-                    <MenuItem value="PENDING">PENDING</MenuItem>
-                    <MenuItem value="RESOLVED">RESOLVED</MenuItem>
-                    <MenuItem value="CLOSED">CLOSED</MenuItem>
+                    {STATUS_OPTIONS.map(option => (
+                      <MenuItem key={option.value} value={option.value}>
+                        {option.label}
+                      </MenuItem>
+                    ))}
                   </>
                 )}
                 

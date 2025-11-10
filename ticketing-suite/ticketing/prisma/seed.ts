@@ -86,11 +86,11 @@ async function main() {
 
   // Create issue types
   const issueTypes = [
-    { key: 'SAFETY', label: 'Safety' },
-    { key: 'FAULT', label: 'Fault' },
-    { key: 'SECURITY', label: 'Security' },
-    { key: 'MAINTENANCE', label: 'Maintenance' },
-    { key: 'OTHER', label: 'Other' },
+    { key: 'PPA_TOP', label: 'PPA TOP' },
+    { key: 'PPA_OTHER', label: 'PPA Other' },
+    { key: 'EPC', label: 'EPC' },
+    { key: 'O_AND_M', label: 'O&M' },
+    { key: 'HSE', label: 'HSE' },
   ];
 
   for (const type of issueTypes) {
@@ -120,10 +120,10 @@ async function main() {
       id: 'ticket-1',
       tenantId: tenant.id,
       siteId: site1.id,
-      typeKey: 'SAFETY',
+      typeKey: 'PPA_TOP',
       description: 'Fire extinguisher needs inspection',
       details: 'Annual inspection is overdue',
-      status: 'NEW',
+      status: 'AWAITING_RESPONSE',
       priority: 'P2',
       assignedUserId: user.id,
     },
@@ -136,10 +136,10 @@ async function main() {
       id: 'ticket-2',
       tenantId: tenant.id,
       siteId: site2.id,
-      typeKey: 'FAULT',
+      typeKey: 'O_AND_M',
       description: 'HVAC system not working',
       details: 'Temperature control unit is not responding',
-      status: 'TRIAGE',
+      status: 'ADE_TO_RESPOND',
       priority: 'P1',
       assignedUserId: admin.id,
     },

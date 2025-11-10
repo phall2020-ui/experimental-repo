@@ -1,32 +1,30 @@
 import React from 'react'
 import { Chip, ChipProps } from '@mui/material'
-
-type TicketStatus = 'NEW' | 'TRIAGE' | 'IN_PROGRESS' | 'PENDING' | 'RESOLVED' | 'CLOSED'
+import { STATUS_LABELS, type TicketStatusValue } from '../../lib/statuses'
 
 interface StatusChipProps extends Omit<ChipProps, 'color'> {
-  status: TicketStatus
+  status: TicketStatusValue
 }
 
-const statusConfig: Record<TicketStatus, { color: ChipProps['color']; label: string }> = {
-  NEW: { color: 'info', label: 'New' },
-  TRIAGE: { color: 'warning', label: 'Triage' },
-  IN_PROGRESS: { color: 'primary', label: 'In Progress' },
-  PENDING: { color: 'warning', label: 'Pending' },
-  RESOLVED: { color: 'success', label: 'Resolved' },
-  CLOSED: { color: 'default', label: 'Closed' },
+const statusColors: Record<TicketStatusValue, ChipProps['color']> = {
+  AWAITING_RESPONSE: 'info',
+  ADE_TO_RESPOND: 'primary',
+  ON_HOLD: 'warning',
+  CLOSED: 'default',
 }
 
 export const StatusChip: React.FC<StatusChipProps> = ({ status, ...props }) => {
-  const config = statusConfig[status]
+  const label = STATUS_LABELS[status]
+  const color = statusColors[status]
   
   return (
     <Chip
-      label={config.label}
-      color={config.color}
+      label={label}
+      color={color}
       size="small"
       variant="outlined"
       {...props}
-      aria-label={`Status: ${config.label}`}
+      aria-label={`Status: ${label}`}
     />
   )
 }

@@ -15,6 +15,7 @@ import { Modal } from './common'
 import { useSites, useUsers, useIssueTypes, useFieldDefinitions } from '../hooks/useDirectory'
 import { useCreateTicket } from '../hooks/useTickets'
 import CustomFieldsForm from './CustomFieldsForm'
+import { STATUS_OPTIONS, type TicketStatusValue } from '../lib/statuses'
 
 interface CreateTicketProps {
   onClose: () => void
@@ -34,7 +35,7 @@ export default function CreateTicket({ onClose, onSuccess }: CreateTicketProps) 
     type: '',
     description: '',
     details: '',
-    status: 'NEW' as const,
+    status: (STATUS_OPTIONS[0]?.value ?? 'AWAITING_RESPONSE') as TicketStatusValue,
     priority: 'P3' as const,
     assignedUserId: '',
     custom_fields: {} as Record<string, any>
@@ -168,8 +169,8 @@ export default function CreateTicket({ onClose, onSuccess }: CreateTicketProps) 
                 label="Status"
                 aria-label="Status"
               >
-                {['NEW', 'TRIAGE', 'IN_PROGRESS', 'PENDING', 'RESOLVED', 'CLOSED'].map(s => (
-                  <MenuItem key={s} value={s}>{s}</MenuItem>
+                {STATUS_OPTIONS.map(option => (
+                  <MenuItem key={option.value} value={option.value}>{option.label}</MenuItem>
                 ))}
               </Select>
             </FormControl>

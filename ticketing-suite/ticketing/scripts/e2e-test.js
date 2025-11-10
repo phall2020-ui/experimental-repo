@@ -53,9 +53,9 @@ async function run() {
       method: 'POST',
       body: JSON.stringify({
         siteId: latestSite.id,
-        type: 'SAFETY',
+        type: 'PPA_TOP',
         description: 'CLI user ticket',
-        status: 'NEW',
+        status: 'AWAITING_RESPONSE',
         priority: 'P3',
         details: 'Created via automated script',
       }),

@@ -17,11 +17,12 @@ import { exportToCSV, exportToJSON } from '../lib/export'
 import { useKeyboardShortcuts, SHORTCUT_CATEGORIES, type KeyboardShortcut } from '../hooks/useKeyboardShortcuts'
 import { useSavedViews, type SavedView } from '../hooks/useSavedViews'
 import { useTicketTemplates } from '../hooks/useTicketTemplates'
+import { STATUS_OPTIONS } from '../lib/statuses'
 
 const StatusFilter: React.FC<{value:string,onChange:(v:string)=>void}> = ({value,onChange}) => (
   <select value={value} onChange={e=>onChange(e.target.value)}>
     <option value="">All statuses</option>
-    {['NEW','TRIAGE','IN_PROGRESS','PENDING','RESOLVED','CLOSED'].map(s => <option key={s} value={s}>{s}</option>)}
+    {STATUS_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
   </select>
 )
 
@@ -128,7 +129,7 @@ const TicketRow: React.FC<{
           disabled={quickSaving}
           aria-label={`Status for ticket ${ticket.id}`}
         >
-          {['NEW','TRIAGE','IN_PROGRESS','PENDING','RESOLVED','CLOSED'].map(s => <option key={s} value={s}>{s}</option>)}
+          {STATUS_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
         </select>
       </td>
       <td>{ticket.typeKey}</td>
@@ -824,10 +825,10 @@ export default function Dashboard() {
         </div>
         <div style={{marginBottom:8}}>
           <div className="muted">Status weights</div>
-          {['NEW','TRIAGE','IN_PROGRESS','PENDING','RESOLVED','CLOSED'].map(s => (
-            <div key={s} className="row" style={{marginTop:6}}>
-              <label style={{width:120}}>{s}</label>
-              <input type="number" value={(cfg.weightStatus as any)[s]||0} onChange={e=>setCfg({...cfg, weightStatus: {...cfg.weightStatus, [s]: Number(e.target.value)}})} />
+          {STATUS_OPTIONS.map(s => (
+            <div key={s.value} className="row" style={{marginTop:6}}>
+              <label style={{width:120}}>{s.label}</label>
+              <input type="number" value={(cfg.weightStatus as any)[s.value]||0} onChange={e=>setCfg({...cfg, weightStatus: {...cfg.weightStatus, [s.value]: Number(e.target.value)}})} />
             </div>
           ))}
         </div>

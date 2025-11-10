@@ -1,4 +1,5 @@
 import axios from 'axios'
+import type { TicketStatusValue } from './statuses'
 export const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3000'
 const client = axios.create({ baseURL: API_BASE })
 client.interceptors.request.use((config) => {
@@ -11,7 +12,7 @@ export interface Ticket {
   siteId: string
   typeKey: string
   description: string
-  status: 'NEW' | 'TRIAGE' | 'IN_PROGRESS' | 'PENDING' | 'RESOLVED' | 'CLOSED'
+  status: TicketStatusValue
   priority: 'P1' | 'P2' | 'P3' | 'P4'
   details?: string
   customFields?: Record<string, any>

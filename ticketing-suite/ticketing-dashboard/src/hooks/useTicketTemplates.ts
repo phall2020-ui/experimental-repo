@@ -29,11 +29,11 @@ export const DEFAULT_TEMPLATES: TicketTemplate[] = [
     category: 'Development',
     isGlobal: true,
     template: {
-      type: 'BUG',
+      type: 'PPA_TOP',
       priority: 'P3',
-      status: 'NEW',
+      status: 'AWAITING_RESPONSE',
       description: '[Bug] ',
-      details: '**Steps to Reproduce:**\n1. \n2. \n3. \n\n**Expected Behavior:**\n\n\n**Actual Behavior:**\n\n\n**Environment:**\n- Browser: \n- OS: \n'
+      details: '**Steps to Reproduce:**\n1. \n2. \n3. \n\n**Expected Behavior:**\n\n\n**Actual Behavior:**\n'
     },
     createdAt: new Date().toISOString(),
     usageCount: 0
@@ -45,9 +45,9 @@ export const DEFAULT_TEMPLATES: TicketTemplate[] = [
     category: 'Development',
     isGlobal: true,
     template: {
-      type: 'FEATURE',
+      type: 'PPA_OTHER',
       priority: 'P4',
-      status: 'NEW',
+      status: 'AWAITING_RESPONSE',
       description: '[Feature] ',
       details: '**Problem Statement:**\n\n\n**Proposed Solution:**\n\n\n**Benefits:**\n\n\n**Alternatives Considered:**\n\n'
     },
@@ -61,9 +61,9 @@ export const DEFAULT_TEMPLATES: TicketTemplate[] = [
     category: 'Support',
     isGlobal: true,
     template: {
-      type: 'SUPPORT',
+      type: 'EPC',
       priority: 'P3',
-      status: 'NEW',
+      status: 'AWAITING_RESPONSE',
       description: '[Support] ',
       details: '**Issue Description:**\n\n\n**Impact:**\n\n\n**Urgency:**\n\n'
     },
@@ -77,9 +77,9 @@ export const DEFAULT_TEMPLATES: TicketTemplate[] = [
     category: 'Operations',
     isGlobal: true,
     template: {
-      type: 'INCIDENT',
+      type: 'HSE',
       priority: 'P1',
-      status: 'TRIAGE',
+      status: 'ADE_TO_RESPOND',
       description: '[INCIDENT] ',
       details: '**Incident Summary:**\n\n\n**Impact:**\n\n\n**Timeline:**\n\n\n**Next Steps:**\n\n'
     },

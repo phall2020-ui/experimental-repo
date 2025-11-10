@@ -101,12 +101,10 @@ model IssueType {
 }
 
 enum TicketStatus {
-  NEW
-  TRIAGE
-  IN_PROGRESS
-  PENDING
-  RESOLVED
+  AWAITING_RESPONSE
+  ADE_TO_RESPOND
   CLOSED
+  ON_HOLD
 }
 
 enum TicketPriority {

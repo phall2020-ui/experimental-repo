@@ -176,7 +176,7 @@ describe('Ticketing System E2E Tests', () => {
           siteId: testSiteId,
           type: 'TEST_TYPE',
           description: 'Test ticket description',
-          status: 'NEW',
+          status: 'AWAITING_RESPONSE',
           priority: 'P2',
           details: 'Test ticket details',
           assignedUserId: testUserId,
@@ -186,7 +186,7 @@ describe('Ticketing System E2E Tests', () => {
         .expect((res) => {
           expect(res.body).toHaveProperty('id');
           expect(res.body.description).toBe('Test ticket description');
-          expect(res.body.status).toBe('NEW');
+          expect(res.body.status).toBe('AWAITING_RESPONSE');
           expect(res.body.priority).toBe('P2');
           testTicketId = res.body.id;
         });
@@ -205,15 +205,15 @@ describe('Ticketing System E2E Tests', () => {
         });
     });
 
-    it('GET /tickets?status=NEW - should filter tickets by status', () => {
+    it('GET /tickets?status=AWAITING_RESPONSE - should filter tickets by status', () => {
       return request(app.getHttpServer())
-        .get('/tickets?status=NEW')
+        .get('/tickets?status=AWAITING_RESPONSE')
         .set('Authorization', `Bearer ${authToken}`)
         .expect(200)
         .expect((res) => {
           expect(Array.isArray(res.body)).toBe(true);
           if (res.body.length > 0) {
-            expect(res.body[0].status).toBe('NEW');
+            expect(res.body[0].status).toBe('AWAITING_RESPONSE');
           }
         });
     });
@@ -260,14 +260,14 @@ describe('Ticketing System E2E Tests', () => {
         .set('Authorization', `Bearer ${authToken}`)
         .send({
           description: 'Updated test ticket description',
-          status: 'IN_PROGRESS',
+          status: 'ADE_TO_RESPOND',
           priority: 'P1',
         })
         .expect(200)
         .expect((res) => {
           expect(res.body.id).toBe(testTicketId);
           expect(res.body.description).toBe('Updated test ticket description');
-          expect(res.body.status).toBe('IN_PROGRESS');
+          expect(res.body.status).toBe('ADE_TO_RESPOND');
           expect(res.body.priority).toBe('P1');
         });
     });
@@ -289,7 +289,7 @@ describe('Ticketing System E2E Tests', () => {
           siteId: testSiteId,
           type: 'TEST_TYPE',
           description: 'Test ticket',
-          status: 'NEW',
+          status: 'AWAITING_RESPONSE',
           priority: 'P2',
         })
         .expect(401);
@@ -814,14 +814,14 @@ describe('Ticketing System E2E Tests', () => {
           siteId: testSiteId,
           type: 'TEST_TYPE',
           description: 'Lifecycle test ticket',
-          status: 'NEW',
+          status: 'AWAITING_RESPONSE',
           priority: 'P1',
           details: 'Testing complete lifecycle',
         })
         .expect(201);
 
       flowTicketId = createResponse.body.id;
-      expect(createResponse.body.status).toBe('NEW');
+      expect(createResponse.body.status).toBe('AWAITING_RESPONSE');
 
       // Step 2: Add a comment to the ticket
       const commentResponse = await request(app.getHttpServer())
@@ -835,17 +835,17 @@ describe('Ticketing System E2E Tests', () => {
 
       expect(commentResponse.body.body).toBe('Initial comment on ticket');
 
-      // Step 3: Update ticket to IN_PROGRESS
+      // Step 3: Update ticket to ADE_TO_RESPOND
       const updateResponse = await request(app.getHttpServer())
         .patch(`/tickets/${flowTicketId}`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({
-          status: 'IN_PROGRESS',
+          status: 'ADE_TO_RESPOND',
           assignedUserId: testUserId,
         })
         .expect(200);
 
-      expect(updateResponse.body.status).toBe('IN_PROGRESS');
+      expect(updateResponse.body.status).toBe('ADE_TO_RESPOND');
       expect(updateResponse.body.assignedUserId).toBe(testUserId);
 
       // Step 4: Add another comment
@@ -897,16 +897,16 @@ describe('Ticketing System E2E Tests', () => {
 
       expect(Array.isArray(historyResponse.body)).toBe(true);
 
-      // Step 9: Update ticket to RESOLVED
+      // Step 9: Update ticket to CLOSED
       const resolveResponse = await request(app.getHttpServer())
         .patch(`/tickets/${flowTicketId}`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({
-          status: 'RESOLVED',
+          status: 'CLOSED',
         })
         .expect(200);
 
-      expect(resolveResponse.body.status).toBe('RESOLVED');
+      expect(resolveResponse.body.status).toBe('CLOSED');
 
       // Step 10: Verify final state
       const finalResponse = await request(app.getHttpServer())
@@ -914,7 +914,7 @@ describe('Ticketing System E2E Tests', () => {
         .set('Authorization', `Bearer ${authToken}`)
         .expect(200);
 
-      expect(finalResponse.body.status).toBe('RESOLVED');
+      expect(finalResponse.body.status).toBe('CLOSED');
       expect(finalResponse.body.assignedUserId).toBe(testUserId);
     });
   });
