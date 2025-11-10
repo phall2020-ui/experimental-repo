@@ -17,7 +17,7 @@
     "seed": "ts-node prisma/seed.ts",
     "seed:test": "ts-node prisma/seed-test-data.ts",
     "test": "jest",
-    "test:e2e": "jest --config jest.e2e.config.js --runInBand"
+    "test:e2e": "jest --config jest.e2e.config.js --runInBand",
     "postinstall": "prisma generate",
   },
   "dependencies": {
