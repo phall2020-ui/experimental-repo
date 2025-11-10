@@ -21,6 +21,9 @@ if [ -z "$ENTRY" ]; then
 fi
 echo "✅ Using entry: $ENTRY"
 
+echo "🧬 Generating Prisma client…"
+npx prisma generate
+
 echo "🗃️  Running prisma migrate deploy…"
 npx prisma migrate deploy
 
