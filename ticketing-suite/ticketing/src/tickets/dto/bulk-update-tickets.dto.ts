@@ -1,4 +1,4 @@
-import { ArrayNotEmpty, IsArray, IsEnum, IsOptional, IsString, IsUUID, ValidateIf } from 'class-validator';
+import { ArrayNotEmpty, IsArray, IsEnum, IsISO8601, IsOptional, IsString, IsUUID, ValidateIf } from 'class-validator';
 import { TicketPriority, TicketStatus } from '@prisma/client';
 
 export class BulkUpdateTicketsDto {
@@ -18,5 +18,9 @@ export class BulkUpdateTicketsDto {
   @ValidateIf((_, value) => value !== undefined && value !== null && value !== '')
   @IsUUID()
   assignedUserId?: string | null;
+
+  @IsOptional()
+  @IsISO8601()
+  dueAt?: string | null;
 }
 

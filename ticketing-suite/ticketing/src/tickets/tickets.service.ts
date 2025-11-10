@@ -237,7 +237,8 @@ export class TicketsService {
 
   async update(tenantId: string, id: string, patch: Partial<{
     siteId: string; type: string; description: string;
-    status: TicketStatus; priority: TicketPriority; details?: string; assignedUserId?: string;
+    status: TicketStatus; priority: TicketPriority; details?: string; assignedUserId?: string | null;
+    dueAt?: string | null;
     custom_fields: Record<string, unknown>;
   }>) {
     return this.prisma.withTenant(tenantId, async (tx) => {

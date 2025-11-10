@@ -81,7 +81,7 @@ export class TicketsController {
   @Patch('bulk')
   @Roles('ADMIN', 'USER')
   async bulkUpdate(@Req() req: any, @Body() body: BulkUpdateTicketsDto) {
-    if (body.status === undefined && body.priority === undefined && body.assignedUserId === undefined) {
+    if (body.status === undefined && body.priority === undefined && body.assignedUserId === undefined && body.dueAt === undefined) {
       throw new BadRequestException('At least one update field must be provided');
     }
     this.setActor(req.user?.sub);
@@ -89,6 +89,7 @@ export class TicketsController {
       status: body.status,
       priority: body.priority,
       assignedUserId: body.assignedUserId === '' ? null : body.assignedUserId,
+      dueAt: body.dueAt ?? undefined,
     });
   }
 
