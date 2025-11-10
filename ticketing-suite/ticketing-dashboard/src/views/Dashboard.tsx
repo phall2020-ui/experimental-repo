@@ -54,11 +54,13 @@ const TicketRow: React.FC<{
   ticket: Ticket
   users: UserOpt[]
   sites: SiteOpt[]
+  types: IssueTypeOpt[]
   isSelected?: boolean
   onToggleSelect?: () => void
   onQuickView?: () => void
-}> = ({ ticket, users, sites, isSelected = false, onToggleSelect, onQuickView }) => {
+}> = ({ ticket, users, sites, types, isSelected = false, onToggleSelect, onQuickView }) => {
   const assignedUser = users.find(u => u.id === ticket.assignedUserId)
+  const typeLabel = types.find(t => t.key === ticket.typeKey)?.label ?? ticket.typeKey.replace(/_/g, ' ')
 
   // RAG color coding for due dates
   const getDueDateColor = () => {
@@ -110,7 +112,7 @@ const TicketRow: React.FC<{
       <td>
         <StatusChip status={ticket.status} />
       </td>
-      <td>{ticket.typeKey}</td>
+      <td>{typeLabel}</td>
       <td>
         <div
           style={{ display: 'flex', justifyContent: 'center' }}
@@ -834,6 +836,7 @@ const statsCardStyle = React.useCallback((accent: string): React.CSSProperties =
                   ticket={t}
                   users={users}
                   sites={sites}
+                  types={types}
                   isSelected={selectedTicketIds.has(t.id)}
                   onToggleSelect={() => handleToggleSelect(t.id)}
                   onQuickView={() => handleQuickView(t.id)}
