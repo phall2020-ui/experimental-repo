@@ -11,6 +11,7 @@ import TicketTemplates from '../components/TicketTemplates'
 import KeyboardShortcutsHelp from '../components/KeyboardShortcutsHelp'
 import { PriorityBadge } from '../components/ui/PriorityBadge'
 import { EmptyState } from '../components/ui/EmptyState'
+import { StatusChip } from '../components/ui/StatusChip'
 import { listSites, listUsers, listIssueTypes, listFieldDefinitions, type SiteOpt, type UserOpt, type IssueTypeOpt, type FieldDefOpt } from '../lib/directory'
 import { useNotifications } from '../lib/notifications'
 import { exportToCSV, exportToJSON } from '../lib/export'
@@ -27,7 +28,7 @@ const StatusFilter: React.FC<{value:string,onChange:(v:string)=>void}> = ({value
 )
 
 // User avatar component
-const UserAvatar: React.FC<{ user?: UserOpt; size?: number }> = ({ user, size = 24 }) => {
+const UserAvatar: React.FC<{ user?: UserOpt; size?: number; showMargin?: boolean }> = ({ user, size = 24, showMargin = true }) => {
   if (!user) return <span style={{ fontSize: size * 0.6 }}>—</span>
   const initials = (user.name || user.email || '?').split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
   return (
@@ -43,7 +44,7 @@ const UserAvatar: React.FC<{ user?: UserOpt; size?: number }> = ({ user, size = 
         justifyContent: 'center',
         fontSize: size * 0.4,
         fontWeight: 600,
-        marginRight: 6
+        marginRight: showMargin ? 6 : 0
       }}
       title={user.name || user.email}
     >
@@ -107,46 +108,47 @@ const TicketRow: React.FC<{
           />
         </td>
       )}
-      <td>
-        <select 
-          value={ticket.priority} 
-          onChange={e => quickUpdate('priority', e.target.value)}
-          style={{fontSize: 11, padding: 2}}
-          disabled={quickSaving}
-          aria-label={`Priority for ticket ${ticket.id}`}
+      <td style={{ fontFamily: 'monospace', fontSize: 12 }}>
+        <span
+          title={ticket.id}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            cursor: onQuickView ? 'pointer' : 'default'
+          }}
+          onClick={onQuickView}
         >
-          {['P1','P2','P3','P4'].map(p => <option key={p} value={p}>{p}</option>)}
-        </select>
+          {ticket.id.slice(0, 8)}
+          {ticket.id.length > 8 ? '…' : ''}
+        </span>
       </td>
       <td>
         <div className="linkish"><Link to={`/tickets/${ticket.id}`}>{ticket.description}</Link></div>
         <div className="status">{ticket.details || ''}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+          <PriorityBadge priority={ticket.priority} />
+          <select 
+            value={ticket.priority} 
+            onChange={e => quickUpdate('priority', e.target.value)}
+            style={{fontSize: 11, padding: 2}}
+            disabled={quickSaving}
+            aria-label={`Priority for ticket ${ticket.id}`}
+          >
+            {['P1','P2','P3','P4'].map(p => <option key={p} value={p}>{p}</option>)}
+          </select>
+        </div>
       </td>
       <td>
-        <select 
-          value={ticket.status} 
-          onChange={e => quickUpdate('status', e.target.value)}
-          style={{fontSize: 11, padding: 2}}
-          disabled={quickSaving}
-          aria-label={`Status for ticket ${ticket.id}`}
-        >
-          {STATUS_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-        </select>
+        <StatusChip status={ticket.status} />
       </td>
       <td>{ticket.typeKey}</td>
       <td>
-        <div style={{ display: 'flex', alignItems: 'center' }}>
-          <UserAvatar user={assignedUser} size={20} />
-          <select 
-            value={ticket.assignedUserId || ''} 
-            onChange={e => quickUpdate('assignedUserId', e.target.value || '')}
-            style={{fontSize: 11, padding: 2, minWidth: 120, flex: 1}}
-            disabled={quickSaving}
-            aria-label={`Assigned user for ticket ${ticket.id}`}
-          >
-            <option value="">Unassigned</option>
-            {users.map(u => <option key={u.id} value={u.id}>{u.name || u.email}</option>)}
-          </select>
+        <div
+          style={{ display: 'flex', justifyContent: 'center' }}
+          aria-label={`Assigned user for ticket ${ticket.id}: ${assignedUser ? (assignedUser.name || assignedUser.email) : 'Unassigned'}`}
+        >
+          <UserAvatar user={assignedUser} size={24} showMargin={false} />
         </div>
       </td>
       <td>{sites.find(s => s.id === ticket.siteId)?.name || '—'}</td>
@@ -772,8 +774,8 @@ export default function Dashboard() {
                   aria-label="Select all tickets"
                 />
               </th>
-              <th style={{cursor: 'pointer'}} onClick={() => handleSort('priority')}>
-                Priority <SortIcon col="priority" />
+              <th style={{cursor: 'pointer'}} onClick={() => handleSort('id')}>
+                Ticket ID <SortIcon col="id" />
               </th>
               <th style={{cursor: 'pointer'}} onClick={() => handleSort('description')}>
                 Description <SortIcon col="description" />
