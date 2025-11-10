@@ -255,13 +255,13 @@ export class TicketsService {
         return { deleted: 0 };
       }
 
-      const existingIds = existing.map(t => t.id);
+      const existingIds: string[] = existing.map(({ id }: { id: string }) => id);
 
       await tx.ticket.deleteMany({
         where: { tenantId, id: { in: existingIds } },
       });
 
-      await Promise.all(existingIds.map(id =>
+      await Promise.all(existingIds.map((id: string) =>
         tx.outbox.create({ data: { tenantId, type: 'ticket.deleted', entityId: id, payload: {} }})
       ));
 
