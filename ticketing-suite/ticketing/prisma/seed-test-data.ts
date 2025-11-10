@@ -151,8 +151,13 @@ async function main() {
       typeKey: 'PPA_TOP',
       description: 'Login page not loading on mobile devices',
       details: 'Users on iOS Safari are unable to access the login page. The page shows a blank screen after the initial load.',
+<<<<<<< HEAD
       status: 'AWAITING_RESPONSE' as TicketStatus,
       priority: 'P1' as TicketPriority,
+=======
+      status: 'NEW' as TicketStatus,
+      priority: 'High' as TicketPriority,
+>>>>>>> 74f08e7 (Align dashboard site column and custom field filtering)
       assignedUserId: users[1].id,
       customFields: { severity: 'Critical', customer_impact: true },
     },
@@ -161,8 +166,13 @@ async function main() {
       typeKey: 'PPA_OTHER',
       description: 'Add dark mode support to dashboard',
       details: 'Implement a dark mode theme option for users who prefer working in low-light environments.',
+<<<<<<< HEAD
       status: 'ADE_TO_RESPOND' as TicketStatus,
       priority: 'P3' as TicketPriority,
+=======
+      status: 'IN_PROGRESS' as TicketStatus,
+      priority: 'Low' as TicketPriority,
+>>>>>>> 74f08e7 (Align dashboard site column and custom field filtering)
       assignedUserId: users[2].id,
       customFields: {},
     },
@@ -171,8 +181,13 @@ async function main() {
       typeKey: 'EPC',
       description: 'User unable to reset password',
       details: 'Customer reports not receiving password reset emails. Email address verified as correct.',
+<<<<<<< HEAD
       status: 'ON_HOLD' as TicketStatus,
       priority: 'P2' as TicketPriority,
+=======
+      status: 'TRIAGE' as TicketStatus,
+      priority: 'Medium' as TicketPriority,
+>>>>>>> 74f08e7 (Align dashboard site column and custom field filtering)
       assignedUserId: users[3].id,
       customFields: { severity: 'High', customer_impact: true },
     },
@@ -181,8 +196,13 @@ async function main() {
       typeKey: 'O_AND_M',
       description: 'Database connection timeout errors',
       details: 'Multiple users experiencing intermittent database connection timeouts during peak hours.',
+<<<<<<< HEAD
       status: 'ADE_TO_RESPOND' as TicketStatus,
       priority: 'P1' as TicketPriority,
+=======
+      status: 'IN_PROGRESS' as TicketStatus,
+      priority: 'High' as TicketPriority,
+>>>>>>> 74f08e7 (Align dashboard site column and custom field filtering)
       assignedUserId: users[1].id,
       customFields: { severity: 'Critical', customer_impact: true },
     },
@@ -191,8 +211,13 @@ async function main() {
       typeKey: 'O_AND_M',
       description: 'Scheduled server maintenance - Chicago datacenter',
       details: 'Routine maintenance window scheduled for Saturday 2 AM - 6 AM CST.',
+<<<<<<< HEAD
       status: 'ON_HOLD' as TicketStatus,
       priority: 'P3' as TicketPriority,
+=======
+      status: 'PENDING' as TicketStatus,
+      priority: 'Low' as TicketPriority,
+>>>>>>> 74f08e7 (Align dashboard site column and custom field filtering)
       assignedUserId: users[4].id,
       customFields: {},
     },
@@ -201,8 +226,13 @@ async function main() {
       typeKey: 'HSE',
       description: 'Potential SQL injection vulnerability in search',
       details: 'Security audit revealed potential SQL injection point in the advanced search feature.',
+<<<<<<< HEAD
       status: 'AWAITING_RESPONSE' as TicketStatus,
       priority: 'P1' as TicketPriority,
+=======
+      status: 'NEW' as TicketStatus,
+      priority: 'High' as TicketPriority,
+>>>>>>> 74f08e7 (Align dashboard site column and custom field filtering)
       assignedUserId: users[1].id,
       customFields: { severity: 'Critical', customer_impact: false },
     },
@@ -211,8 +241,13 @@ async function main() {
       typeKey: 'PPA_TOP',
       description: 'Export to CSV function not working',
       details: 'When attempting to export ticket data to CSV, the download fails with a 500 error.',
+<<<<<<< HEAD
       status: 'CLOSED' as TicketStatus,
       priority: 'P2' as TicketPriority,
+=======
+      status: 'RESOLVED' as TicketStatus,
+      priority: 'Medium' as TicketPriority,
+>>>>>>> 74f08e7 (Align dashboard site column and custom field filtering)
       assignedUserId: users[2].id,
       customFields: { severity: 'Medium' },
     },
@@ -221,8 +256,13 @@ async function main() {
       typeKey: 'PPA_OTHER',
       description: 'Update API documentation for v2 endpoints',
       details: 'New API endpoints need to be documented in the developer portal.',
+<<<<<<< HEAD
       status: 'ADE_TO_RESPOND' as TicketStatus,
       priority: 'P4' as TicketPriority,
+=======
+      status: 'IN_PROGRESS' as TicketStatus,
+      priority: 'Low' as TicketPriority,
+>>>>>>> 74f08e7 (Align dashboard site column and custom field filtering)
       assignedUserId: users[5].id,
       customFields: {},
     },
@@ -231,8 +271,13 @@ async function main() {
       typeKey: 'EPC',
       description: 'Upgrade Redis cluster to latest version',
       details: 'Plan and execute upgrade of Redis cluster from 6.2 to 7.0 for improved performance.',
+<<<<<<< HEAD
       status: 'ON_HOLD' as TicketStatus,
       priority: 'P3' as TicketPriority,
+=======
+      status: 'PENDING' as TicketStatus,
+      priority: 'Low' as TicketPriority,
+>>>>>>> 74f08e7 (Align dashboard site column and custom field filtering)
       assignedUserId: users[4].id,
       customFields: {},
     },
@@ -242,7 +287,7 @@ async function main() {
       description: 'Implement bulk ticket operations',
       details: 'Add ability to select multiple tickets and perform bulk actions like status change, assignment, etc.',
       status: 'CLOSED' as TicketStatus,
-      priority: 'P2' as TicketPriority,
+      priority: 'Medium' as TicketPriority,
       assignedUserId: users[2].id,
       customFields: {},
     },
@@ -251,8 +296,13 @@ async function main() {
       typeKey: 'PPA_TOP',
       description: 'Notification emails not being sent',
       details: 'Email notifications for ticket updates are not being delivered to users.',
+<<<<<<< HEAD
       status: 'AWAITING_RESPONSE' as TicketStatus,
       priority: 'P2' as TicketPriority,
+=======
+      status: 'NEW' as TicketStatus,
+      priority: 'Medium' as TicketPriority,
+>>>>>>> 74f08e7 (Align dashboard site column and custom field filtering)
       assignedUserId: null,
       customFields: { severity: 'High', customer_impact: true },
     },
@@ -261,8 +311,13 @@ async function main() {
       typeKey: 'EPC',
       description: 'Help with custom field configuration',
       details: 'User needs assistance setting up custom fields for their workflow.',
+<<<<<<< HEAD
       status: 'CLOSED' as TicketStatus,
       priority: 'P4' as TicketPriority,
+=======
+      status: 'RESOLVED' as TicketStatus,
+      priority: 'Low' as TicketPriority,
+>>>>>>> 74f08e7 (Align dashboard site column and custom field filtering)
       assignedUserId: users[3].id,
       customFields: {},
     },
@@ -272,7 +327,7 @@ async function main() {
       description: 'Add keyboard shortcuts for power users',
       details: 'Implement keyboard shortcuts for common actions to improve productivity.',
       status: 'CLOSED' as TicketStatus,
-      priority: 'P3' as TicketPriority,
+      priority: 'Low' as TicketPriority,
       assignedUserId: users[2].id,
       customFields: {},
     },
@@ -281,8 +336,13 @@ async function main() {
       typeKey: 'O_AND_M',
       description: 'Payment processing system outage',
       details: 'Payment gateway is returning errors. All transactions are failing.',
+<<<<<<< HEAD
       status: 'CLOSED' as TicketStatus,
       priority: 'P1' as TicketPriority,
+=======
+      status: 'RESOLVED' as TicketStatus,
+      priority: 'High' as TicketPriority,
+>>>>>>> 74f08e7 (Align dashboard site column and custom field filtering)
       assignedUserId: users[1].id,
       customFields: { severity: 'Critical', customer_impact: true },
     },
@@ -291,8 +351,13 @@ async function main() {
       typeKey: 'O_AND_M',
       description: 'Clean up old log files',
       details: 'Server disk space running low. Need to archive and clean up old application logs.',
+<<<<<<< HEAD
       status: 'AWAITING_RESPONSE' as TicketStatus,
       priority: 'P3' as TicketPriority,
+=======
+      status: 'NEW' as TicketStatus,
+      priority: 'Low' as TicketPriority,
+>>>>>>> 74f08e7 (Align dashboard site column and custom field filtering)
       assignedUserId: users[4].id,
       customFields: {},
     },

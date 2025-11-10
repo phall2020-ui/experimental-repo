@@ -12,8 +12,13 @@ export interface Ticket {
   siteId: string
   typeKey: string
   description: string
+<<<<<<< HEAD
   status: TicketStatusValue
   priority: 'P1' | 'P2' | 'P3' | 'P4'
+=======
+  status: 'NEW' | 'TRIAGE' | 'IN_PROGRESS' | 'PENDING' | 'RESOLVED' | 'CLOSED'
+  priority: 'High' | 'Medium' | 'Low'
+>>>>>>> 74f08e7 (Align dashboard site column and custom field filtering)
   details?: string
   customFields?: Record<string, any>
   createdAt: string

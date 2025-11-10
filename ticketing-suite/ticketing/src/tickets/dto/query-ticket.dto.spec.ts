@@ -57,8 +57,13 @@ describe('QueryTicketDto', () => {
 
   it('should accept all filters together', async () => {
     const dto = new QueryTicketDto();
+<<<<<<< HEAD
     dto.status = 'AWAITING_RESPONSE';
     dto.priority = 'P1';
+=======
+    dto.status = 'NEW';
+    dto.priority = 'High';
+>>>>>>> 74f08e7 (Align dashboard site column and custom field filtering)
     dto.siteId = '550e8400-e29b-41d4-a716-446655440000';
     dto.assignedUserId = '550e8400-e29b-41d4-a716-446655440001';
     dto.createdFrom = '2025-01-01';

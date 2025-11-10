@@ -222,10 +222,9 @@ export default function BulkOperations({
                 
                 {dialogType === 'priority' && (
                   <>
-                    <MenuItem value="P1">P1 - Critical</MenuItem>
-                    <MenuItem value="P2">P2 - High</MenuItem>
-                    <MenuItem value="P3">P3 - Medium</MenuItem>
-                    <MenuItem value="P4">P4 - Low</MenuItem>
+                    <MenuItem value="High">High</MenuItem>
+                    <MenuItem value="Medium">Medium</MenuItem>
+                    <MenuItem value="Low">Low</MenuItem>
                   </>
                 )}
                 

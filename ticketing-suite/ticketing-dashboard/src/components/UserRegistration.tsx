@@ -278,7 +278,7 @@ export default function UserRegistration({ onClose, onSuccess }: UserRegistratio
                           <option value="ADMIN">ADMIN</option>
                         </select>
                       ) : (
-                        <span className={`badge ${u.role === 'ADMIN' ? 'P1' : 'P3'}`}>{u.role}</span>
+                        <span className={`badge ${u.role === 'ADMIN' ? 'High' : 'Low'}`}>{u.role}</span>
                       )}
                     </td>
                     <td style={{ textAlign: 'right' }}>

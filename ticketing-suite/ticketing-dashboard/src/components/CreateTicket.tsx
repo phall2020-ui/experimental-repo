@@ -215,9 +215,13 @@ export default function CreateTicket({ onClose, onSuccess }: CreateTicketProps) 
               <CustomFieldsForm
                 fieldDefs={filteredFieldDefs}
                 values={formData.custom_fields}
+<<<<<<< HEAD
                 onChange={(custom_fields) => {
                   setFormData({ ...formData, custom_fields: sanitizeCustomFieldValues(custom_fields) })
                 }}
+=======
+                onChange={(custom_fields) => setFormData({ ...formData, custom_fields: sanitizeCustomFieldValues(custom_fields) })}
+>>>>>>> 74f08e7 (Align dashboard site column and custom field filtering)
               />
             </Box>
           )}

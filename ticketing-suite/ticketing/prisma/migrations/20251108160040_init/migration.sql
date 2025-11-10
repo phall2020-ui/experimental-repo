@@ -2,7 +2,7 @@
 CREATE TYPE "TicketStatus" AS ENUM ('AWAITING_RESPONSE', 'ADE_TO_RESPOND', 'CLOSED', 'ON_HOLD');
 
 -- CreateEnum
-CREATE TYPE "TicketPriority" AS ENUM ('P1', 'P2', 'P3', 'P4');
+CREATE TYPE "TicketPriority" AS ENUM ('High', 'Medium', 'Low');
 
 -- CreateEnum
 CREATE TYPE "FieldDatatype" AS ENUM ('string', 'number', 'boolean', 'date', 'enum');

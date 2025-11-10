@@ -29,9 +29,15 @@ export const DEFAULT_TEMPLATES: TicketTemplate[] = [
     category: 'Development',
     isGlobal: true,
     template: {
+<<<<<<< HEAD
       type: 'PPA_TOP',
       priority: 'P3',
       status: 'AWAITING_RESPONSE',
+=======
+      type: 'BUG',
+      priority: 'Low',
+      status: 'NEW',
+>>>>>>> 74f08e7 (Align dashboard site column and custom field filtering)
       description: '[Bug] ',
       details: '**Steps to Reproduce:**\n1. \n2. \n3. \n\n**Expected Behavior:**\n\n\n**Actual Behavior:**\n'
     },
@@ -45,9 +51,15 @@ export const DEFAULT_TEMPLATES: TicketTemplate[] = [
     category: 'Development',
     isGlobal: true,
     template: {
+<<<<<<< HEAD
       type: 'PPA_OTHER',
       priority: 'P4',
       status: 'AWAITING_RESPONSE',
+=======
+      type: 'FEATURE',
+      priority: 'Low',
+      status: 'NEW',
+>>>>>>> 74f08e7 (Align dashboard site column and custom field filtering)
       description: '[Feature] ',
       details: '**Problem Statement:**\n\n\n**Proposed Solution:**\n\n\n**Benefits:**\n\n\n**Alternatives Considered:**\n\n'
     },
@@ -61,9 +73,15 @@ export const DEFAULT_TEMPLATES: TicketTemplate[] = [
     category: 'Support',
     isGlobal: true,
     template: {
+<<<<<<< HEAD
       type: 'EPC',
       priority: 'P3',
       status: 'AWAITING_RESPONSE',
+=======
+      type: 'SUPPORT',
+      priority: 'Low',
+      status: 'NEW',
+>>>>>>> 74f08e7 (Align dashboard site column and custom field filtering)
       description: '[Support] ',
       details: '**Issue Description:**\n\n\n**Impact:**\n\n\n**Urgency:**\n\n'
     },
@@ -77,9 +95,15 @@ export const DEFAULT_TEMPLATES: TicketTemplate[] = [
     category: 'Operations',
     isGlobal: true,
     template: {
+<<<<<<< HEAD
       type: 'HSE',
       priority: 'P1',
       status: 'ADE_TO_RESPOND',
+=======
+      type: 'INCIDENT',
+      priority: 'High',
+      status: 'TRIAGE',
+>>>>>>> 74f08e7 (Align dashboard site column and custom field filtering)
       description: '[INCIDENT] ',
       details: '**Incident Summary:**\n\n\n**Impact:**\n\n\n**Timeline:**\n\n\n**Next Steps:**\n\n'
     },

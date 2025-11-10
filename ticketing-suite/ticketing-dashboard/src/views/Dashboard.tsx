@@ -102,7 +102,7 @@ const TicketRow: React.FC<{
           disabled={quickSaving}
           aria-label={`Priority for ticket ${ticket.id}`}
         >
-          {['P1','P2','P3','P4'].map(p => <option key={p} value={p}>{p}</option>)}
+          {['High','Medium','Low'].map(p => <option key={p} value={p}>{p}</option>)}
         </select>
       </td>
       <td>
@@ -574,7 +574,7 @@ export default function Dashboard() {
                 <label style={{fontSize: 12}}>Priority</label>
                 <select value={priority} onChange={e=>setPriority(e.target.value)} style={{width: 120}} aria-label="Filter by priority">
                   <option value="">All priorities</option>
-                  {['P1','P2','P3','P4'].map(p => <option key={p} value={p}>{p}</option>)}
+                  {['High','Medium','Low'].map(p => <option key={p} value={p}>{p}</option>)}
                 </select>
               </div>
               <div style={{display: 'flex', flexDirection: 'column', gap: 4}}>
@@ -832,7 +832,7 @@ export default function Dashboard() {
         </div>
         <div style={{marginBottom:8}}>
           <div className="muted">Priority weights</div>
-          {(['P1','P2','P3','P4'] as const).map(p => (
+          {(['High','Medium','Low'] as const).map(p => (
             <div key={p} className="row" style={{marginTop:6}}>
               <label style={{width:60}}>{p}</label>
               <input type="number" value={cfg.weightPriority[p]} onChange={e=>setCfg({...cfg, weightPriority: {...cfg.weightPriority, [p]: Number(e.target.value)}})} />

@@ -108,10 +108,9 @@ enum TicketStatus {
 }
 
 enum TicketPriority {
-  P1
-  P2
-  P3
-  P4
+  High
+  Medium
+  Low
 }
 
 enum Role {

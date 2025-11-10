@@ -8,6 +8,8 @@ import Comments from '../components/Comments'
 import Attachments from '../components/Attachments'
 import CustomFieldsForm from '../components/CustomFieldsForm'
 import { useNotifications } from '../lib/notifications'
+import { STATUS_OPTIONS } from '../lib/statuses'
+import { filterFieldDefs, sanitizeCustomFieldValues } from '../lib/customFields'
 
 // User avatar component
 const UserAvatar: React.FC<{ user?: UserOpt; size?: number }> = ({ user, size = 32 }) => {
@@ -140,7 +142,11 @@ export default function TicketView() {
           <label style={{width:150}}>Assigned User</label>
           <div style={{flex:1, display: 'flex', alignItems: 'center', gap: 8}}>
             <UserAvatar user={users.find(u => u.id === t.assignedUserId)} size={32} />
+<<<<<<< HEAD
             <select value={t.assignedUserId || ''} onChange={e=>setT({...t, assignedUserId: e.target.value || ''})} style={{flex:1}}>
+=======
+            <select value={t.assignedUserId || ''} onChange={e=>setT({...t, assignedUserId:e.target.value || ''})} style={{flex:1}}>
+>>>>>>> 74f08e7 (Align dashboard site column and custom field filtering)
               <option value="">Unassigned</option>
               {users.map(u => <option key={u.id} value={u.id}>{u.name || u.email}</option>)}
             </select>

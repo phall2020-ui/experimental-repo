@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, TicketPriority } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
@@ -123,8 +123,13 @@ async function main() {
       typeKey: 'PPA_TOP',
       description: 'Fire extinguisher needs inspection',
       details: 'Annual inspection is overdue',
+<<<<<<< HEAD
       status: 'AWAITING_RESPONSE',
       priority: 'P2',
+=======
+      status: 'NEW',
+      priority: 'Medium' as TicketPriority,
+>>>>>>> 74f08e7 (Align dashboard site column and custom field filtering)
       assignedUserId: user.id,
     },
   });
@@ -139,8 +144,13 @@ async function main() {
       typeKey: 'O_AND_M',
       description: 'HVAC system not working',
       details: 'Temperature control unit is not responding',
+<<<<<<< HEAD
       status: 'ADE_TO_RESPOND',
       priority: 'P1',
+=======
+      status: 'TRIAGE',
+      priority: 'High' as TicketPriority,
+>>>>>>> 74f08e7 (Align dashboard site column and custom field filtering)
       assignedUserId: admin.id,
     },
   });

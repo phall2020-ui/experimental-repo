@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 import type { FieldDefOpt } from './directory'
+=======
+import type { FieldDefOpt } from '../lib/directory'
+>>>>>>> 74f08e7 (Align dashboard site column and custom field filtering)
 
 const EXCLUDED_CUSTOM_FIELDS = ['environment', 'estimated_hours']
 
