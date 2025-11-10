@@ -37,8 +37,15 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=5 \
 # ✅ Don’t hardcode port here — Railway injects it dynamically
 # EXPOSE 3000
 
-# ✅ Run migrations, then start the server on the injected port
-CMD sh -c "npx prisma migrate deploy && node dist/src/main.js"
-
+# 🧪 Prints env, verifies artifact, migrates, starts app
+CMD sh -c '\
+  echo "🔧 Starting container. PORT=${PORT} NODE_ENV=${NODE_ENV}"; \
+  echo "Checking for dist/src/main.js"; \
+  [ -f dist/src/main.js ] || { echo "❌ dist/src/main.js not found"; ls -R dist | sed -n "1,200p"; exit 1; }; \
+  echo "✅ Build artifact present"; \
+  npx prisma migrate deploy; \
+  echo "🚀 Launching app..."; \
+  node dist/src/main.js \
+'
 
 
