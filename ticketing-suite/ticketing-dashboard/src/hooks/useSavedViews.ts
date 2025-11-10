@@ -48,9 +48,9 @@ export const DEFAULT_VIEWS: SavedView[] = [
   {
     id: 'high-priority',
     name: 'High Priority',
-    description: 'High and Medium priority tickets',
+    description: 'P1 and P2 priority tickets',
     filters: {
-      priority: 'High,Medium' // Special format for multiple
+      priority: 'P1,P2' // Special format for multiple
     },
     isPinned: true,
     createdAt: new Date().toISOString()

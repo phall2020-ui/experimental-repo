@@ -285,9 +285,10 @@ export default function TicketQuickView({
                       onChange={(e) => setEditedTicket({ ...editedTicket, priority: e.target.value as any })}
                       label="Priority"
                     >
-                      <MenuItem value="High">High</MenuItem>
-                      <MenuItem value="Medium">Medium</MenuItem>
-                      <MenuItem value="Low">Low</MenuItem>
+                      <MenuItem value="P1">P1</MenuItem>
+                      <MenuItem value="P2">P2</MenuItem>
+                      <MenuItem value="P3">P3</MenuItem>
+                      <MenuItem value="P4">P4</MenuItem>
                     </Select>
                   </FormControl>
 

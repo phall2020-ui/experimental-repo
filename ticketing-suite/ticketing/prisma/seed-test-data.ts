@@ -272,7 +272,7 @@ async function main() {
       description: 'Add keyboard shortcuts for power users',
       details: 'Implement keyboard shortcuts for common actions to improve productivity.',
       status: 'CLOSED' as TicketStatus,
-      priority: 'Low' as TicketPriority,
+      priority: 'P4' as TicketPriority,
       assignedUserId: users[2].id,
       customFields: {},
     },
