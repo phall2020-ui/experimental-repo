@@ -1,4 +1,4 @@
-import { PrismaClient, TicketStatus, TicketPriority } from '@prisma/client';
+/*import { PrismaClient, TicketStatus, TicketPriority } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
@@ -445,4 +445,4 @@ main()
   })
   .finally(async () => {
     await prisma.$disconnect();
-  });
+  });*/
