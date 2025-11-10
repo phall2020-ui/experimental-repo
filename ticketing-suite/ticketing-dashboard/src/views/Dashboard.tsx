@@ -9,7 +9,6 @@ import BulkOperations from '../components/BulkOperations'
 import TicketQuickView from '../components/TicketQuickView'
 import TicketTemplates from '../components/TicketTemplates'
 import KeyboardShortcutsHelp from '../components/KeyboardShortcutsHelp'
-import { PriorityBadge } from '../components/ui/PriorityBadge'
 import { EmptyState } from '../components/ui/EmptyState'
 import { StatusChip } from '../components/ui/StatusChip'
 import { listSites, listUsers, listIssueTypes, listFieldDefinitions, type SiteOpt, type UserOpt, type IssueTypeOpt, type FieldDefOpt } from '../lib/directory'
@@ -110,7 +109,7 @@ const TicketRow: React.FC<{
         <div className="linkish"><Link to={`/tickets/${ticket.id}`}>{ticket.description}</Link></div>
         <div className="status">{ticket.details || ''}</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
-          <PriorityBadge priority={ticket.priority} />
+          <span style={{ fontSize: 11, fontWeight: 600 }}>{ticket.priority}</span>
         </div>
       </td>
       <td>
