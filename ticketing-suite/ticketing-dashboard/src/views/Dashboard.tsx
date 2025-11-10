@@ -1,5 +1,5 @@
 import React from 'react'
-import { listTickets, updateTicket, type Ticket } from '../lib/api'
+import { bulkDeleteTickets, bulkUpdateTickets, listTickets, updateTicket, type Ticket } from '../lib/api'
 import { sortTickets, loadCfg, saveCfg, type PriorityCfg } from '../lib/prioritise'
 import { Link, useNavigate } from 'react-router-dom'
 import CreateTicket from '../components/CreateTicket'
@@ -190,6 +190,21 @@ export default function Dashboard() {
   const [types, setTypes] = React.useState<IssueTypeOpt[]>([])
   const [fieldDefs, setFieldDefs] = React.useState<FieldDefOpt[]>([])
   const [customFieldFilters, setCustomFieldFilters] = React.useState<Record<string, string>>({})
+  const [isAdmin, setIsAdmin] = React.useState(false)
+
+  React.useEffect(() => {
+    const token = localStorage.getItem('token')
+    if (token) {
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]))
+        setIsAdmin(payload.role === 'ADMIN')
+      } catch {
+        setIsAdmin(false)
+      }
+    } else {
+      setIsAdmin(false)
+    }
+  }, [])
   const [sortColumn, setSortColumn] = React.useState<string>('')
   const [sortDirection, setSortDirection] = React.useState<'asc' | 'desc'>('desc')
   const userId = localStorage.getItem('userId') || ''
@@ -399,12 +414,25 @@ export default function Dashboard() {
   }
 
   const handleBulkUpdate = async (updates: any) => {
-    const selectedTickets = sortedTickets.filter(t => selectedTicketIds.has(t.id))
-    const promises = selectedTickets.map(ticket => updateTicket(ticket.id, updates))
-    
+    const ids = Array.from(selectedTicketIds)
+    if (ids.length === 0) return
+
+    const payload: {
+      ids: string[]
+      status?: Ticket['status']
+      priority?: Ticket['priority']
+      assignedUserId?: string | null
+    } = { ids }
+
+    if (updates.status) payload.status = updates.status
+    if (updates.priority) payload.priority = updates.priority
+    if (Object.prototype.hasOwnProperty.call(updates, 'assignedUserId')) {
+      payload.assignedUserId = updates.assignedUserId === '' ? null : updates.assignedUserId
+    }
+
     try {
-      await Promise.all(promises)
-      showNotification('success', `Updated ${selectedTickets.length} tickets`)
+      await bulkUpdateTickets(payload)
+      showNotification('success', `Updated ${ids.length} ticket${ids.length === 1 ? '' : 's'}`)
       setSelectedTicketIds(new Set())
       fetchList(true)
     } catch (error: any) {
@@ -413,6 +441,19 @@ export default function Dashboard() {
         error.message = Array.isArray(message) ? message.join(', ') : message
         throw error
       }
+      throw new Error(Array.isArray(message) ? message.join(', ') : message)
+    }
+  }
+
+  const handleBulkDelete = async (ids: string[]) => {
+    if (!ids || ids.length === 0) return
+    try {
+      await bulkDeleteTickets(ids)
+      showNotification('success', `Deleted ${ids.length} ticket${ids.length === 1 ? '' : 's'}`)
+      setSelectedTicketIds(new Set())
+      fetchList(true)
+    } catch (error: any) {
+      const message = error?.response?.data?.message || error?.message || 'Failed to delete tickets'
       throw new Error(Array.isArray(message) ? message.join(', ') : message)
     }
   }
@@ -887,6 +928,8 @@ export default function Dashboard() {
         onClearSelection={() => setSelectedTicketIds(new Set())}
         onBulkUpdate={handleBulkUpdate}
         users={users}
+        canDelete={isAdmin}
+        onBulkDelete={handleBulkDelete}
       />
 
       <TicketQuickView

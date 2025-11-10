@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Patch, Param, Body, Query, Req, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { TicketsService } from './tickets.service';
 import { CreateTicketDto } from './dto/create-ticket.dto';
 import { UpdateTicketDto } from './dto/update-ticket.dto';
@@ -6,6 +6,8 @@ import { QueryTicketDto } from './dto/query-ticket.dto';
 import { JwtAuthGuard } from '../common/auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
+import { BulkUpdateTicketsDto } from './dto/bulk-update-tickets.dto';
+import { BulkDeleteTicketsDto } from './dto/bulk-delete-tickets.dto';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('tickets')
@@ -72,5 +74,26 @@ export class TicketsController {
       assignedUserId: patch.assignedUserId,
       custom_fields: patch.custom_fields,
     });
+  }
+
+  @Patch('bulk')
+  @Roles('ADMIN', 'USER')
+  async bulkUpdate(@Req() req: any, @Body() body: BulkUpdateTicketsDto) {
+    if (body.status === undefined && body.priority === undefined && body.assignedUserId === undefined) {
+      throw new BadRequestException('At least one update field must be provided');
+    }
+    this.setActor(req.user?.sub);
+    return this.svc.bulkUpdate(this.tenant(req), body.ids, {
+      status: body.status,
+      priority: body.priority,
+      assignedUserId: body.assignedUserId === '' ? null : body.assignedUserId,
+    });
+  }
+
+  @Delete('bulk')
+  @Roles('ADMIN')
+  async bulkDelete(@Req() req: any, @Body() body: BulkDeleteTicketsDto) {
+    this.setActor(req.user?.sub);
+    return this.svc.bulkDelete(this.tenant(req), body.ids);
   }
 }

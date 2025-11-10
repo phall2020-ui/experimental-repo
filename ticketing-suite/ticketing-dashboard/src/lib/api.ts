@@ -52,6 +52,14 @@ export const createTicket = async (data: {
   custom_fields?: Record<string, any>
 }) => (await client.post<Ticket>('/tickets', data)).data
 export const updateTicket = async (id: string, patch: Partial<Ticket> & { custom_fields?: any }) => (await client.patch<Ticket>(`/tickets/${id}`, patch)).data
+export const bulkUpdateTickets = async (payload: {
+  ids: string[]
+  status?: Ticket['status']
+  priority?: Ticket['priority']
+  assignedUserId?: string | null
+}) => (await client.patch<Ticket[]>('/tickets/bulk', payload)).data
+export const bulkDeleteTickets = async (ids: string[]) =>
+  (await client.delete<{ deleted: number }>('/tickets/bulk', { data: { ids } })).data
 export const listTicketHistory = async (id: string) => (await client.get<TicketHistoryEntry[]>(`/tickets/${id}/history`)).data
 
 // Comments API

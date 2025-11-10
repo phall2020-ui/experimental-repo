@@ -21,7 +21,8 @@ import {
   CheckBox as CheckBoxIcon,
   MoreVert as MoreIcon,
   Close as CloseIcon,
-  Done as DoneIcon
+  Done as DoneIcon,
+  DeleteForever as DeleteIcon
 } from '@mui/icons-material'
 import { Ticket } from '../lib/api'
 import { STATUS_OPTIONS } from '../lib/statuses'
@@ -31,17 +32,21 @@ interface BulkOperationsProps {
   onClearSelection: () => void
   onBulkUpdate: (updates: any) => Promise<void>
   users: any[]
+  canDelete?: boolean
+  onBulkDelete?: (ids: string[]) => Promise<void>
 }
 
 export default function BulkOperations({
   selectedTickets,
   onClearSelection,
   onBulkUpdate,
-  users
+  users,
+  canDelete = false,
+  onBulkDelete
 }: BulkOperationsProps) {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [dialogType, setDialogType] = useState<'status' | 'priority' | 'assign' | null>(null)
+  const [dialogType, setDialogType] = useState<'status' | 'priority' | 'assign' | 'delete' | null>(null)
   const [selectedValue, setSelectedValue] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -54,7 +59,7 @@ export default function BulkOperations({
     setAnchorEl(null)
   }
 
-  const handleOpenDialog = (type: 'status' | 'priority' | 'assign') => {
+  const handleOpenDialog = (type: 'status' | 'priority' | 'assign' | 'delete') => {
     setDialogType(type)
     setSelectedValue('')
     setError(null)
@@ -69,32 +74,39 @@ export default function BulkOperations({
     setError(null)
   }
 
-  const handleApplyBulkUpdate = async () => {
-    if (!selectedValue || !dialogType) return
+  const handleApplyBulkAction = async () => {
+    if (!dialogType) return
+    if (dialogType !== 'delete' && !selectedValue) return
 
     setLoading(true)
     setError(null)
 
     try {
-      const updates: any = {}
-      
-      switch (dialogType) {
-        case 'status':
-          updates.status = selectedValue
-          break
-        case 'priority':
-          updates.priority = selectedValue
-          break
-        case 'assign':
-          updates.assignedUserId = selectedValue === 'unassign' ? '' : selectedValue
-          break
+      if (dialogType === 'delete') {
+        if (!onBulkDelete) throw new Error('Bulk delete is not available')
+        await onBulkDelete(selectedTickets.map(ticket => ticket.id))
+      } else {
+        const updates: any = {}
+        
+        switch (dialogType) {
+          case 'status':
+            updates.status = selectedValue
+            break
+          case 'priority':
+            updates.priority = selectedValue
+            break
+          case 'assign':
+            updates.assignedUserId = selectedValue === 'unassign' ? '' : selectedValue
+            break
+        }
+
+        await onBulkUpdate(updates)
       }
 
-      await onBulkUpdate(updates)
       handleCloseDialog()
       onClearSelection()
     } catch (err: any) {
-      const message = err?.response?.data?.message || err?.message || 'Failed to update tickets'
+      const message = err?.response?.data?.message || err?.message || (dialogType === 'delete' ? 'Failed to delete tickets' : 'Failed to update tickets')
       setError(Array.isArray(message) ? message.join(', ') : message)
     } finally {
       setLoading(false)
@@ -111,6 +123,8 @@ export default function BulkOperations({
         return 'Change Priority'
       case 'assign':
         return 'Assign Tickets'
+      case 'delete':
+        return 'Delete Tickets'
       default:
         return ''
     }
@@ -179,6 +193,11 @@ export default function BulkOperations({
         <MenuItem onClick={() => handleOpenDialog('assign')}>
           Assign to User
         </MenuItem>
+        {canDelete && (
+          <MenuItem onClick={() => handleOpenDialog('delete')}>
+            Delete Tickets
+          </MenuItem>
+        )}
       </Menu>
 
       <Dialog open={dialogOpen} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
@@ -191,56 +210,69 @@ export default function BulkOperations({
               </Alert>
             )}
 
-            <Alert severity="info">
-              This will update {selectedTickets.length} ticket{selectedTickets.length !== 1 ? 's' : ''}
-            </Alert>
+            {dialogType === 'delete' ? (
+              <>
+                <Alert severity="warning">
+                  This action will permanently delete {selectedTickets.length} ticket{selectedTickets.length !== 1 ? 's' : ''}. This cannot be undone.
+                </Alert>
+                <Typography variant="body2">
+                  Please confirm you want to delete these tickets. All associated comments, attachments, and history entries will be removed.
+                </Typography>
+              </>
+            ) : (
+              <>
+                <Alert severity="info">
+                  This will update {selectedTickets.length} ticket{selectedTickets.length !== 1 ? 's' : ''}
+                </Alert>
 
-            <FormControl fullWidth>
-              <InputLabel>
-                {dialogType === 'status' && 'New Status'}
-                {dialogType === 'priority' && 'New Priority'}
-                {dialogType === 'assign' && 'Assign To'}
-              </InputLabel>
-              <Select
-                value={selectedValue}
-                onChange={(e) => setSelectedValue(e.target.value)}
-                label={
-                  dialogType === 'status' ? 'New Status' :
-                  dialogType === 'priority' ? 'New Priority' :
-                  'Assign To'
-                }
-              >
-                {dialogType === 'status' && (
-                  <>
-                    {STATUS_OPTIONS.map(option => (
-                      <MenuItem key={option.value} value={option.value}>
-                        {option.label}
-                      </MenuItem>
-                    ))}
-                  </>
-                )}
-                
-                {dialogType === 'priority' && (
-                  <>
-                    <MenuItem value="P1">P1</MenuItem>
-                    <MenuItem value="P2">P2</MenuItem>
-                    <MenuItem value="P3">P3</MenuItem>
-                    <MenuItem value="P4">P4</MenuItem>
-                  </>
-                )}
-                
-                {dialogType === 'assign' && (
-                  <>
-                    <MenuItem value="unassign">Unassign</MenuItem>
-                    {users.map(user => (
-                      <MenuItem key={user.id} value={user.id}>
-                        {user.name || user.email}
-                      </MenuItem>
-                    ))}
-                  </>
-                )}
-              </Select>
-            </FormControl>
+                <FormControl fullWidth>
+                  <InputLabel>
+                    {dialogType === 'status' && 'New Status'}
+                    {dialogType === 'priority' && 'New Priority'}
+                    {dialogType === 'assign' && 'Assign To'}
+                  </InputLabel>
+                  <Select
+                    value={selectedValue}
+                    onChange={(e) => setSelectedValue(e.target.value)}
+                    label={
+                      dialogType === 'status' ? 'New Status' :
+                      dialogType === 'priority' ? 'New Priority' :
+                      'Assign To'
+                    }
+                  >
+                    {dialogType === 'status' && (
+                      <>
+                        {STATUS_OPTIONS.map(option => (
+                          <MenuItem key={option.value} value={option.value}>
+                            {option.label}
+                          </MenuItem>
+                        ))}
+                      </>
+                    )}
+                    
+                    {dialogType === 'priority' && (
+                      <>
+                        <MenuItem value="P1">P1</MenuItem>
+                        <MenuItem value="P2">P2</MenuItem>
+                        <MenuItem value="P3">P3</MenuItem>
+                        <MenuItem value="P4">P4</MenuItem>
+                      </>
+                    )}
+                    
+                    {dialogType === 'assign' && (
+                      <>
+                        <MenuItem value="unassign">Unassign</MenuItem>
+                        {users.map(user => (
+                          <MenuItem key={user.id} value={user.id}>
+                            {user.name || user.email}
+                          </MenuItem>
+                        ))}
+                      </>
+                    )}
+                  </Select>
+                </FormControl>
+              </>
+            )}
           </Stack>
         </DialogContent>
         <DialogActions>
@@ -248,12 +280,15 @@ export default function BulkOperations({
             Cancel
           </Button>
           <Button
-            onClick={handleApplyBulkUpdate}
+            onClick={handleApplyBulkAction}
             variant="contained"
-            disabled={!selectedValue || loading}
-            startIcon={loading ? <CircularProgress size={16} /> : <DoneIcon />}
+            color={dialogType === 'delete' ? 'error' : 'primary'}
+            disabled={(dialogType !== 'delete' && !selectedValue) || loading}
+            startIcon={loading ? <CircularProgress size={16} /> : dialogType === 'delete' ? <DeleteIcon /> : <DoneIcon />}
           >
-            {loading ? 'Updating...' : 'Apply to All'}
+            {loading
+              ? dialogType === 'delete' ? 'Deleting...' : 'Updating...'
+              : dialogType === 'delete' ? 'Delete' : 'Apply to All'}
           </Button>
         </DialogActions>
       </Dialog>

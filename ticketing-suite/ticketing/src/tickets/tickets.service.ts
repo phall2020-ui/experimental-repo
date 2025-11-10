@@ -151,67 +151,121 @@ export class TicketsService {
     });
   }
 
+  private async applyUpdate(
+    tx: any,
+    tenantId: string,
+    id: string,
+    patch: Partial<{
+      siteId: string; type: string; description: string;
+      status: TicketStatus; priority: TicketPriority; details?: string; assignedUserId?: string | null;
+      custom_fields: Record<string, unknown>;
+    }>
+  ) {
+    // Fetch the current state before update
+    const before = await tx.ticket.findFirst({ where: { id, tenantId } });
+    if (!before) throw new NotFoundException();
+
+    if (patch.siteId) {
+      const ok = await tx.site.findFirst({ where: { id: patch.siteId, tenantId }});
+      if (!ok) throw new BadRequestException('Invalid siteId for tenant');
+    }
+
+    // Validate typeKey if provided
+    if (patch.type) {
+      const issueType = await tx.issueType.findFirst({ where: { tenantId, key: patch.type, active: true }});
+      if (!issueType) throw new BadRequestException('Invalid or inactive typeKey for tenant');
+    }
+
+    // Validate assignedUserId if provided (allow null/empty to unassign)
+    if (patch.assignedUserId !== undefined && patch.assignedUserId !== null && patch.assignedUserId !== '') {
+      const user = await tx.user.findFirst({ where: { id: patch.assignedUserId, tenantId }});
+      if (!user) throw new BadRequestException('Invalid assignedUserId for tenant');
+    }
+
+    if (patch.custom_fields) {
+      const defs = await this.loadFieldDefs(tx, tenantId);
+      this.validateCustomFields(patch.custom_fields, defs);
+    }
+    const updateData: any = {};
+    if (patch.siteId) updateData.siteId = patch.siteId;
+    if (patch.type) updateData.typeKey = patch.type;
+    if (patch.description) updateData.description = patch.description;
+    if (patch.status) updateData.status = patch.status;
+    if (patch.priority) updateData.priority = patch.priority;
+    if (patch.details !== undefined) updateData.details = patch.details;
+    if (patch.assignedUserId !== undefined) updateData.assignedUserId = patch.assignedUserId || null;
+    if (patch.custom_fields) updateData.customFields = patch.custom_fields;
+
+    const updated = await tx.ticket.update({
+      where: { id },
+      data: updateData
+    });
+    await tx.outbox.create({ data: { tenantId, type: 'ticket.updated', entityId: id, payload: {} }});
+
+    // Record history entry if there are changes
+    const changes = buildChanges(before, updated);
+    if (Object.keys(changes).length > 0) {
+      await tx.ticketHistory.create({
+        data: {
+          tenantId,
+          ticketId: updated.id,
+          actorUserId: (global as any).__actorUserId ?? null,
+          changes
+        }
+      });
+    }
+
+    return updated;
+  }
+
   async update(tenantId: string, id: string, patch: Partial<{
     siteId: string; type: string; description: string;
     status: TicketStatus; priority: TicketPriority; details?: string; assignedUserId?: string;
     custom_fields: Record<string, unknown>;
   }>) {
     return this.prisma.withTenant(tenantId, async (tx) => {
-      // Fetch the current state before update
-      const before = await tx.ticket.findFirst({ where: { id, tenantId } });
-      if (!before) throw new NotFoundException();
-      
-      if (patch.siteId) {
-        const ok = await tx.site.findFirst({ where: { id: patch.siteId, tenantId }});
-        if (!ok) throw new BadRequestException('Invalid siteId for tenant');
+      return this.applyUpdate(tx, tenantId, id, patch);
+    });
+  }
+
+  async bulkUpdate(tenantId: string, ids: string[], patch: Partial<{
+    siteId: string; type: string; description: string;
+    status: TicketStatus; priority: TicketPriority; details?: string; assignedUserId?: string | null;
+    custom_fields: Record<string, unknown>;
+  }>) {
+    if (!ids || ids.length === 0) return [];
+    return this.prisma.withTenant(tenantId, async (tx) => {
+      const results = [];
+      for (const id of ids) {
+        const updated = await this.applyUpdate(tx, tenantId, id, patch);
+        results.push(updated);
       }
-      
-      // Validate typeKey if provided
-      if (patch.type) {
-        const issueType = await tx.issueType.findFirst({ where: { tenantId, key: patch.type, active: true }});
-        if (!issueType) throw new BadRequestException('Invalid or inactive typeKey for tenant');
-      }
-      
-      // Validate assignedUserId if provided (allow null/empty to unassign)
-      if (patch.assignedUserId !== undefined && patch.assignedUserId !== null && patch.assignedUserId !== '') {
-        const user = await tx.user.findFirst({ where: { id: patch.assignedUserId, tenantId }});
-        if (!user) throw new BadRequestException('Invalid assignedUserId for tenant');
-      }
-      
-      if (patch.custom_fields) {
-        const defs = await this.loadFieldDefs(tx, tenantId);
-        this.validateCustomFields(patch.custom_fields, defs);
-      }
-      const updateData: any = {};
-      if (patch.siteId) updateData.siteId = patch.siteId;
-      if (patch.type) updateData.typeKey = patch.type;
-      if (patch.description) updateData.description = patch.description;
-      if (patch.status) updateData.status = patch.status;
-      if (patch.priority) updateData.priority = patch.priority;
-      if (patch.details !== undefined) updateData.details = patch.details;
-      if (patch.assignedUserId !== undefined) updateData.assignedUserId = patch.assignedUserId || null;
-      if (patch.custom_fields) updateData.customFields = patch.custom_fields;
-      
-      const updated = await tx.ticket.update({
-        where: { id },
-        data: updateData
+      return results;
+    });
+  }
+
+  async bulkDelete(tenantId: string, ids: string[]) {
+    if (!ids || ids.length === 0) return { deleted: 0 };
+    return this.prisma.withTenant(tenantId, async (tx) => {
+      const existing = await tx.ticket.findMany({
+        where: { tenantId, id: { in: ids } },
+        select: { id: true },
       });
-      await tx.outbox.create({ data: { tenantId, type: 'ticket.updated', entityId: id, payload: {} }});
-      
-      // Record history entry if there are changes
-      const changes = buildChanges(before, updated);
-      if (Object.keys(changes).length > 0) {
-        await tx.ticketHistory.create({
-          data: {
-            tenantId,
-            ticketId: updated.id,
-            actorUserId: (global as any).__actorUserId ?? null,
-            changes
-          }
-        });
+      if (existing.length === 0) {
+        return { deleted: 0 };
       }
-      
-      return updated;
+
+      const existingIds = existing.map(t => t.id);
+
+      await tx.ticket.deleteMany({
+        where: { tenantId, id: { in: existingIds } },
+      });
+
+      await Promise.all(existingIds.map(id =>
+        tx.outbox.create({ data: { tenantId, type: 'ticket.deleted', entityId: id, payload: {} }})
+      ));
+
+      return { deleted: existingIds.length };
     });
   }
 
