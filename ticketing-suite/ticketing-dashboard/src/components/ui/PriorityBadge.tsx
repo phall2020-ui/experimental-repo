@@ -7,7 +7,7 @@ import {
   Assignment as LowIcon
 } from '@mui/icons-material'
 
-type Priority = 'High' | 'Medium' | 'Low'
+type Priority = 'P1' | 'P2' | 'P3' | 'P4'
 
 interface PriorityBadgeProps extends Omit<ChipProps, 'color'> {
   priority: Priority
@@ -24,43 +24,49 @@ const pulse = keyframes`
   }
 `
 
-const priorityConfig: Record<Priority, { 
+const priorityConfig: Record<Priority, {
   color: ChipProps['color']
   label: string
   icon: React.ReactElement
   bgColor: string
 }> = {
-  High: { 
-    color: 'error', 
-    label: 'High', 
+  P1: {
+    color: 'error',
+    label: 'Critical (P1)',
     icon: <CriticalIcon />,
     bgColor: '#d32f2f'
   },
-  Medium: { 
-    color: 'warning', 
-    label: 'Medium', 
+  P2: {
+    color: 'warning',
+    label: 'High (P2)',
     icon: <HighIcon />,
     bgColor: '#ed6c02'
   },
-  Low: { 
-    color: 'default', 
-    label: 'Low', 
+  P3: {
+    color: 'info',
+    label: 'Medium (P3)',
+    icon: <MediumIcon />,
+    bgColor: '#0288d1'
+  },
+  P4: {
+    color: 'default',
+    label: 'Low (P4)',
     icon: <LowIcon />,
     bgColor: '#757575'
   },
 }
 
-export const PriorityBadge: React.FC<PriorityBadgeProps> = ({ 
-  priority, 
+export const PriorityBadge: React.FC<PriorityBadgeProps> = ({
+  priority,
   isOverdue = false,
   showIcon = true,
-  ...props 
+  ...props
 }) => {
   const config = priorityConfig[priority]
   
   return (
     <Chip
-      label={`${config.label} Priority`}
+      label={`${config.label}`}
       color={config.color}
       size="small"
       icon={showIcon ? config.icon : undefined}
@@ -68,7 +74,7 @@ export const PriorityBadge: React.FC<PriorityBadgeProps> = ({
       aria-label={`${config.label} priority`}
       sx={{
         fontWeight: 600,
-        ...(isOverdue && (priority === 'High' || priority === 'Medium') && {
+        ...(isOverdue && (priority === 'P1' || priority === 'P2') && {
           animation: `${pulse} 2s ease-in-out infinite`,
           boxShadow: `0 0 8px ${config.bgColor}`,
         }),

@@ -250,7 +250,7 @@ test.describe('Main Application Flows', () => {
     
     // Test filter by status
     const statusFilter = page.locator('select').first();
-    await statusFilter.selectOption('NEW');
+    await statusFilter.selectOption('AWAITING_RESPONSE');
     await page.waitForTimeout(500);
     
     // Clear filter

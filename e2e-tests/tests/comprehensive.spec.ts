@@ -293,12 +293,12 @@ test.describe('Complete End-to-End Testing Suite', () => {
       // Find status filter dropdown
       const statusFilter = page.locator('select').first();
       if (await statusFilter.count() > 0) {
-        await statusFilter.selectOption('NEW');
+        await statusFilter.selectOption('AWAITING_RESPONSE');
         await page.waitForTimeout(500);
         
         // Verify filter is applied
         const selectedValue = await statusFilter.inputValue();
-        expect(selectedValue).toBe('NEW');
+        expect(selectedValue).toBe('AWAITING_RESPONSE');
       }
     });
 
@@ -308,7 +308,7 @@ test.describe('Complete End-to-End Testing Suite', () => {
       // Apply filter
       const statusFilter = page.locator('select').first();
       if (await statusFilter.count() > 0) {
-        await statusFilter.selectOption('NEW');
+        await statusFilter.selectOption('AWAITING_RESPONSE');
         await page.waitForTimeout(500);
         
         // Clear filter
@@ -470,7 +470,7 @@ test.describe('Complete End-to-End Testing Suite', () => {
       const statusFilter = page.locator('select').first();
       if (await statusFilter.count() > 0) {
         // Rapidly change filters
-        await statusFilter.selectOption('NEW');
+        await statusFilter.selectOption('AWAITING_RESPONSE');
         await statusFilter.selectOption('IN_PROGRESS');
         await statusFilter.selectOption('RESOLVED');
         await statusFilter.selectOption('');
@@ -550,7 +550,7 @@ test.describe('Complete End-to-End Testing Suite', () => {
       // Step 1: Apply status filter
       const statusFilter = page.locator('select').first();
       if (await statusFilter.count() > 0) {
-        await statusFilter.selectOption('NEW');
+        await statusFilter.selectOption('AWAITING_RESPONSE');
         await page.waitForTimeout(500);
         
         // Step 2: View filtered results
