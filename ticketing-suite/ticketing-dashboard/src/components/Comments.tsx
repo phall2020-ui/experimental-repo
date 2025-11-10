@@ -108,9 +108,10 @@ export default function Comments({ ticketId }: CommentsProps) {
               key={comment.id}
               style={{
                 padding: 12,
-                background: '#0e141c',
+                background: '#ffffff',
                 borderRadius: 8,
-                border: '1px solid #1c2532'
+                border: '1px solid #e3e8ef',
+                boxShadow: '0 1px 2px rgba(16, 24, 40, 0.04)'
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
@@ -124,23 +125,23 @@ export default function Comments({ ticketId }: CommentsProps) {
                       padding: '2px 8px',
                       borderRadius: 4,
                       fontSize: 11,
-                      background: comment.visibility === 'PUBLIC' ? '#14311d' : '#2a1a1a',
-                      color: comment.visibility === 'PUBLIC' ? '#a6f0c2' : '#8ca0b3',
-                      border: `1px solid ${comment.visibility === 'PUBLIC' ? '#1d4b2c' : '#3a2c0d'}`
+                      background: comment.visibility === 'PUBLIC' ? '#e7f8ed' : '#f4f6fa',
+                      color: '#3a4859',
+                      border: '1px solid #d4dae5'
                     }}
                   >
                     {comment.visibility}
                   </span>
                   <button
                     onClick={() => handleEdit(comment)}
-                    style={{ fontSize: 11, padding: '2px 8px' }}
+                    style={{ fontSize: 11, padding: '2px 8px', borderRadius: 4, border: '1px solid #cfd6e3', background: '#ffffff' }}
                     title="Edit comment"
                   >
                     Edit
                   </button>
                   <button
                     onClick={() => handleDelete(comment.id)}
-                    style={{ fontSize: 11, padding: '2px 8px', background: '#5a1a1a', borderColor: '#7a2a2a' }}
+                    style={{ fontSize: 11, padding: '2px 8px', borderRadius: 4, border: '1px solid #f0b3b3', background: '#ffe5e5', color: '#7a1f1f' }}
                     title="Delete comment"
                   >
                     Delete

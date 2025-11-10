@@ -229,7 +229,19 @@ export default function TicketView() {
             {history.map(h => {
               const actorUser = users.find(u => u.id === h.actorUserId)
               return (
-                <div key={h.id} className="bar" style={{display:'grid', gap:6, padding:8, background:'#0e141c', borderRadius:4, border: '1px solid #1c2532'}}>
+                <div
+                  key={h.id}
+                  className="bar"
+                  style={{
+                    display:'grid',
+                    gap:6,
+                    padding:12,
+                    background:'#ffffff',
+                    borderRadius:6,
+                    border: '1px solid #e3e8ef',
+                    boxShadow: '0 1px 2px rgba(16, 24, 40, 0.04)'
+                  }}
+                >
                   <div className="row" style={{alignItems: 'center'}}>
                     <UserAvatar user={actorUser} size={24} />
                     <div className="subtle">

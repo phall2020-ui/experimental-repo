@@ -29,6 +29,10 @@ export default function CreateTicket({ onClose, onSuccess }: CreateTicketProps) 
   const { data: types = [] } = useIssueTypes()
   const { data: fieldDefs = [] } = useFieldDefinitions()
   const createTicketMutation = useCreateTicket()
+  const filteredFieldDefs = React.useMemo(
+    () => fieldDefs.filter(def => !['environment', 'estimated_hours'].includes(def.key)),
+    [fieldDefs]
+  )
   
   const [formData, setFormData] = React.useState({
     siteId: '',
@@ -66,8 +70,11 @@ export default function CreateTicket({ onClose, onSuccess }: CreateTicketProps) 
       }
       if (formData.details) payload.details = formData.details
       if (formData.assignedUserId) payload.assignedUserId = formData.assignedUserId
-      if (Object.keys(formData.custom_fields).length > 0) {
-        payload.custom_fields = formData.custom_fields
+      const sanitizedCustomFields = Object.fromEntries(
+        Object.entries(formData.custom_fields).filter(([key]) => !['environment', 'estimated_hours'].includes(key))
+      )
+      if (Object.keys(sanitizedCustomFields).length > 0) {
+        payload.custom_fields = sanitizedCustomFields
       }
 
       const ticket = await createTicketMutation.mutateAsync(payload)
@@ -207,12 +214,17 @@ export default function CreateTicket({ onClose, onSuccess }: CreateTicketProps) 
             </Select>
           </FormControl>
 
-          {fieldDefs.length > 0 && (
+          {filteredFieldDefs.length > 0 && (
             <Box sx={{ mt: 1 }}>
               <CustomFieldsForm
-                fieldDefs={fieldDefs}
+                fieldDefs={filteredFieldDefs}
                 values={formData.custom_fields}
-                onChange={(custom_fields) => setFormData({ ...formData, custom_fields })}
+                onChange={(custom_fields) => {
+                  const sanitized = Object.fromEntries(
+                    Object.entries(custom_fields).filter(([key]) => !['environment', 'estimated_hours'].includes(key))
+                  )
+                  setFormData({ ...formData, custom_fields: sanitized })
+                }}
               />
             </Box>
           )}
