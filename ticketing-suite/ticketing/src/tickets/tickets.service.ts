@@ -10,7 +10,7 @@ type CFDefs = Record<string, {
 }>;
 
 function buildChanges(before: any | null, after: any) {
-  const fields = ['status', 'details', 'priority', 'assignedUserId', 'typeKey', 'siteId'];
+  const fields = ['status', 'details', 'priority', 'assignedUserId', 'typeKey', 'siteId', 'dueAt'];
   const changes: Record<string, { from: any; to: any }> = {};
   for (const k of fields) {
     const fromVal = before ? before[k] : undefined;
@@ -61,7 +61,7 @@ export class TicketsService {
   async create(tenantId: string, dto: {
     siteId: string; type: string; description: string;
     status: TicketStatus; priority: TicketPriority; details?: string; assignedUserId?: string;
-    custom_fields?: Record<string, unknown>;
+    custom_fields?: Record<string, unknown>; dueAt?: string | null;
   }) {
     return this.prisma.withTenant(tenantId, async (tx) => {
       const site = await tx.site.findFirst({ where: { id: dto.siteId, tenantId }});
@@ -79,11 +79,21 @@ export class TicketsService {
       
       const defs = await this.loadFieldDefs(tx, tenantId);
       this.validateCustomFields(dto.custom_fields ?? {}, defs);
+      let dueAt: Date | null = null;
+      if (dto.dueAt) {
+        const parsed = new Date(dto.dueAt);
+        if (isNaN(parsed.getTime())) {
+          throw new BadRequestException('Invalid dueAt value');
+        }
+        dueAt = parsed;
+      }
+
       const t = await tx.ticket.create({
         data: {
           tenantId, siteId: dto.siteId, typeKey: dto.type, description: dto.description,
           status: dto.status, priority: dto.priority, details: dto.details ?? null,
           assignedUserId: dto.assignedUserId ?? null,
+          dueAt,
           customFields: dto.custom_fields ?? {} as any,
         }
       });
@@ -158,6 +168,7 @@ export class TicketsService {
     patch: Partial<{
       siteId: string; type: string; description: string;
       status: TicketStatus; priority: TicketPriority; details?: string; assignedUserId?: string | null;
+      dueAt?: string | null;
       custom_fields: Record<string, unknown>;
     }>
   ) {
@@ -195,6 +206,12 @@ export class TicketsService {
     if (patch.details !== undefined) updateData.details = patch.details;
     if (patch.assignedUserId !== undefined) updateData.assignedUserId = patch.assignedUserId || null;
     if (patch.custom_fields) updateData.customFields = patch.custom_fields;
+    if (patch.dueAt !== undefined) {
+      updateData.dueAt = patch.dueAt ? new Date(patch.dueAt) : null;
+      if (updateData.dueAt && isNaN(updateData.dueAt.getTime())) {
+        throw new BadRequestException('Invalid dueAt value');
+      }
+    }
 
     const updated = await tx.ticket.update({
       where: { id },
@@ -231,6 +248,7 @@ export class TicketsService {
   async bulkUpdate(tenantId: string, ids: string[], patch: Partial<{
     siteId: string; type: string; description: string;
     status: TicketStatus; priority: TicketPriority; details?: string; assignedUserId?: string | null;
+    dueAt?: string | null;
     custom_fields: Record<string, unknown>;
   }>) {
     if (!ids || ids.length === 0) return [];

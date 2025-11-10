@@ -28,6 +28,7 @@ export class TicketsController {
       priority: body.priority,
       details: body.details,
       assignedUserId: body.assignedUserId,
+      dueAt: body.dueAt,
       custom_fields: body.custom_fields ?? {},
     });
   }
@@ -72,6 +73,7 @@ export class TicketsController {
       priority: patch.priority,
       details: patch.details,
       assignedUserId: patch.assignedUserId,
+      dueAt: patch.dueAt,
       custom_fields: patch.custom_fields,
     });
   }

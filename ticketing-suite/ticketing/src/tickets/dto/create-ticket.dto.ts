@@ -1,4 +1,4 @@
-import { IsUUID, IsString, IsEnum, IsOptional, IsObject } from 'class-validator';
+import { IsUUID, IsString, IsEnum, IsOptional, IsObject, IsISO8601 } from 'class-validator';
 import { TicketStatus, TicketPriority } from '@prisma/client';
 export class CreateTicketDto {
   @IsUUID() siteId!: string;
@@ -9,4 +9,5 @@ export class CreateTicketDto {
   @IsOptional() @IsString() details?: string;
   @IsOptional() @IsString() assignedUserId?: string;
   @IsOptional() @IsObject() custom_fields?: Record<string, unknown>;
+  @IsOptional() @IsISO8601() dueAt?: string | null;
 }
