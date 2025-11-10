@@ -218,15 +218,15 @@ describe('Ticketing System E2E Tests', () => {
         });
     });
 
-    it('GET /tickets?priority=Medium - should filter tickets by priority', () => {
+    it('GET /tickets?priority=P2 - should filter tickets by priority', () => {
       return request(app.getHttpServer())
-        .get('/tickets?priority=Medium')
+        .get('/tickets?priority=P2')
         .set('Authorization', `Bearer ${authToken}`)
         .expect(200)
         .expect((res) => {
           expect(Array.isArray(res.body)).toBe(true);
           if (res.body.length > 0) {
-            expect(res.body[0].priority).toBe('Medium');
+            expect(res.body[0].priority).toBe('P2');
           }
         });
     });
