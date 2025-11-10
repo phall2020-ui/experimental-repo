@@ -1,17 +1,28 @@
 #!/bin/sh
 set -e
 
-echo "🔧 Starting container. PORT=${PORT} NODE_ENV=${NODE_ENV}"
+echo "🔧 Starting container. PWD=$(pwd) PORT=${PORT} NODE_ENV=${NODE_ENV}"
 
-# Ensure build output exists
-if [ ! -f "dist/src/main.js" ]; then
-  echo "❌ dist/src/main.js not found. Built files:"
-  ls -R dist | sed -n '1,200p' || true
-  exit 1
+# Show what's actually in the image (helps debugging)
+echo "📂 Listing /app (top)…"; ls -la | sed -n '1,120p' || true
+echo "📂 Listing /app/dist (top)…"; ls -la dist 2>/dev/null | sed -n '1,200p' || true
+
+# Pick whichever build artifact exists
+ENTRY=""
+if [ -f "dist/src/main.js" ]; then
+  ENTRY="dist/src/main.js"
+elif [ -f "dist/main.js" ]; then
+  ENTRY="dist/main.js"
 fi
 
-echo "🗃️ Running prisma migrate deploy..."
+if [ -z "$ENTRY" ]; then
+  echo "❌ No build artifact found at dist/src/main.js or dist/main.js"
+  exit 1
+fi
+echo "✅ Using entry: $ENTRY"
+
+echo "🗃️  Running prisma migrate deploy…"
 npx prisma migrate deploy
 
-echo "🚀 Launching app..."
-exec node dist/src/main.js
+echo "🚀 Launching app…"
+exec node "$ENTRY"
