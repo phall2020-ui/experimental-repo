@@ -26,10 +26,8 @@ npx prisma migrate deploy
 
 if [ "$RUN_MIN_SEED" = "1" ]; then
   echo "Running minimal seed…"
-  node prisma/seed.js 2>/dev/null || node --loader ts-node/esm prisma/seed.ts || true
+  node dist/prisma/seed.js 2>/dev/null || node -r ts-node/register prisma/seed.ts || true
 fi
-
-node dist/main.js
 
 echo "🚀 Launching app…"
 exec node "$ENTRY"
