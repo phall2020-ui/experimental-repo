@@ -12,7 +12,7 @@
     "start": "node dist/src/main.js",
     "start:prod": "node dist/src/main.js",
     "prisma:dev": "prisma migrate dev --preview-feature",
-    "prisma:deploy": "prisma migrate deploy",
+    "prisma:deploy": "echo PRISMA_BEGIN && prisma migrate deploy && echo PRISMA_DONE && npm run start:prod",
     "prisma:generate": "prisma generate",
     "seed": "ts-node prisma/seed.ts",
     "seed:test": "ts-node prisma/seed-test-data.ts",
