@@ -10,10 +10,15 @@ import {
   MenuItem,
   Alert,
   Stack,
+  Checkbox,
+  FormControlLabel,
+  Collapse,
+  Divider,
 } from '@mui/material'
 import { Modal } from './common'
 import { useSites, useUsers, useIssueTypes, useFieldDefinitions } from '../hooks/useDirectory'
 import { useCreateTicket } from '../hooks/useTickets'
+import { createRecurringTicket } from '../lib/api'
 import CustomFieldsForm from './CustomFieldsForm'
 import { STATUS_OPTIONS, type TicketStatusValue } from '../lib/statuses'
 import { filterFieldDefs, sanitizeCustomFieldValues } from '../lib/customFields'
@@ -32,7 +37,17 @@ export default function CreateTicket({ onClose, onSuccess }: CreateTicketProps) 
   const createTicketMutation = useCreateTicket()
   const filteredFieldDefs = React.useMemo(() => filterFieldDefs(fieldDefs), [fieldDefs])
   
-  const [formData, setFormData] = React.useState({
+const FREQUENCY_OPTIONS = [
+  { value: 'DAILY', label: 'Daily' },
+  { value: 'WEEKLY', label: 'Weekly' },
+  { value: 'MONTHLY', label: 'Monthly' },
+  { value: 'QUARTERLY', label: 'Quarterly' },
+  { value: 'YEARLY', label: 'Yearly' },
+] as const
+
+type FrequencyValue = typeof FREQUENCY_OPTIONS[number]['value']
+
+const [formData, setFormData] = React.useState({
     siteId: '',
     type: '',
     description: '',
@@ -42,6 +57,15 @@ export default function CreateTicket({ onClose, onSuccess }: CreateTicketProps) 
     assignedUserId: '',
     custom_fields: {} as Record<string, any>
   })
+const [isRecurring, setIsRecurring] = React.useState(false)
+
+const [recurringSettings, setRecurringSettings] = React.useState({
+  frequency: 'MONTHLY' as FrequencyValue,
+  intervalValue: 1,
+  startDate: new Date().toISOString().split('T')[0],
+  endDate: '',
+  leadTimeDays: 7,
+})
 
   React.useEffect(() => {
     if (sites.length > 0 && !formData.siteId) {
@@ -55,6 +79,9 @@ export default function CreateTicket({ onClose, onSuccess }: CreateTicketProps) 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!formData.siteId || !formData.type || !formData.description) {
+      return
+    }
+    if (isRecurring && (!recurringSettings.startDate || recurringSettings.intervalValue < 1 || recurringSettings.leadTimeDays < 0)) {
       return
     }
 
@@ -74,6 +101,27 @@ export default function CreateTicket({ onClose, onSuccess }: CreateTicketProps) 
       }
 
       const ticket = await createTicketMutation.mutateAsync(payload)
+
+      if (isRecurring) {
+        try {
+          await createRecurringTicket({
+            siteId: formData.siteId,
+            typeKey: formData.type,
+            description: formData.description,
+            priority: formData.priority,
+            frequency: recurringSettings.frequency,
+            intervalValue: recurringSettings.intervalValue,
+            startDate: recurringSettings.startDate,
+            endDate: recurringSettings.endDate || undefined,
+            leadTimeDays: recurringSettings.leadTimeDays,
+            details: formData.details || undefined,
+          })
+        } catch (recurringError) {
+          console.error('Failed to schedule recurring ticket:', recurringError)
+          alert('Ticket was created, but setting up the recurring schedule failed. Please try again later.')
+        }
+      }
+
       onSuccess?.()
       nav(`/tickets/${ticket.id}`)
     } catch (error) {
@@ -221,6 +269,106 @@ export default function CreateTicket({ onClose, onSuccess }: CreateTicketProps) 
               />
             </Box>
           )}
+
+          <Divider sx={{ my: 1 }} />
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={isRecurring}
+                onChange={(event) => setIsRecurring(event.target.checked)}
+              />
+            }
+            label="Make this a recurring ticket"
+          />
+          <Collapse in={isRecurring} unmountOnExit>
+            <Box
+              sx={{
+                p: 2,
+                borderRadius: 2,
+                border: '1px solid #d7dbe3',
+                backgroundColor: '#f8fafc',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 2,
+              }}
+            >
+              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))' }, gap: 2 }}>
+                <FormControl fullWidth size="small">
+                  <InputLabel id="frequency-label">Frequency</InputLabel>
+                  <Select
+                    labelId="frequency-label"
+                    value={recurringSettings.frequency}
+                    label="Frequency"
+                    onChange={e =>
+                      setRecurringSettings(prev => ({
+                        ...prev,
+                        frequency: e.target.value as typeof recurringSettings.frequency,
+                      }))
+                    }
+                  >
+                    {FREQUENCY_OPTIONS.map(opt => (
+                      <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+                <TextField
+                  size="small"
+                  type="number"
+                  label="Interval"
+                  inputProps={{ min: 1 }}
+                  value={recurringSettings.intervalValue}
+                  onChange={e =>
+                    setRecurringSettings(prev => ({
+                      ...prev,
+                      intervalValue: Math.max(1, Number(e.target.value) || 1),
+                    }))
+                  }
+                />
+              </Box>
+              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, minmax(0, 1fr))' }, gap: 2 }}>
+                <TextField
+                  size="small"
+                  type="date"
+                  label="Start Date"
+                  InputLabelProps={{ shrink: true }}
+                  value={recurringSettings.startDate}
+                  onChange={e =>
+                    setRecurringSettings(prev => ({
+                      ...prev,
+                      startDate: e.target.value,
+                    }))
+                  }
+                  required
+                />
+                <TextField
+                  size="small"
+                  type="date"
+                  label="End Date (optional)"
+                  InputLabelProps={{ shrink: true }}
+                  value={recurringSettings.endDate}
+                  onChange={e =>
+                    setRecurringSettings(prev => ({
+                      ...prev,
+                      endDate: e.target.value,
+                    }))
+                  }
+                />
+                <TextField
+                  size="small"
+                  type="number"
+                  label="Lead time (days)"
+                  inputProps={{ min: 0 }}
+                  value={recurringSettings.leadTimeDays}
+                  onChange={e =>
+                    setRecurringSettings(prev => ({
+                      ...prev,
+                      leadTimeDays: Math.max(0, Number(e.target.value) || 0),
+                    }))
+                  }
+                />
+              </Box>
+            </Box>
+          </Collapse>
         </Stack>
       </Box>
     </Modal>

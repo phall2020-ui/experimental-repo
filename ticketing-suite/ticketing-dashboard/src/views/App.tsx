@@ -7,7 +7,6 @@ import {
   Person as PersonIcon,
   People as PeopleIcon,
   LocationOn as LocationIcon,
-  Repeat as RepeatIcon,
 } from '@mui/icons-material'
 import UserRegistration from '../components/UserRegistration'
 import IssueTypeManagement from '../components/IssueTypeManagement'
@@ -111,19 +110,6 @@ export default function App() {
               aria-label="Manage sites"
             >
               Sites
-            </Button>
-          </Tooltip>
-
-          <Tooltip title="Recurring Tickets">
-            <Button
-              component={Link}
-              to="/recurring"
-              startIcon={<RepeatIcon />}
-              size="small"
-              sx={{ display: { xs: 'none', md: 'flex' } }}
-              aria-label="Recurring tickets"
-            >
-              Recurring
             </Button>
           </Tooltip>
 
