@@ -1,9 +1,8 @@
 import React from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { getTicket, updateTicket, listTicketHistory, createRecurringTicket, updateRecurringTicket, type TicketHistoryEntry, type RecurringTicketConfig } from '../lib/api'
+import { getTicket, updateTicket, listTicketHistory, createRecurringTicket, updateRecurringTicket, type TicketHistoryEntry, type RecurringTicketConfig, type Ticket } from '../lib/api'
 import { listSites, listUsers, listIssueTypes, listFieldDefinitions, type SiteOpt, type UserOpt, type IssueTypeOpt, type FieldDefOpt } from '../lib/directory'
 import Comments from '../components/Comments'
-import Attachments from '../components/Attachments'
 import CustomFieldsForm from '../components/CustomFieldsForm'
 import { useNotifications } from '../lib/notifications'
 import { STATUS_OPTIONS } from '../lib/statuses'
@@ -141,6 +140,25 @@ export default function TicketView() {
     } finally { setSaving(false) }
   }
 
+  const isRecurringActive = recurringEnabled
+
+  const derivedDueDate = React.useMemo(() => {
+    if (isRecurringActive && recurringForm.startDate) {
+      return new Date(`${recurringForm.startDate}T00:00:00Z`)
+    }
+    return t?.dueAt ? new Date(t.dueAt) : undefined
+  }, [isRecurringActive, recurringForm.startDate, t?.dueAt])
+
+  React.useEffect(() => {
+    if (!isRecurringActive || !recurringForm.startDate) return
+    setT((prev: Ticket | null): Ticket | null => {
+      if (!prev) return prev
+      const iso = new Date(`${recurringForm.startDate}T00:00:00Z`).toISOString()
+      if (prev.dueAt === iso) return prev
+      return { ...prev, dueAt: iso }
+    })
+  }, [isRecurringActive, recurringForm.startDate])
+
   const handleRecurringSave = async () => {
     if (!t) return
     setRecurringSaving(true)
@@ -191,8 +209,8 @@ export default function TicketView() {
   if (!t) return <div className="container"><div className="panel">Loading…</div></div>
   const sanitizedCustomFields = sanitizeCustomFieldValues(t.customFields)
   return (
-    <div className="container">
-      <div className="panel">
+    <div className="container text-modern">
+      <div className="panel text-modern">
         <div className="row" style={{justifyContent:'space-between'}}>
           <div className="h1">Ticket</div>
           <button onClick={()=>nav(-1)}>← Back</button>
@@ -243,12 +261,19 @@ export default function TicketView() {
           <label style={{width:150}}>Due Date</label>
           <input 
             type="datetime-local" 
-            value={t.dueAt ? new Date(t.dueAt).toISOString().slice(0, 16) : ''} 
-            onChange={e=>setT({...t, dueAt:e.target.value ? new Date(e.target.value).toISOString() : null})} 
-            style={{flex:1}}
+            value={derivedDueDate ? derivedDueDate.toISOString().slice(0, 16) : ''} 
+            onChange={e => {
+              if (isRecurringActive) return
+              setT((prev: Ticket | null): Ticket | null => {
+                if (!prev) return prev
+                return { ...prev, dueAt: e.target.value ? new Date(e.target.value).toISOString() : null }
+              })
+            }} 
+            style={{flex:1, opacity: isRecurringActive ? 0.5 : 1, cursor: isRecurringActive ? 'not-allowed' : 'text'}}
+            disabled={isRecurringActive}
           />
-          {t.dueAt && (() => {
-            const dueDate = new Date(t.dueAt)
+          {derivedDueDate && (() => {
+            const dueDate = derivedDueDate
             const now = new Date()
             const isOverdue = dueDate < now
             const hoursUntilDue = (dueDate.getTime() - now.getTime()) / (1000 * 60 * 60)
@@ -267,38 +292,11 @@ export default function TicketView() {
               </span>
             )
           })()}
-        </div>
-
-        <div style={{marginTop:16, paddingTop:16, borderTop:'1px solid #1c2532'}}>
-          <div style={{fontWeight:600, marginBottom:8}}>Timestamps</div>
-          <div style={{display:'grid', gap:8, fontSize:14}}>
-            <div className="row">
-              <span style={{width:150, color:'#999'}}>Created:</span>
-              <span>{new Date(t.createdAt).toLocaleString()}</span>
-            </div>
-            <div className="row">
-              <span style={{width:150, color:'#999'}}>Updated:</span>
-              <span>{new Date(t.updatedAt).toLocaleString()}</span>
-            </div>
-            {t.dueAt && (
-              <div className="row">
-                <span style={{width:150, color:'#999'}}>Due:</span>
-                <span>{new Date(t.dueAt).toLocaleString()}</span>
-              </div>
-            )}
-            {t.firstResponseAt && (
-              <div className="row">
-                <span style={{width:150, color:'#999'}}>First Response:</span>
-                <span>{new Date(t.firstResponseAt).toLocaleString()}</span>
-              </div>
-            )}
-            {t.resolvedAt && (
-              <div className="row">
-                <span style={{width:150, color:'#999'}}>Resolved:</span>
-                <span>{new Date(t.resolvedAt).toLocaleString()}</span>
-              </div>
-            )}
-          </div>
+          {isRecurringActive && (
+            <span style={{ marginLeft: 12, fontSize: 12, color: '#94a3b8' }}>
+              Controlled by recurring schedule start date.
+            </span>
+          )}
         </div>
 
         <div style={{marginTop:24, paddingTop:16, borderTop:'1px solid #1c2532'}}>
@@ -312,11 +310,22 @@ export default function TicketView() {
                 onChange={e => {
                   const checked = e.target.checked
                   setRecurringEnabled(checked)
-                  if (checked && !recurringConfig) {
+                  if (checked) {
+                    const baseDate = recurringConfig
+                      ? new Date(recurringConfig.startDate)
+                      : t?.dueAt
+                        ? new Date(t.dueAt)
+                        : new Date()
+                    const start = baseDate.toISOString().split('T')[0]
                     setRecurringForm(prev => ({
                       ...prev,
-                      startDate: new Date().toISOString().split('T')[0],
+                      startDate: start,
                     }))
+                    setT((prev: Ticket | null): Ticket | null => {
+                      if (!prev) return prev
+                      const iso = new Date(`${start}T00:00:00Z`).toISOString()
+                      return { ...prev, dueAt: iso }
+                    })
                   }
                 }}
               />
@@ -426,8 +435,7 @@ export default function TicketView() {
       </div>
       
       <Comments ticketId={id!} />
-      <Attachments ticketId={id!} />
-      <div className="panel" style={{padding:16, marginTop:12}}>
+      <div className="panel text-modern" style={{padding:16, marginTop:12}}>
         <div style={{fontWeight:700, marginBottom:8}}>Update history</div>
         {history.length === 0 ? (
           <div className="subtle">No updates yet.</div>
@@ -465,6 +473,38 @@ export default function TicketView() {
             })}
           </div>
         )}
+      </div>
+      <div className="panel text-modern" style={{padding:16, marginTop:12}}>
+        <div style={{fontWeight:600, marginBottom:8}}>Timestamps</div>
+        <div style={{display:'grid', gap:8, fontSize:14}}>
+          <div className="row">
+            <span style={{width:150, color:'#999'}}>Created:</span>
+            <span>{new Date(t.createdAt).toLocaleString()}</span>
+          </div>
+          <div className="row">
+            <span style={{width:150, color:'#999'}}>Updated:</span>
+            <span>{new Date(t.updatedAt).toLocaleString()}</span>
+          </div>
+          {derivedDueDate && (
+            <div className="row">
+              <span style={{width:150, color:'#999'}}>Due:</span>
+              <span>{derivedDueDate.toLocaleString()}</span>
+              {isRecurringActive && <span style={{ marginLeft: 6, color: '#64748b', fontSize: 12 }}>(via recurring)</span>}
+            </div>
+          )}
+          {t.firstResponseAt && (
+            <div className="row">
+              <span style={{width:150, color:'#999'}}>First Response:</span>
+              <span>{new Date(t.firstResponseAt).toLocaleString()}</span>
+            </div>
+          )}
+          {t.resolvedAt && (
+            <div className="row">
+              <span style={{width:150, color:'#999'}}>Resolved:</span>
+              <span>{new Date(t.resolvedAt).toLocaleString()}</span>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )

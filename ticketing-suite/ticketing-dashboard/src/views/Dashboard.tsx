@@ -235,10 +235,10 @@ const TicketRow: React.FC<{
           {ticket.priority}
         </span>
       </td>
-      <td>
+      <td className="text-modern">
         <StatusChip status={ticket.status} />
       </td>
-      <td>{typeLabel}</td>
+      <td className="text-modern">{typeLabel}</td>
       <td>
         <div
           style={{ display: 'flex', justifyContent: 'center' }}
@@ -247,7 +247,7 @@ const TicketRow: React.FC<{
           <UserAvatar user={assignedUser} size={24} showMargin={false} />
         </div>
       </td>
-      <td>{sites.find(s => s.id === ticket.siteId)?.name || '—'}</td>
+      <td className="text-modern">{sites.find(s => s.id === ticket.siteId)?.name || '—'}</td>
       <td>
         {effectiveDueDate ? (
           <span style={{
@@ -770,8 +770,9 @@ const statsCardStyle = React.useCallback((accent: string): React.CSSProperties =
   }, [])
 
   return (
-    <div className="grid">
-      <div className="panel">
+    <div className="container text-modern">
+      <div className="grid">
+        <div className="panel text-modern">
         <div
           className="row"
           style={{
@@ -1155,7 +1156,7 @@ const statsCardStyle = React.useCallback((accent: string): React.CSSProperties =
         )}
       </div>
 
-      <div className="panel">
+      <div className="panel text-modern">
         <div className="h1" style={{ marginBottom: 12 }}>Statistics</div>
         <div
           style={{
@@ -1274,9 +1275,9 @@ const statsCardStyle = React.useCallback((accent: string): React.CSSProperties =
         <div style={{ fontSize: 12, color: '#475569', marginTop: 16 }}>
           Total: {stats.total} ticket{stats.total === 1 ? '' : 's'}
         </div>
-      </div>
-      {/* My prioritisation section disabled per user request */}
-      {/* <div className="panel">
+        </div>
+        {/* My prioritisation section disabled per user request */}
+        {/* <div className="panel">
         <div className="h1" style={{marginBottom:8}}>My prioritisation</div>
         <div className="muted" style={{marginBottom:12}}>Configure how your dashboard orders tickets. This only affects your view.</div>
         <div className="row" style={{marginBottom:8}}>
@@ -1316,6 +1317,8 @@ const statsCardStyle = React.useCallback((accent: string): React.CSSProperties =
           <button className="primary" onClick={saveConfig}>Save</button>
         </div>
       </div> */}
+      </div>
+
       {showCreate && (
         <CreateTicket
           onClose={() => setShowCreate(false)}

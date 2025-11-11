@@ -30,15 +30,15 @@ export default function RecurringTickets() {
 
   if (isLoading) {
     return (
-      <div className="container">
-        <div className="panel">Loading recurring schedules…</div>
+      <div className="container text-modern">
+        <div className="panel text-modern">Loading recurring schedules…</div>
       </div>
     )
   }
 
   return (
-    <div className="container">
-      <div className="panel">
+    <div className="container text-modern">
+      <div className="panel text-modern">
         <div className="row" style={{ alignItems: 'center', marginBottom: 12 }}>
           <div className="h1">Future Activities</div>
           <div className="spacer" />
@@ -46,13 +46,13 @@ export default function RecurringTickets() {
             ← Back
           </button>
         </div>
-        <p style={{ fontSize: 13, color: '#64748b', marginBottom: 16 }}>
+        <p className="text-modern-muted" style={{ marginBottom: 16 }}>
           These recurring tickets have not yet reached their lead time window. Once the lead time is reached,
           they will be generated automatically and appear on the main dashboard.
         </p>
 
         {upcoming.length === 0 ? (
-          <div className="panel" style={{ background: '#0f172a', border: '1px solid #1e293b' }}>
+          <div className="panel text-modern" style={{ background: '#0f172a', border: '1px solid #1e293b', color: '#f8fafc' }}>
             No future activities scheduled.
           </div>
         ) : (
@@ -87,20 +87,22 @@ export default function RecurringTickets() {
                           '—'
                         )}
                       </td>
-                      <td>
+                      <td className="text-modern">
                         {schedule.originTicketId ? (
-                          <Link to={`/tickets/${schedule.originTicketId}`} style={{ textDecoration: 'underline' }}>
-                            {schedule.description}
-                          </Link>
+                          <div className="linkish">
+                            <Link to={`/tickets/${schedule.originTicketId}`}>
+                              {schedule.description}
+                            </Link>
+                          </div>
                         ) : (
                           schedule.description
                         )}
                       </td>
-                      <td>{site?.name || schedule.siteId}</td>
-                      <td>{issueType?.label || schedule.typeKey.replace(/_/g, ' ')}</td>
-                      <td>{assignedUser ? assignedUser.name || assignedUser.email : 'Unassigned'}</td>
-                      <td>{dueDate.toLocaleDateString()}</td>
-                      <td>{frequencyLabels[schedule.frequency] ?? schedule.frequency}</td>
+                      <td className="text-modern">{site?.name || schedule.siteId}</td>
+                      <td className="text-modern">{issueType?.label || schedule.typeKey.replace(/_/g, ' ')}</td>
+                      <td className="text-modern">{assignedUser ? assignedUser.name || assignedUser.email : 'Unassigned'}</td>
+                      <td className="text-modern">{dueDate.toLocaleDateString()}</td>
+                      <td className="text-modern">{frequencyLabels[schedule.frequency] ?? schedule.frequency}</td>
                     </tr>
                   )
                 })}
