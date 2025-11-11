@@ -8,6 +8,8 @@ import { AttachmentsModule } from './attachments/attachments.module';
 import { HealthModule } from './health/health.module';
 import { DirectoryModule } from './directory/directory.module';
 import { FeaturesModule } from './features/features.module';
+import { RecurringTicketsModule } from './recurring-tickets/recurring-tickets.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -19,6 +21,8 @@ import { FeaturesModule } from './features/features.module';
     HealthModule,
     DirectoryModule,
     FeaturesModule,
+    RecurringTicketsModule,
+    NotificationsModule,
   ],
   providers: [PrismaService],
 })

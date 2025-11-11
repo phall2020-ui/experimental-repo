@@ -7,10 +7,12 @@ import {
   Person as PersonIcon,
   People as PeopleIcon,
   LocationOn as LocationIcon,
+  Repeat as RepeatIcon,
 } from '@mui/icons-material'
 import UserRegistration from '../components/UserRegistration'
 import IssueTypeManagement from '../components/IssueTypeManagement'
 import FieldDefinitionManagement from '../components/FieldDefinitionManagement'
+import NotificationBell from '../components/NotificationBell'
 import { useNotifications } from '../lib/notifications'
 
 export default function App() {
@@ -111,6 +113,21 @@ export default function App() {
               Sites
             </Button>
           </Tooltip>
+
+          <Tooltip title="Recurring Tickets">
+            <Button
+              component={Link}
+              to="/recurring"
+              startIcon={<RepeatIcon />}
+              size="small"
+              sx={{ display: { xs: 'none', md: 'flex' } }}
+              aria-label="Recurring tickets"
+            >
+              Recurring
+            </Button>
+          </Tooltip>
+
+          <NotificationBell />
         </Toolbar>
       </AppBar>
       

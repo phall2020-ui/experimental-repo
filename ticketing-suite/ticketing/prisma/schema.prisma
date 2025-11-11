@@ -158,6 +158,15 @@ enum CommentVisibility {
   INTERNAL
 }
 
+enum NotificationType {
+  TICKET_CREATED
+  TICKET_UPDATED
+  TICKET_ASSIGNED
+  TICKET_COMMENTED
+  TICKET_RESOLVED
+  RECURRING_TICKET_GENERATED
+}
+
 model Attachment {
   id            String   @id @default(uuid())
   tenantId      String
@@ -203,4 +212,53 @@ model TicketHistory {
   ticket      Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, ticketId, at])
+}
+
+model RecurringTicket {
+  id                    String              @id @default(uuid())
+  tenantId              String
+  siteId                String
+  typeKey               String
+  description           String
+  priority              TicketPriority
+  details               String?
+  assignedUserId        String?
+  customFields          Json                @default("{}")
+  frequency             RecurrenceFrequency
+  intervalValue         Int                 @default(1)
+  startDate             DateTime
+  endDate               DateTime?
+  leadTimeDays          Int                 @default(0)
+  isActive              Boolean             @default(true)
+  lastGeneratedAt       DateTime?
+  nextScheduledAt       DateTime
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+
+  @@index([tenantId, isActive, nextScheduledAt])
+  @@index([tenantId, siteId])
+}
+
+enum RecurrenceFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+  YEARLY
+}
+
+model Notification {
+  id          String             @id @default(uuid())
+  tenantId    String
+  userId      String?
+  type        NotificationType
+  title       String
+  message     String
+  ticketId    String?
+  metadata    Json               @default("{}")
+  isRead      Boolean            @default(false)
+  createdAt   DateTime           @default(now())
+
+  @@index([tenantId, userId, isRead, createdAt])
+  @@index([tenantId, ticketId])
 }
