@@ -140,6 +140,12 @@ const TicketRow: React.FC<{
 }> = ({ ticket, users, sites, types, isSelected = false, onToggleSelect, onQuickView }) => {
   const assignedUser = users.find(u => u.id === ticket.assignedUserId)
   const typeLabel = types.find(t => t.key === ticket.typeKey)?.label ?? ticket.typeKey.replace(/_/g, ' ')
+  const priorityColorMap: Record<Ticket['priority'], string> = {
+    P1: '#dc2626',
+    P2: '#f97316',
+    P3: '#2563eb',
+    P4: '#14b8a6'
+  }
 
   // RAG color coding for due dates
   const getDueDateColor = () => {
@@ -169,7 +175,7 @@ const TicketRow: React.FC<{
           />
         </td>
       )}
-      <td style={{ fontFamily: 'monospace', fontSize: 12 }}>
+      <td style={{ fontFamily: 'monospace', fontSize: 12, width: 110 }}>
         <span
           title={ticket.id}
           style={{
@@ -186,6 +192,36 @@ const TicketRow: React.FC<{
       <td>
         <div className="linkish"><Link to={`/tickets/${ticket.id}`}>{ticket.description}</Link></div>
         <div className="status">{ticket.details || ''}</div>
+      </td>
+      <td style={{ width: 120 }}>
+        <span
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '3px 10px',
+            borderRadius: 999,
+            background: priorityColorMap[ticket.priority],
+            color: '#fff',
+            fontSize: 12,
+            fontWeight: 600,
+            letterSpacing: 0.3
+          }}
+          title={`Priority ${ticket.priority}`}
+        >
+          <span
+            aria-hidden
+            style={{
+              display: 'inline-block',
+              width: 6,
+              height: 6,
+              borderRadius: '50%',
+              background: '#fff',
+              opacity: 0.9
+            }}
+          />
+          {ticket.priority}
+        </span>
       </td>
       <td>
         <StatusChip status={ticket.status} />
@@ -982,6 +1018,9 @@ const statsCardStyle = React.useCallback((accent: string): React.CSSProperties =
               </th>
               <th style={{cursor: 'pointer'}} onClick={() => handleSort('description')}>
                 Description <SortIcon col="description" />
+              </th>
+              <th style={{cursor: 'pointer', width: 120}} onClick={() => handleSort('priority')}>
+                Priority <SortIcon col="priority" />
               </th>
               <th style={{cursor: 'pointer'}} onClick={() => handleSort('status')}>
                 Status <SortIcon col="status" />
