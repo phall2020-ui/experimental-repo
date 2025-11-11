@@ -10,16 +10,16 @@ export enum RecurrenceFrequency {
 
 export class CreateRecurringTicketDto {
   @IsString()
-  siteId: string;
+  siteId!: string;
 
   @IsString()
-  typeKey: string;
+  typeKey!: string;
 
   @IsString()
-  description: string;
+  description!: string;
 
   @IsEnum(['P1', 'P2', 'P3', 'P4'])
-  priority: string;
+  priority!: string;
 
   @IsOptional()
   @IsString()
@@ -34,14 +34,14 @@ export class CreateRecurringTicketDto {
   customFields?: Record<string, any>;
 
   @IsEnum(RecurrenceFrequency)
-  frequency: RecurrenceFrequency;
+  frequency!: RecurrenceFrequency;
 
   @IsInt()
   @Min(1)
-  intervalValue: number;
+  intervalValue!: number;
 
   @IsDateString()
-  startDate: string;
+  startDate!: string;
 
   @IsOptional()
   @IsDateString()
@@ -49,7 +49,7 @@ export class CreateRecurringTicketDto {
 
   @IsInt()
   @Min(0)
-  leadTimeDays: number;
+  leadTimeDays!: number;
 
   @IsOptional()
   @IsBoolean()

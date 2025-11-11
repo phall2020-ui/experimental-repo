@@ -16,7 +16,12 @@ export class NotificationsService {
   }) {
     return this.prisma.notification.create({
       data: {
-        ...data,
+        tenantId: data.tenantId,
+        userId: data.userId,
+        type: data.type as any,
+        title: data.title,
+        message: data.message,
+        ticketId: data.ticketId,
         metadata: data.metadata || {},
       },
     });
