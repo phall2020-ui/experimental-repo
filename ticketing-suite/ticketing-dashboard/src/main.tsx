@@ -16,7 +16,6 @@ import Login from './views/Login'
 import HealthDashboard from './views/HealthDashboard'
 import UserProfile from './views/UserProfile'
 import SiteManagement from './views/SiteManagement'
-import RecurringTickets from './components/RecurringTickets'
 
 const router = createBrowserRouter([
   { 
@@ -32,7 +31,6 @@ const router = createBrowserRouter([
       { path:'health', element:<HealthDashboard/> },
       { path:'profile', element:<UserProfile/> },
       { path:'sites', element:<SiteManagement/> },
-      { path:'recurring', element:<RecurringTickets/> },
       { path:'*', element:<Dashboard/> } // Catch-all route
     ]
   },

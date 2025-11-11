@@ -51,6 +51,22 @@ export const createTicket = async (data: {
   assignedUserId?: string
   custom_fields?: Record<string, any>
 }) => (await client.post<Ticket>('/tickets', data)).data
+
+export interface RecurringTicketPayload {
+  siteId: string
+  typeKey: string
+  description: string
+  priority: Ticket['priority']
+  frequency: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'YEARLY'
+  intervalValue: number
+  startDate: string
+  endDate?: string
+  leadTimeDays: number
+  details?: string
+}
+
+export const createRecurringTicket = async (data: RecurringTicketPayload) =>
+  (await client.post('/recurring-tickets', data)).data
 export const updateTicket = async (id: string, patch: Partial<Ticket> & { custom_fields?: any }) => (await client.patch<Ticket>(`/tickets/${id}`, patch)).data
 export const bulkUpdateTickets = async (payload: {
   ids: string[]
