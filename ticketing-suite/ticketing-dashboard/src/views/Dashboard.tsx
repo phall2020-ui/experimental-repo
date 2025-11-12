@@ -133,13 +133,13 @@ const UserAvatar: React.FC<{ user?: UserOpt; size?: number; showMargin?: boolean
 
 const TABLE_COLUMN_WIDTHS = {
   select: 48,
-  id: 136,
-  description: 360,
-  priority: 120,
-  status: 120,
+  id: 100,
+  description: 450,
+  priority: 100,
+  status: 160,
   type: 160,
-  assigned: 140,
-  site: 180,
+  assigned: 100,
+  site: 160,
   due: 160
 } as const
 
