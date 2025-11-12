@@ -178,7 +178,7 @@ const TicketRow: React.FC<{
   return (
     <tr style={{ backgroundColor: isSelected ? 'rgba(25, 118, 210, 0.08)' : undefined }}>
       {onToggleSelect && (
-        <td style={{ width: 40 }}>
+        <td style={{ width: 48 }}>
           <input
             type="checkbox"
             checked={isSelected}
@@ -187,7 +187,7 @@ const TicketRow: React.FC<{
           />
         </td>
       )}
-      <td style={{ fontFamily: 'monospace', fontSize: 12, width: 110 }}>
+      <td style={{ fontFamily: 'monospace', fontSize: 12, width: 160 }}>
         <span
           title={ticket.id}
           style={{
@@ -201,7 +201,7 @@ const TicketRow: React.FC<{
           {ticket.id}
         </span>
       </td>
-      <td>
+      <td className="text-modern" style={{ width: 320 }}>
         <div className="linkish"><Link to={`/tickets/${ticket.id}`}>{ticket.description}</Link></div>
         <div className="status">{ticket.details || ''}</div>
       </td>
@@ -235,11 +235,11 @@ const TicketRow: React.FC<{
           {ticket.priority}
         </span>
       </td>
-      <td className="text-modern">
+      <td className="text-modern" style={{ width: 120 }}>
         <StatusChip status={ticket.status} />
       </td>
-      <td className="text-modern">{typeLabel}</td>
-      <td>
+      <td className="text-modern" style={{ width: 160 }}>{typeLabel}</td>
+      <td style={{ width: 140 }}>
         <div
           style={{ display: 'flex', justifyContent: 'center' }}
           aria-label={`Assigned user for ticket ${ticket.id}: ${assignedUser ? (assignedUser.name || assignedUser.email) : 'Unassigned'}`}
@@ -247,8 +247,8 @@ const TicketRow: React.FC<{
           <UserAvatar user={assignedUser} size={24} showMargin={false} />
         </div>
       </td>
-      <td className="text-modern">{sites.find(s => s.id === ticket.siteId)?.name || '—'}</td>
-      <td>
+      <td className="text-modern" style={{ width: 180 }}>{sites.find(s => s.id === ticket.siteId)?.name || '—'}</td>
+      <td style={{ width: 160 }}>
         {effectiveDueDate ? (
           <span style={{
             padding: '4px 8px',
@@ -1070,7 +1070,7 @@ const statsCardStyle = React.useCallback((accent: string): React.CSSProperties =
         <table>
           <thead>
             <tr>
-              <th style={{width: 40}}>
+              <th style={{width: 48}}>
                 <input
                   type="checkbox"
                   checked={visibleTickets.length > 0 && selectedTicketIds.size === visibleTickets.length}
@@ -1078,28 +1078,28 @@ const statsCardStyle = React.useCallback((accent: string): React.CSSProperties =
                   aria-label="Select all tickets"
                 />
               </th>
-              <th style={{cursor: 'pointer'}} onClick={() => handleSort('id')}>
+              <th style={{cursor: 'pointer', width: 160}} onClick={() => handleSort('id')}>
                 Ticket ID <SortIcon col="id" />
               </th>
-              <th style={{cursor: 'pointer'}} onClick={() => handleSort('description')}>
+              <th style={{cursor: 'pointer', width: 320}} onClick={() => handleSort('description')}>
                 Description <SortIcon col="description" />
               </th>
               <th style={{cursor: 'pointer', width: 120}} onClick={() => handleSort('priority')}>
                 Priority <SortIcon col="priority" />
               </th>
-              <th style={{cursor: 'pointer'}} onClick={() => handleSort('status')}>
+              <th style={{cursor: 'pointer', width: 120}} onClick={() => handleSort('status')}>
                 Status <SortIcon col="status" />
               </th>
-              <th style={{cursor: 'pointer'}} onClick={() => handleSort('typeKey')}>
+              <th style={{cursor: 'pointer', width: 160}} onClick={() => handleSort('typeKey')}>
                 Type <SortIcon col="typeKey" />
               </th>
-              <th style={{cursor: 'pointer'}} onClick={() => handleSort('assignedUserId')}>
+              <th style={{cursor: 'pointer', width: 140}} onClick={() => handleSort('assignedUserId')}>
                 Assigned <SortIcon col="assignedUserId" />
               </th>
-              <th style={{cursor: 'pointer'}} onClick={() => handleSort('siteId')}>
+              <th style={{cursor: 'pointer', width: 180}} onClick={() => handleSort('siteId')}>
                 Site <SortIcon col="siteId" />
               </th>
-              <th style={{cursor: 'pointer'}} onClick={() => handleSort('dueAt')}>
+              <th style={{cursor: 'pointer', width: 160}} onClick={() => handleSort('dueAt')}>
                 Due Date <SortIcon col="dueAt" />
               </th>
             </tr>

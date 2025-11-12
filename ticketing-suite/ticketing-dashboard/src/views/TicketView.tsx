@@ -160,7 +160,7 @@ export default function TicketView() {
   }, [isRecurringActive, recurringForm.startDate])
 
   const handleRecurringSave = async () => {
-    if (!t) return
+    if (!t || !id) return
     setRecurringSaving(true)
     setRecurringError(null)
     const sanitizedCustomFields = sanitizeCustomFieldValues(t.customFields)
@@ -196,8 +196,12 @@ export default function TicketView() {
           customFields: sanitizedCustomFields,
         })
       }
+      const dueAtForUpdate = t.dueAt
+      if (isRecurringActive && dueAtForUpdate) {
+        await updateTicket(id, { dueAt: dueAtForUpdate })
+      }
       showNotification('success', 'Recurring schedule saved')
-      await refetchRecurring()
+      await Promise.all([refetchRecurring(), load()])
     } catch (e: any) {
       const message = e?.response?.data?.message || e?.message || 'Failed to update recurring schedule'
       setRecurringError(message)
