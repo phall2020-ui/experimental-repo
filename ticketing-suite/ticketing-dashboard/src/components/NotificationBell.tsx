@@ -137,6 +137,9 @@ export default function NotificationBell() {
     setShowPanel(!showPanel);
   };
 
+  const hasUnread = unreadCount > 0;
+  const bellIcon = hasUnread ? '🚩' : '🔔';
+
   const getNotificationIcon = (type: string) => {
     switch (type) {
       case 'TICKET_CREATED': return '🎫';
@@ -165,8 +168,8 @@ export default function NotificationBell() {
           fontSize: '20px',
         }}
       >
-        🔔
-        {unreadCount > 0 && (
+        {bellIcon}
+        {hasUnread && (
           <span
             style={{
               position: 'absolute',

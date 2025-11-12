@@ -1,15 +1,73 @@
 import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Prisma, CommentVisibility, NotificationType } from '@prisma/client';
 import { PrismaService } from '../infra/prisma.service';
-import { CommentVisibility } from '@prisma/client';
-@Injectable() export class CommentsService {
+
+@Injectable()
+export class CommentsService {
   constructor(private prisma: PrismaService) {}
-  async add(tenantId: string, ticketId: string, authorUserId: string | undefined, body: string, visibility: CommentVisibility) {
+
+  async add(
+    tenantId: string,
+    ticketId: string,
+    authorUserId: string | undefined,
+    body: string,
+    visibility: CommentVisibility,
+    mentions: string[]
+  ) {
     return this.prisma.withTenant(tenantId, async (tx) => {
-      const exists = await tx.ticket.findFirst({ where: { id: ticketId, tenantId }});
-      if (!exists) throw new BadRequestException('Invalid ticket');
-      const c = await tx.comment.create({ data: { tenantId, ticketId, authorUserId: authorUserId ?? null, body, visibility } });
-      await tx.outbox.create({ data: { tenantId, type: 'comment.created', entityId: c.id, payload: { ticketId, visibility } }});
-      return c;
+      const ticket = await tx.ticket.findFirst({
+        where: { id: ticketId, tenantId },
+        select: { id: true, description: true },
+      });
+      if (!ticket) throw new BadRequestException('Invalid ticket');
+
+      const comment = await tx.comment.create({
+        data: { tenantId, ticketId, authorUserId: authorUserId ?? null, body, visibility },
+      });
+      await tx.outbox.create({
+        data: { tenantId, type: 'comment.created', entityId: comment.id, payload: { ticketId, visibility } },
+      });
+
+      const uniqueMentions = Array.from(
+        new Set((mentions ?? []).filter((id): id is string => typeof id === 'string' && id.length > 0))
+      );
+
+      if (uniqueMentions.length > 0) {
+        const mentionedUsers = await tx.user.findMany({
+          where: { tenantId, id: { in: uniqueMentions } },
+          select: { id: true, name: true, email: true },
+        });
+
+        let authorDisplay = 'A teammate';
+        if (authorUserId) {
+          const author = await tx.user.findFirst({
+            where: { tenantId, id: authorUserId },
+            select: { name: true, email: true },
+          });
+          if (author) authorDisplay = author.name || author.email || authorDisplay;
+        }
+
+        const rows = mentionedUsers
+          .filter((user) => user.id !== authorUserId)
+          .map((user) => ({
+            tenantId,
+            userId: user.id,
+            type: NotificationType.TICKET_COMMENTED,
+            title: `Mentioned in ${ticket.id}`,
+            message: `${authorDisplay} mentioned you in a comment on ${ticket.id}`,
+            ticketId: ticket.id,
+            metadata: {
+              commentId: comment.id,
+              generatedAt: new Date().toISOString(),
+            } as Prisma.JsonObject,
+          }));
+
+        if (rows.length > 0) {
+          await tx.notification.createMany({ data: rows });
+        }
+      }
+
+      return comment;
     });
   }
   async list(tenantId: string, ticketId: string) {
