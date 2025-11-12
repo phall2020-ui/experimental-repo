@@ -126,8 +126,12 @@ export interface Comment {
 }
 
 export const listComments = async (ticketId: string) => (await client.get<Comment[]>(`/tickets/${ticketId}/comments`)).data
-export const addComment = async (ticketId: string, body: string, visibility: 'PUBLIC' | 'INTERNAL' = 'INTERNAL') => 
-  (await client.post<Comment>(`/tickets/${ticketId}/comments`, { body, visibility })).data
+export const addComment = async (
+  ticketId: string,
+  body: string,
+  visibility: 'PUBLIC' | 'INTERNAL' = 'INTERNAL',
+  mentions: string[] = []
+) => (await client.post<Comment>(`/tickets/${ticketId}/comments`, { body, visibility, mentions })).data
 export const updateComment = async (ticketId: string, commentId: string, body: string) =>
   (await client.patch<Comment>(`/tickets/${ticketId}/comments/${commentId}`, { body })).data
 export const deleteComment = async (ticketId: string, commentId: string) =>

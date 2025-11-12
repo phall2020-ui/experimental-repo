@@ -103,8 +103,8 @@ export const useComments = (ticketId: string) => {
 export const useAddComment = (ticketId: string) => {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ body, visibility }: { body: string; visibility: 'PUBLIC' | 'INTERNAL' }) =>
-      addComment(ticketId, body, visibility),
+    mutationFn: ({ body, visibility, mentions }: { body: string; visibility: 'PUBLIC' | 'INTERNAL'; mentions?: string[] }) =>
+      addComment(ticketId, body, visibility, mentions ?? []),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.comments(ticketId) })
     },

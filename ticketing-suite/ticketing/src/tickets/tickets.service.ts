@@ -1,6 +1,6 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../infra/prisma.service';
-import { Prisma, TicketStatus, TicketPriority } from '@prisma/client';
+import { Prisma, TicketStatus, TicketPriority, NotificationType } from '@prisma/client';
 import { allocateTicketId } from './ticket-id.util';
 
 type CFDefs = Record<string, {
@@ -102,6 +102,22 @@ export class TicketsService {
         }
       });
       await tx.outbox.create({ data: { tenantId, type: 'ticket.created', entityId: t.id, payload: {} }});
+
+      if (t.assignedUserId) {
+        await tx.notification.create({
+          data: {
+            tenantId,
+            userId: t.assignedUserId,
+            type: NotificationType.TICKET_ASSIGNED,
+            title: `Ticket assigned · ${t.id}`,
+            message: `You have been assigned "${t.description}"`,
+            ticketId: t.id,
+            metadata: {
+              generatedAt: new Date().toISOString(),
+            } as Prisma.JsonObject,
+          },
+        });
+      }
       
       // Record history entry for creation
       await tx.ticketHistory.create({
@@ -233,6 +249,26 @@ export class TicketsService {
           actorUserId: (global as any).__actorUserId ?? null,
           changes
         }
+      });
+    }
+
+    if (
+      patch.assignedUserId !== undefined &&
+      updated.assignedUserId &&
+      updated.assignedUserId !== before.assignedUserId
+    ) {
+      await tx.notification.create({
+        data: {
+          tenantId,
+          userId: updated.assignedUserId,
+          type: NotificationType.TICKET_ASSIGNED,
+          title: `Ticket assigned · ${updated.id}`,
+          message: `You have been assigned "${updated.description}"`,
+          ticketId: updated.id,
+          metadata: {
+            generatedAt: new Date().toISOString(),
+          } as Prisma.JsonObject,
+        },
       });
     }
 
