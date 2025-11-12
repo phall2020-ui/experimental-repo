@@ -204,9 +204,13 @@ npm run prisma:deploy
 
 ## Security Considerations
 
-1. **Password in Email**: The welcome email contains the user's temporary password in plain text. Users should be encouraged to change their password immediately.
+1. **Password in Email**: The welcome email contains the user's temporary password in plain text. Users should be encouraged to change their password immediately. The password is sent via email BEFORE it is hashed to ensure the correct plain text password is communicated.
 2. **Email Content**: All email content is generated server-side to prevent injection attacks.
 3. **SMTP Credentials**: SMTP credentials should be stored securely in environment variables, never in code.
+4. **SMTP Security**: The system properly handles both SSL (port 465) and STARTTLS (port 587) connections:
+   - Port 465: Uses `secure: true` for SSL
+   - Port 587: Uses `secure: false` with `requireTLS: true` for STARTTLS
+5. **Type Safety**: Email notification preferences are validated at runtime to prevent type errors and ensure only valid notification types trigger emails.
 
 ## Future Enhancements
 
