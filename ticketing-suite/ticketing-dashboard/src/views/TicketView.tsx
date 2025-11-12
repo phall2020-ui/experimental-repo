@@ -149,15 +149,18 @@ export default function TicketView() {
         await updateRecurringTicket(recurringConfig.id, { isActive: false })
       }
       
+      // Reload fresh data from server
+      await Promise.all([load(), refetchRecurring()])
+      
       setHasChanges(false)
-      setInitialData(JSON.parse(JSON.stringify(t)))
-      await refetchRecurring()
+      showNotification('success', 'Changes saved')
     } catch (e) {
       console.error('Auto-save failed:', e)
+      showNotification('error', 'Failed to save changes')
     } finally {
       setAutoSaving(false)
     }
-  }, [t, id, recurringEnabled, recurringForm, recurringConfig, refetchRecurring])
+  }, [t, id, recurringEnabled, recurringForm, recurringConfig, refetchRecurring, load, showNotification])
 
   // Track changes
   React.useEffect(() => {

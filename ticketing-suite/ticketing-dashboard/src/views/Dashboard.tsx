@@ -463,6 +463,21 @@ export default function Dashboard() {
     return () => clearTimeout(id) 
   }, [search])
 
+  // Refresh when navigating back to dashboard
+  React.useEffect(() => {
+    const handleFocus = () => {
+      fetchList(true)
+    }
+    
+    window.addEventListener('focus', handleFocus)
+    return () => window.removeEventListener('focus', handleFocus)
+  }, [])
+
+  // Refresh on mount
+  React.useEffect(() => {
+    fetchList(true)
+  }, [])
+
   const clearFilters = () => {
     setStatus('')
     setPriority('')
