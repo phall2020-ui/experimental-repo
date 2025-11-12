@@ -34,14 +34,15 @@ model Site {
 }
 
 model User {
-  id       String @id @default(uuid())
-  tenantId String
-  email    String   @unique
-  password String
-  name     String
-  role     Role     @default(USER)
-  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  tickets  Ticket[] @relation("UserTickets")
+  id          String    @id @default(uuid())
+  tenantId    String
+  email       String    @unique
+  password    String
+  name        String
+  role        Role      @default(USER)
+  lastLoginAt DateTime?
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tickets     Ticket[]  @relation("UserTickets")
 }
 
 model Ticket {

@@ -8,7 +8,7 @@ client.interceptors.request.use(cfg => {
 })
 
 export type SiteOpt = { id: string; name: string }
-export type UserOpt = { id: string; name: string; email: string; role: 'ADMIN' | 'USER' }
+export type UserOpt = { id: string; name: string; email: string; role: 'ADMIN' | 'USER'; lastLoginAt?: string | null }
 export type IssueTypeOpt = { key: string; label: string }
 export type FieldDefOpt = {
   key: string

@@ -50,4 +50,10 @@ export class UsersController {
   async changePassword(@Req() req: any, @Body() body: { oldPassword: string; newPassword: string }) {
     return this.svc.changePassword(req.user.sub, body.oldPassword, body.newPassword);
   }
+
+  @Post(':id/reset-password')
+  @Roles('ADMIN')
+  async resetPassword(@Req() req: any, @Param('id') id: string, @Body() body: { password: string }) {
+    return this.svc.resetPassword(id, body.password);
+  }
 }

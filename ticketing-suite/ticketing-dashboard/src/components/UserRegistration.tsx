@@ -36,6 +36,7 @@ export default function UserRegistration({ onClose, onSuccess }: UserRegistratio
   const [error, setError] = React.useState<string | null>(null)
   const [editingId, setEditingId] = React.useState<string | null>(null)
   const [editData, setEditData] = React.useState<{ name: string; email: string; role: 'USER' | 'ADMIN' }>({ name: '', email: '', role: 'USER' })
+  const [showPassword, setShowPassword] = React.useState(false)
   const [formData, setFormData] = React.useState({
     email: '',
     password: '',
@@ -174,13 +175,24 @@ export default function UserRegistration({ onClose, onSuccess }: UserRegistratio
             <TextField
               fullWidth
               required
-              type="password"
+              type={showPassword ? 'text' : 'password'}
               size="small"
               label="Password"
               value={formData.password}
               onChange={e => setFormData({ ...formData, password: e.target.value })}
               placeholder="Minimum 6 characters"
               inputProps={{ minLength: 6, 'aria-label': 'Password' }}
+              InputProps={{
+                endAdornment: (
+                  <Button
+                    size="small"
+                    onClick={() => setShowPassword(!showPassword)}
+                    sx={{ minWidth: 'auto', fontSize: '0.75rem' }}
+                  >
+                    {showPassword ? 'Hide' : 'Show'}
+                  </Button>
+                )
+              }}
             />
 
             <TextField
@@ -237,6 +249,7 @@ export default function UserRegistration({ onClose, onSuccess }: UserRegistratio
                   <th style={{ textAlign: 'left' }}>Name</th>
                   <th style={{ textAlign: 'left' }}>Email</th>
                   <th style={{ textAlign: 'left' }}>Role</th>
+                  <th style={{ textAlign: 'left' }}>Last Login</th>
                   <th style={{ textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
@@ -280,6 +293,9 @@ export default function UserRegistration({ onClose, onSuccess }: UserRegistratio
                       ) : (
                         <span className={`badge ${u.role === 'ADMIN' ? 'High' : 'Low'}`}>{u.role}</span>
                       )}
+                    </td>
+                    <td>
+                      {u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString() : 'Never'}
                     </td>
                     <td style={{ textAlign: 'right' }}>
                       {editingId === u.id ? (

@@ -23,6 +23,13 @@ export class AuthService {
     if (!user) throw new UnauthorizedException('Invalid credentials');
     const ok = await bcrypt.compare(password, user.password);
     if (!ok) throw new UnauthorizedException('Invalid credentials');
+    
+    // Update last login time
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date() }
+    });
+    
     const payload = { sub: user.id, tenantId: user.tenantId, role: user.role };
     return { token: this.jwt.sign(payload) };
   }

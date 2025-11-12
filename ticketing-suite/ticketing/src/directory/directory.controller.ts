@@ -60,7 +60,7 @@ export class DirectoryController {
   users(@Req() req: any) {
     return this.prisma.user.findMany({
       where: { tenantId: this.tenant(req) },
-      select: { id: true, name: true, email: true, role: true }
+      select: { id: true, name: true, email: true, role: true, lastLoginAt: true }
     });
   }
 
