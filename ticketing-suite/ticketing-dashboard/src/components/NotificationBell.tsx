@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { API_BASE } from '../lib/api';
 import axios from 'axios';
 
@@ -18,17 +18,42 @@ export default function NotificationBell() {
   const [showPanel, setShowPanel] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    loadUnreadCount();
-    const interval = setInterval(loadUnreadCount, 30000); // Poll every 30 seconds
-    return () => clearInterval(interval);
+  const getUserStorageKey = useCallback(() => {
+    const userId = localStorage.getItem('userId') || 'anonymous';
+    return `notifications:lastRefresh:${userId}`;
   }, []);
 
-  const loadUnreadCount = async () => {
+  const refreshDailyDigests = useCallback(async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    const todayKey = new Date().toISOString().slice(0, 10);
+    const storageKey = getUserStorageKey();
+    const lastRun = localStorage.getItem(storageKey);
+
+    if (lastRun === todayKey) {
+      return;
+    }
+
+    try {
+      await axios.post(
+        `${API_BASE}/notifications/daily-refresh`,
+        {},
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      localStorage.setItem(storageKey, todayKey);
+    } catch (error) {
+      console.error('Failed to refresh notifications digest:', error);
+    }
+  }, [getUserStorageKey]);
+
+  const loadUnreadCount = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
       if (!token) return;
-      
+
       const response = await axios.get(`${API_BASE}/notifications/unread-count`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -36,9 +61,31 @@ export default function NotificationBell() {
     } catch (error) {
       console.error('Failed to load unread count:', error);
     }
-  };
+  }, []);
 
-  const loadNotifications = async () => {
+  useEffect(() => {
+    const initialise = async () => {
+      await refreshDailyDigests();
+      await loadUnreadCount();
+    };
+    initialise();
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        void (async () => {
+          await refreshDailyDigests();
+          await loadUnreadCount();
+        })();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [refreshDailyDigests, loadUnreadCount]);
+
+  const loadNotifications = useCallback(async () => {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
@@ -51,7 +98,7 @@ export default function NotificationBell() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   const markAsRead = async (id: string) => {
     try {
@@ -81,7 +128,11 @@ export default function NotificationBell() {
 
   const togglePanel = () => {
     if (!showPanel) {
-      loadNotifications();
+      void (async () => {
+        await refreshDailyDigests();
+        await loadNotifications();
+        await loadUnreadCount();
+      })();
     }
     setShowPanel(!showPanel);
   };
@@ -94,6 +145,8 @@ export default function NotificationBell() {
       case 'TICKET_COMMENTED': return '💬';
       case 'TICKET_RESOLVED': return '✅';
       case 'RECURRING_TICKET_GENERATED': return '🔄';
+      case 'TICKET_ACTIVITY_DIGEST': return '📝';
+      case 'TICKET_DUE_SOON': return '⏰';
       default: return '🔔';
     }
   };

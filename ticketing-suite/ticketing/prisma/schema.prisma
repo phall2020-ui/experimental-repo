@@ -166,6 +166,8 @@ enum NotificationType {
   TICKET_COMMENTED
   TICKET_RESOLVED
   RECURRING_TICKET_GENERATED
+  TICKET_ACTIVITY_DIGEST
+  TICKET_DUE_SOON
 }
 
 model Attachment {
@@ -264,4 +266,13 @@ model Notification {
 
   @@index([tenantId, userId, isRead, createdAt])
   @@index([tenantId, ticketId])
+}
+
+model NotificationDigest {
+  tenantId  String
+  userId    String
+  lastRunAt DateTime @default(now())
+
+  @@id([tenantId, userId])
+  @@index([lastRunAt])
 }

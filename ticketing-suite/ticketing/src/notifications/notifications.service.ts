@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../infra/prisma.service';
+import { Prisma, NotificationType, TicketStatus } from '@prisma/client';
 
 @Injectable()
 export class NotificationsService {
@@ -89,6 +90,161 @@ export class NotificationsService {
       title,
       message,
       ticketId,
+    });
+  }
+
+  async dailyRefresh(tenantId: string, userId: string) {
+    const now = new Date();
+    const startOfToday = new Date(now);
+    startOfToday.setHours(0, 0, 0, 0);
+    const startOfTomorrow = new Date(startOfToday);
+    startOfTomorrow.setDate(startOfTomorrow.getDate() + 1);
+
+    return this.prisma.$transaction(async (tx) => {
+      const digest = await tx.notificationDigest.findUnique({
+        where: { tenantId_userId: { tenantId, userId } },
+      });
+
+      const alreadyRanToday =
+        digest?.lastRunAt &&
+        digest.lastRunAt >= startOfToday &&
+        digest.lastRunAt < startOfTomorrow;
+
+      const since = digest?.lastRunAt ?? new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+      let dueSoonCount = 0;
+      let updatesCount = 0;
+
+      if (!alreadyRanToday) {
+        // Clear previous digest notifications so we only show the most recent snapshot
+        await tx.notification.deleteMany({
+          where: {
+            tenantId,
+            userId,
+            type: { in: [NotificationType.TICKET_DUE_SOON, NotificationType.TICKET_ACTIVITY_DIGEST] },
+          },
+        });
+
+        const weekAhead = new Date(startOfToday);
+        weekAhead.setDate(weekAhead.getDate() + 7);
+
+        const dueSoonTickets = await tx.ticket.findMany({
+          where: {
+            tenantId,
+            assignedUserId: userId,
+            status: { not: TicketStatus.CLOSED },
+            dueAt: {
+              gte: startOfToday,
+              lt: weekAhead,
+            },
+          },
+          select: {
+            id: true,
+            description: true,
+            dueAt: true,
+            site: { select: { name: true } },
+          },
+        });
+
+        if (dueSoonTickets.length > 0) {
+          dueSoonCount = dueSoonTickets.length;
+          await tx.notification.createMany({
+            data: dueSoonTickets.map((ticket) => ({
+              tenantId,
+              userId,
+              type: NotificationType.TICKET_DUE_SOON,
+              title: `Upcoming due date · ${ticket.id}`,
+              message: `${ticket.description} is due on ${ticket.dueAt?.toLocaleDateString()}${ticket.site?.name ? ` · ${ticket.site.name}` : ''}`,
+              ticketId: ticket.id,
+              metadata: {
+                dueAt: ticket.dueAt?.toISOString() ?? null,
+                generatedAt: now.toISOString(),
+              } as Prisma.JsonObject,
+            })),
+          });
+        }
+
+        const recentUpdates = await tx.ticketHistory.findMany({
+          where: {
+            tenantId,
+            at: { gt: since },
+            OR: [
+              { actorUserId: { not: userId } },
+              { actorUserId: null },
+            ],
+            ticket: {
+              tenantId,
+              assignedUserId: userId,
+              status: { not: TicketStatus.CLOSED },
+            },
+          },
+          orderBy: { at: 'desc' },
+          include: {
+            ticket: { select: { id: true, description: true, dueAt: true, site: { select: { name: true } } } },
+          },
+        });
+
+        if (recentUpdates.length > 0) {
+          const updateMap = new Map<
+            string,
+            {
+              ticketId: string;
+              title: string;
+              message: string;
+              latestAt: Date;
+            }
+          >();
+
+          for (const entry of recentUpdates) {
+            if (!entry.ticket) continue;
+            const ticketId = entry.ticket.id;
+            const existing = updateMap.get(ticketId);
+            const changeKeys = Object.keys((entry.changes as Prisma.JsonObject) ?? {});
+            const fieldList = changeKeys.length > 0 ? changeKeys.join(', ') : 'ticket';
+            const baseMessage = `${entry.ticket.description} updated (${fieldList})`;
+            const title = `Updates while you were away · ${ticketId}`;
+
+            if (!existing || existing.latestAt < entry.at) {
+              updateMap.set(ticketId, {
+                ticketId,
+                title,
+                message: `${baseMessage} at ${entry.at.toLocaleString()}`,
+                latestAt: entry.at,
+              });
+            }
+          }
+
+          const updates = Array.from(updateMap.values());
+          if (updates.length > 0) {
+            updatesCount = updates.length;
+            await tx.notification.createMany({
+              data: updates.map((item) => ({
+                tenantId,
+                userId,
+                type: NotificationType.TICKET_ACTIVITY_DIGEST,
+                title: item.title,
+                message: item.message,
+                ticketId: item.ticketId,
+                metadata: {
+                  generatedAt: now.toISOString(),
+                } as Prisma.JsonObject,
+              })),
+            });
+          }
+        }
+
+        await tx.notificationDigest.upsert({
+          where: { tenantId_userId: { tenantId, userId } },
+          create: { tenantId, userId, lastRunAt: now },
+          update: { lastRunAt: now },
+        });
+      }
+
+      return {
+        ran: !alreadyRanToday,
+        dueSoon: dueSoonCount,
+        updates: updatesCount,
+      };
     });
   }
 }
