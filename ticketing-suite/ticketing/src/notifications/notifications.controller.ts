@@ -37,6 +37,15 @@ export class NotificationsController {
     return this.service.markAllAsRead(this.tenant(req), this.userId(req));
   }
 
+  @Post('daily-refresh')
+  async dailyRefresh(@Req() req: any) {
+    const userId = this.userId(req);
+    if (!userId) {
+      return { ran: false, dueSoon: 0, updates: 0 };
+    }
+    return this.service.dailyRefresh(this.tenant(req), userId);
+  }
+
   @Delete(':id')
   async delete(@Req() req: any, @Param('id') id: string) {
     return this.service.delete(this.tenant(req), id);
