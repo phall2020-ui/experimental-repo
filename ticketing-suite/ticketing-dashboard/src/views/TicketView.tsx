@@ -161,19 +161,26 @@ export default function TicketView() {
 
   // Track changes
   React.useEffect(() => {
-    if (!t || !initialData) return
+    if (!t || !initialData || !recurringHydrated) return
+    
     const ticketChanged = JSON.stringify(t) !== JSON.stringify(initialData)
-    const recurringChanged = recurringConfig ? 
-      (recurringEnabled !== recurringConfig.isActive || 
-       JSON.stringify(recurringForm) !== JSON.stringify({
-         frequency: recurringConfig.frequency,
-         intervalValue: recurringConfig.intervalValue,
-         startDate: recurringConfig.startDate.slice(0, 10),
-         endDate: recurringConfig.endDate ? recurringConfig.endDate.slice(0, 10) : '',
-         leadTimeDays: recurringConfig.leadTimeDays,
-       })) : recurringEnabled
+    
+    let recurringChanged = false
+    if (recurringConfig) {
+      // If config exists, check if enabled state or form changed
+      recurringChanged = recurringEnabled !== recurringConfig.isActive ||
+        recurringForm.frequency !== recurringConfig.frequency ||
+        recurringForm.intervalValue !== recurringConfig.intervalValue ||
+        recurringForm.startDate !== recurringConfig.startDate.slice(0, 10) ||
+        recurringForm.endDate !== (recurringConfig.endDate ? recurringConfig.endDate.slice(0, 10) : '') ||
+        recurringForm.leadTimeDays !== recurringConfig.leadTimeDays
+    } else {
+      // If no config, any enabled state is a change
+      recurringChanged = recurringEnabled
+    }
+    
     setHasChanges(ticketChanged || recurringChanged)
-  }, [t, initialData, recurringEnabled, recurringForm, recurringConfig])
+  }, [t, initialData, recurringEnabled, recurringForm, recurringConfig, recurringHydrated])
 
   // Auto-save on unmount
   React.useEffect(() => {
@@ -222,36 +229,31 @@ export default function TicketView() {
   }, [hasChanges, t, recurringEnabled, recurringForm])
   
   React.useEffect(() => {
-    if (!t) return
+    if (!t || recurringHydrated) return
 
     if (recurringConfig) {
       setRecurringEnabled(recurringConfig.isActive)
-      setRecurringForm(prev => ({
-        ...prev,
+      setRecurringForm({
         frequency: recurringConfig.frequency,
         intervalValue: recurringConfig.intervalValue,
         startDate: recurringConfig.startDate.slice(0, 10),
         endDate: recurringConfig.endDate ? recurringConfig.endDate.slice(0, 10) : '',
         leadTimeDays: recurringConfig.leadTimeDays,
-      }))
-      setRecurringHydrated(true)
+      })
     } else {
-      if (!recurringHydrated) {
-        setRecurringEnabled(false)
-      }
-      if (!recurringEnabled || !recurringHydrated) {
-        const baseStart = t.dueAt ? new Date(t.dueAt) : new Date()
-        const startDate = baseStart.toISOString().slice(0, 10)
-        setRecurringForm(prev => ({
-          ...prev,
-          startDate,
-          endDate: '',
-          leadTimeDays: prev.leadTimeDays ?? 7,
-        }))
-      }
-      setRecurringHydrated(true)
+      setRecurringEnabled(false)
+      const baseStart = t.dueAt ? new Date(t.dueAt) : new Date()
+      const startDate = baseStart.toISOString().slice(0, 10)
+      setRecurringForm({
+        frequency: 'MONTHLY' as FrequencyValue,
+        intervalValue: 1,
+        startDate,
+        endDate: '',
+        leadTimeDays: 7,
+      })
     }
-  }, [recurringConfig, t, recurringEnabled, recurringHydrated])
+    setRecurringHydrated(true)
+  }, [recurringConfig, t, recurringHydrated])
   
   // Removed manual save - now using auto-save on unmount
 
