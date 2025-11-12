@@ -67,9 +67,11 @@ export default function TicketView() {
     endDate: '',
     leadTimeDays: 7,
   })
+  const [recurringHydrated, setRecurringHydrated] = React.useState(false)
   
   const load = async () => {
     if (!id) return
+    setRecurringHydrated(false)
     try {
       const data = await getTicket(id)
       setT({
@@ -92,26 +94,36 @@ export default function TicketView() {
   }, [id])
   
   React.useEffect(() => {
+    if (!t) return
+
     if (recurringConfig) {
       setRecurringEnabled(recurringConfig.isActive)
-      setRecurringForm({
+      setRecurringForm(prev => ({
+        ...prev,
         frequency: recurringConfig.frequency,
         intervalValue: recurringConfig.intervalValue,
         startDate: recurringConfig.startDate.slice(0, 10),
         endDate: recurringConfig.endDate ? recurringConfig.endDate.slice(0, 10) : '',
         leadTimeDays: recurringConfig.leadTimeDays,
-      })
+      }))
+      setRecurringHydrated(true)
     } else {
-      setRecurringEnabled(false)
-      setRecurringForm({
-        frequency: 'MONTHLY',
-        intervalValue: 1,
-        startDate: t?.dueAt ? new Date(t.dueAt).toISOString().slice(0, 10) : new Date().toISOString().split('T')[0],
-        endDate: '',
-        leadTimeDays: 7,
-      })
+      if (!recurringHydrated) {
+        setRecurringEnabled(false)
+      }
+      if (!recurringEnabled || !recurringHydrated) {
+        const baseStart = t.dueAt ? new Date(t.dueAt) : new Date()
+        const startDate = baseStart.toISOString().slice(0, 10)
+        setRecurringForm(prev => ({
+          ...prev,
+          startDate,
+          endDate: '',
+          leadTimeDays: prev.leadTimeDays ?? 7,
+        }))
+      }
+      setRecurringHydrated(true)
     }
-  }, [recurringConfig, t])
+  }, [recurringConfig, t, recurringEnabled, recurringHydrated])
   
   const save = async () => {
     if (!id || !t) return
