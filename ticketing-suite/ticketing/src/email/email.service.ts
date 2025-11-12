@@ -20,12 +20,12 @@ export class EmailService {
 
     if (this.enabled) {
       this.transporter = nodemailer.createTransport({
-        host: smtpHost,
-        port: parseInt(smtpPort, 10),
-        secure: parseInt(smtpPort, 10) === 465, // true for 465, false for other ports
+        host: smtpHost!,
+        port: parseInt(smtpPort!, 10),
+        secure: parseInt(smtpPort!, 10) === 465, // true for 465, false for other ports
         auth: {
-          user: smtpUser,
-          pass: smtpPass,
+          user: smtpUser!,
+          pass: smtpPass!,
         },
       });
       this.logger.log('Email service initialized with SMTP configuration');
