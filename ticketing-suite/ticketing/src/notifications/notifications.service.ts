@@ -103,11 +103,12 @@ export class NotificationsService {
         select: { email: true, name: true, emailNotifications: true }
       });
 
-      if (user) {
+      if (user && user.emailNotifications) {
         const emailPrefs = user.emailNotifications as Record<string, boolean>;
         const typeKey = this.getNotificationTypeKey(type);
         
-        if (emailPrefs && emailPrefs[typeKey]) {
+        // Only send email if preferences exist and this type is enabled
+        if (emailPrefs && typeof emailPrefs[typeKey] === 'boolean' && emailPrefs[typeKey]) {
           await this.emailService.sendTicketNotification(
             user.email,
             user.name,
@@ -131,7 +132,8 @@ export class NotificationsService {
       TICKET_COMMENTED: 'ticketCommented',
       TICKET_RESOLVED: 'ticketResolved',
     };
-    return typeMap[type] || 'ticketUpdated';
+    // Return undefined if type is not recognized, so email won't be sent for unknown types
+    return typeMap[type] || '';
   }
 
   async dailyRefresh(tenantId: string, userId: string) {

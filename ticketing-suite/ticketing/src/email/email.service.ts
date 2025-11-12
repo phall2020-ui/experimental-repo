@@ -19,10 +19,12 @@ export class EmailService {
     this.enabled = !!(smtpHost && smtpPort && smtpUser && smtpPass && smtpFrom);
 
     if (this.enabled) {
+      const port = parseInt(smtpPort!, 10);
       this.transporter = nodemailer.createTransport({
         host: smtpHost!,
-        port: parseInt(smtpPort!, 10),
-        secure: parseInt(smtpPort!, 10) === 465, // true for 465, false for other ports
+        port: port,
+        secure: port === 465, // true for 465 (SSL), false for other ports
+        requireTLS: port === 587, // true for 587 (STARTTLS)
         auth: {
           user: smtpUser!,
           pass: smtpPass!,

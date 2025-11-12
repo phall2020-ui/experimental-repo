@@ -13,14 +13,14 @@ export class AuthService {
   ) {}
 
   async register(email: string, password: string, name: string, role: 'USER' | 'ADMIN', tenantId: string) {
+    // Send welcome email with password before hashing
+    await this.emailService.sendWelcomeEmail(email, name, password);
+    
     const hash = await bcrypt.hash(password, 10);
     const user = await this.prisma.user.create({
       data: { email, password: hash, name, role, tenantId },
       select: { id: true, email: true, name: true, role: true, tenantId: true }
     });
-    
-    // Send welcome email with password
-    await this.emailService.sendWelcomeEmail(email, name, password);
     
     return user;
   }
@@ -90,6 +90,15 @@ export class AuthService {
       data: { password: hash }
     });
     return { success: true };
+  }
+
+  async getUserProfile(id: string) {
+    const user = await this.prisma.user.findUnique({ 
+      where: { id },
+      select: { id: true, email: true, name: true, role: true, tenantId: true, emailNotifications: true }
+    });
+    if (!user) throw new NotFoundException('User not found');
+    return user;
   }
 
   async updateEmailNotifications(id: string, emailNotifications: Record<string, boolean>) {

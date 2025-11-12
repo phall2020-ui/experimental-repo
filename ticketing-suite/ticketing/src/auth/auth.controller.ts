@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { Roles } from './roles.decorator';
 import { JwtAuthGuard } from '../common/auth.guard';
@@ -25,6 +25,12 @@ export class AuthController {
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class UsersController {
   constructor(private svc: AuthService) {}
+
+  @Get('profile')
+  @Roles('ADMIN', 'USER')
+  async getProfile(@Req() req: any) {
+    return this.svc.getUserProfile(req.user.sub);
+  }
 
   @Patch('profile')
   @Roles('ADMIN', 'USER')
