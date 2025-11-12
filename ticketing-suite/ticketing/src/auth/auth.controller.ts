@@ -26,18 +26,6 @@ export class AuthController {
 export class UsersController {
   constructor(private svc: AuthService) {}
 
-  @Patch(':id')
-  @Roles('ADMIN')
-  async update(@Req() req: any, @Param('id') id: string, @Body() body: { name?: string; email?: string; role?: 'USER' | 'ADMIN' }) {
-    return this.svc.updateUser(id, body);
-  }
-
-  @Delete(':id')
-  @Roles('ADMIN')
-  async delete(@Req() req: any, @Param('id') id: string) {
-    return this.svc.deleteUser(id);
-  }
-
   @Patch('profile')
   @Roles('ADMIN', 'USER')
   async updateMe(@Req() req: any, @Body() body: { name?: string; email?: string }) {
@@ -49,6 +37,18 @@ export class UsersController {
   @Roles('ADMIN', 'USER')
   async changePassword(@Req() req: any, @Body() body: { oldPassword: string; newPassword: string }) {
     return this.svc.changePassword(req.user.sub, body.oldPassword, body.newPassword);
+  }
+
+  @Patch(':id')
+  @Roles('ADMIN')
+  async update(@Req() req: any, @Param('id') id: string, @Body() body: { name?: string; email?: string; role?: 'USER' | 'ADMIN' }) {
+    return this.svc.updateUser(id, body);
+  }
+
+  @Delete(':id')
+  @Roles('ADMIN')
+  async delete(@Req() req: any, @Param('id') id: string) {
+    return this.svc.deleteUser(id);
   }
 
   @Post(':id/reset-password')

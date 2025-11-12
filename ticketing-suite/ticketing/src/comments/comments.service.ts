@@ -48,8 +48,8 @@ export class CommentsService {
         }
 
         const rows = mentionedUsers
-          .filter((user) => user.id !== authorUserId)
-          .map((user) => ({
+          .filter((user: { id: string; name: string | null; email: string }) => user.id !== authorUserId)
+          .map((user: { id: string; name: string | null; email: string }) => ({
             tenantId,
             userId: user.id,
             type: NotificationType.TICKET_COMMENTED,
