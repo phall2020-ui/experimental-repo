@@ -132,15 +132,15 @@ const UserAvatar: React.FC<{ user?: UserOpt; size?: number; showMargin?: boolean
 }
 
 const TABLE_COLUMN_WIDTHS = {
-  select: 42,
-  id: 75,
-  description: 285,
-  priority: 75,
-  status: 115,
-  type: 115,
-  assigned: 75,
-  site: 105,
-  due: 113
+  select: 50,
+  id: 90,
+  description: 320,
+  priority: 90,
+  status: 130,
+  type: 130,
+  assigned: 90,
+  site: 120,
+  due: 130
 } as const
 
 const TicketRow: React.FC<{
@@ -188,9 +188,12 @@ const TicketRow: React.FC<{
   }
   
   return (
-    <tr style={{ backgroundColor: isSelected ? 'rgba(25, 118, 210, 0.08)' : undefined }}>
+    <tr style={{ 
+      backgroundColor: isSelected ? 'rgba(25, 118, 210, 0.08)' : undefined,
+      borderBottom: '1px solid #e5e7eb'
+    }}>
       {onToggleSelect && (
-        <td>
+        <td style={{ padding: '12px 8px' }}>
           <input
             type="checkbox"
             checked={isSelected}
@@ -205,7 +208,8 @@ const TicketRow: React.FC<{
           fontSize: 12,
           whiteSpace: 'nowrap',
           overflow: 'hidden',
-          textOverflow: 'ellipsis'
+          textOverflow: 'ellipsis',
+          padding: '12px 8px'
         }}
       >
         <span
@@ -226,19 +230,20 @@ const TicketRow: React.FC<{
         style={{
           wordBreak: 'break-word',
           whiteSpace: 'normal',
-          lineHeight: 1.35
+          lineHeight: 1.5,
+          padding: '12px 8px'
         }}
       >
         <div className="linkish"><Link to={`/tickets/${ticket.id}`}>{ticket.description}</Link></div>
         <div className="status">{ticket.details || ''}</div>
       </td>
-      <td>
+      <td style={{ padding: '12px 8px' }}>
         <span
           style={{
             display: 'inline-flex',
             alignItems: 'center',
             gap: 6,
-            padding: '3px 10px',
+            padding: '4px 12px',
             borderRadius: 999,
             background: priorityColorMap[ticket.priority],
             color: '#fff',
@@ -262,11 +267,11 @@ const TicketRow: React.FC<{
           {ticket.priority}
         </span>
       </td>
-      <td className="text-modern">
+      <td className="text-modern" style={{ padding: '12px 8px' }}>
         <StatusChip status={ticket.status} />
       </td>
-      <td className="text-modern">{typeLabel}</td>
-      <td>
+      <td className="text-modern" style={{ padding: '12px 8px' }}>{typeLabel}</td>
+      <td style={{ padding: '12px 8px' }}>
         <div
           style={{ display: 'flex', justifyContent: 'center' }}
           aria-label={`Assigned user for ticket ${ticket.id}: ${assignedUser ? (assignedUser.name || assignedUser.email) : 'Unassigned'}`}
@@ -274,10 +279,10 @@ const TicketRow: React.FC<{
           <UserAvatar user={assignedUser} size={24} showMargin={false} />
         </div>
       </td>
-      <td className="text-modern" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+      <td className="text-modern" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '12px 8px' }}>
         {sites.find(s => s.id === ticket.siteId)?.name || '—'}
       </td>
-      <td>
+      <td style={{ padding: '12px 8px' }}>
         {effectiveDueDate ? (
           <span style={{
             padding: '4px 8px',
@@ -576,12 +581,12 @@ const statsCardStyle = React.useCallback((accent: string): React.CSSProperties =
   return {
     background: `linear-gradient(135deg, ${primary}, ${secondary})`,
     border: `1px solid rgba(${r}, ${g}, ${b}, 0.85)`,
-    borderRadius: 14,
-    padding: 20,
+    borderRadius: 16,
+    padding: '24px',
     color: '#ffffff',
     textShadow: '0 1px 3px rgba(0, 0, 0, 0.6)',
     boxShadow: '0 12px 28px rgba(15, 23, 42, 0.45)',
-    minHeight: 160
+    minHeight: 180
   }
 }, [hexToRgb])
 
@@ -799,9 +804,9 @@ const statsCardStyle = React.useCallback((accent: string): React.CSSProperties =
   }, [])
 
   return (
-    <div className="container text-modern" style={{ overflowX: 'hidden' }}>
-      <div className="grid">
-        <div className="panel text-modern">
+    <div className="container text-modern" style={{ overflowX: 'hidden', maxWidth: '1400px', padding: '32px 24px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+        <div className="panel text-modern" style={{ padding: '24px' }}>
         <div
           className="row"
           style={{
@@ -1092,11 +1097,12 @@ const statsCardStyle = React.useCallback((accent: string): React.CSSProperties =
           </div>
         )}
 
-        <div style={{marginBottom: 8, fontSize: 12, color: '#999'}}>
+        <div style={{marginBottom: 16, fontSize: 13, color: '#64748b', fontWeight: 500}}>
           Showing {visibleTickets.length} ticket{visibleTickets.length !== 1 ? 's' : ''}
         </div>
 
-        <table style={{ tableLayout: 'fixed', width: '100%' }}>
+        <div style={{ overflowX: 'auto', marginLeft: '-24px', marginRight: '-24px', paddingLeft: '24px', paddingRight: '24px' }}>
+        <table style={{ tableLayout: 'fixed', width: '100%', borderSpacing: '0 8px' }}>
           <colgroup>
             <col style={{ width: TABLE_COLUMN_WIDTHS.select }} />
             <col style={{ width: TABLE_COLUMN_WIDTHS.id }} />
@@ -1182,13 +1188,14 @@ const statsCardStyle = React.useCallback((accent: string): React.CSSProperties =
               ))}
           </tbody>
         </table>
+        </div>
 
         {hasMore && sortedTickets.length > 0 && (
-          <div style={{marginTop: 12, textAlign: 'center'}}>
+          <div style={{marginTop: 20, textAlign: 'center'}}>
             <button 
               onClick={() => fetchList(false)} 
               disabled={loading}
-              style={{minWidth: 120}}
+              style={{minWidth: 140, padding: '10px 20px'}}
             >
               {loading ? 'Loading...' : 'Load More'}
             </button>
@@ -1196,13 +1203,14 @@ const statsCardStyle = React.useCallback((accent: string): React.CSSProperties =
         )}
       </div>
 
-      <div className="panel text-modern">
-        <div className="h1" style={{ marginBottom: 12 }}>Statistics</div>
+      <div className="panel text-modern" style={{ padding: '24px' }}>
+        <div className="panel text-modern" style={{ padding: '24px' }}>
+        <div className="h1" style={{ marginBottom: 20, fontSize: '24px' }}>Statistics</div>
         <div
           style={{
             display: 'grid',
-            gap: 16,
-            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))'
+            gap: 20,
+            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))'
           }}
         >
           <div style={statsCardStyle('#5B8DEF')}>
@@ -1312,8 +1320,9 @@ const statsCardStyle = React.useCallback((accent: string): React.CSSProperties =
             )}
           </div>
         </div>
-        <div style={{ fontSize: 12, color: '#475569', marginTop: 16 }}>
+        <div style={{ fontSize: 14, color: '#475569', marginTop: 20, fontWeight: 600 }}>
           Total: {stats.total} ticket{stats.total === 1 ? '' : 's'}
+        </div>
         </div>
         </div>
         {/* My prioritisation section disabled per user request */}
