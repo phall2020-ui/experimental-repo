@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { Roles } from './roles.decorator';
 import { JwtAuthGuard } from '../common/auth.guard';
@@ -25,6 +25,12 @@ export class AuthController {
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class UsersController {
   constructor(private svc: AuthService) {}
+
+  @Get('profile')
+  @Roles('ADMIN', 'USER')
+  async getProfile(@Req() req: any) {
+    return this.svc.getUserProfile(req.user.sub);
+  }
 
   @Patch('profile')
   @Roles('ADMIN', 'USER')
@@ -55,5 +61,17 @@ export class UsersController {
   @Roles('ADMIN')
   async resetPassword(@Req() req: any, @Param('id') id: string, @Body() body: { password: string }) {
     return this.svc.resetPassword(id, body.password);
+  }
+
+  @Patch('profile/email-notifications')
+  @Roles('ADMIN', 'USER')
+  async updateEmailNotifications(@Req() req: any, @Body() body: { emailNotifications: Record<string, boolean> }) {
+    return this.svc.updateEmailNotifications(req.user.sub, body.emailNotifications);
+  }
+
+  @Patch(':id/email-notifications')
+  @Roles('ADMIN')
+  async updateUserEmailNotifications(@Param('id') id: string, @Body() body: { emailNotifications: Record<string, boolean> }) {
+    return this.svc.updateEmailNotifications(id, body.emailNotifications);
   }
 }

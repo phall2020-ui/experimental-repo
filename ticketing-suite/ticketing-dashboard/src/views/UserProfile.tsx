@@ -14,16 +14,35 @@ import {
   Stack,
   Divider,
   Paper,
+  FormControlLabel,
+  Checkbox,
+  FormGroup,
 } from '@mui/material'
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import { useNotifications } from '../lib/notifications'
 import { useI18n } from '../lib/i18n'
+import axios from 'axios'
+
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3000'
+const client = axios.create({ baseURL: API_BASE })
+client.interceptors.request.use((config) => {
+  const token = localStorage.getItem('token') || ''
+  if (token) config.headers.Authorization = `Bearer ${token}`
+  return config
+})
 
 export default function UserProfile() {
   const nav = useNavigate()
   const { showNotification } = useNotifications()
   const { language, setLanguage } = useI18n()
   const [user, setUser] = React.useState<{ name?: string; email?: string; role?: string } | null>(null)
+  const [emailNotifications, setEmailNotifications] = React.useState({
+    ticketCreated: true,
+    ticketUpdated: true,
+    ticketAssigned: true,
+    ticketCommented: true,
+    ticketResolved: true,
+  })
   const [preferences, setPreferences] = React.useState(() => {
     const saved = localStorage.getItem('userPreferences')
     return saved ? JSON.parse(saved) : {
@@ -45,15 +64,38 @@ export default function UserProfile() {
           name: payload.name || 'Unknown',
           role: payload.role || 'USER'
         })
+        
+        // Fetch email notification preferences
+        fetchEmailNotifications()
       } catch {
         setUser({ email: 'Unknown', name: 'Unknown', role: 'USER' })
       }
     }
   }, [])
 
+  const fetchEmailNotifications = async () => {
+    try {
+      const response = await client.get('/users/profile')
+      if (response.data?.emailNotifications) {
+        setEmailNotifications(response.data.emailNotifications)
+      }
+    } catch (error) {
+      console.error('Failed to fetch email notifications:', error)
+    }
+  }
+
   const savePreferences = () => {
     localStorage.setItem('userPreferences', JSON.stringify(preferences))
     showNotification('success', 'Preferences saved')
+  }
+
+  const saveEmailNotifications = async () => {
+    try {
+      await client.patch('/users/profile/email-notifications', { emailNotifications })
+      showNotification('success', 'Email notification preferences saved')
+    } catch (error: any) {
+      showNotification('error', error?.response?.data?.message || 'Failed to save email preferences')
+    }
   }
 
   return (
@@ -95,7 +137,7 @@ export default function UserProfile() {
           </Paper>
 
           {/* Preferences */}
-          <Paper variant="outlined" sx={{ p: 3 }}>
+          <Paper variant="outlined" sx={{ p: 3, mb: 3 }}>
             <Typography variant="h6" gutterBottom>
               Preferences
             </Typography>
@@ -142,6 +184,72 @@ export default function UserProfile() {
                 Save Preferences
               </Button>
             </Stack>
+          </Paper>
+
+          {/* Email Notifications */}
+          <Paper variant="outlined" sx={{ p: 3 }}>
+            <Typography variant="h6" gutterBottom>
+              Email Notifications
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Choose which notifications you want to receive via email
+            </Typography>
+            
+            <FormGroup>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={emailNotifications.ticketCreated}
+                    onChange={e => setEmailNotifications({ ...emailNotifications, ticketCreated: e.target.checked })}
+                  />
+                }
+                label="Ticket Created"
+              />
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={emailNotifications.ticketUpdated}
+                    onChange={e => setEmailNotifications({ ...emailNotifications, ticketUpdated: e.target.checked })}
+                  />
+                }
+                label="Ticket Updated"
+              />
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={emailNotifications.ticketAssigned}
+                    onChange={e => setEmailNotifications({ ...emailNotifications, ticketAssigned: e.target.checked })}
+                  />
+                }
+                label="Ticket Assigned to Me"
+              />
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={emailNotifications.ticketCommented}
+                    onChange={e => setEmailNotifications({ ...emailNotifications, ticketCommented: e.target.checked })}
+                  />
+                }
+                label="New Comment on Ticket"
+              />
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={emailNotifications.ticketResolved}
+                    onChange={e => setEmailNotifications({ ...emailNotifications, ticketResolved: e.target.checked })}
+                  />
+                }
+                label="Ticket Resolved"
+              />
+            </FormGroup>
+
+            <Button
+              variant="contained"
+              onClick={saveEmailNotifications}
+              sx={{ mt: 2 }}
+            >
+              Save Email Preferences
+            </Button>
           </Paper>
         </CardContent>
       </Card>

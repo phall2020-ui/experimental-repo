@@ -8,7 +8,14 @@ client.interceptors.request.use(cfg => {
 })
 
 export type SiteOpt = { id: string; name: string }
-export type UserOpt = { id: string; name: string; email: string; role: 'ADMIN' | 'USER'; lastLoginAt?: string | null }
+export type UserOpt = { 
+  id: string; 
+  name: string; 
+  email: string; 
+  role: 'ADMIN' | 'USER'; 
+  lastLoginAt?: string | null;
+  emailNotifications?: Record<string, boolean>;
+}
 export type IssueTypeOpt = { key: string; label: string }
 export type FieldDefOpt = {
   key: string
@@ -33,6 +40,8 @@ export const deleteUser = async (id: string) =>
   (await client.delete(`/users/${id}`)).data
 export const resetUserPassword = async (id: string, password: string) =>
   (await client.post(`/users/${id}/reset-password`, { password })).data
+export const updateUserEmailNotifications = async (id: string, emailNotifications: Record<string, boolean>) =>
+  (await client.patch(`/users/${id}/email-notifications`, { emailNotifications })).data
 
 // Issue type management
 export const createIssueType = async (data: { key: string; label: string }) =>

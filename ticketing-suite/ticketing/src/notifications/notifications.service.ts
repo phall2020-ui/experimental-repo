@@ -1,10 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../infra/prisma.service';
 import { Prisma, NotificationType, TicketStatus } from '@prisma/client';
+import { EmailService } from '../email/email.service';
 
 @Injectable()
 export class NotificationsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly emailService: EmailService
+  ) {}
 
   async create(data: {
     tenantId: string;
@@ -83,7 +87,7 @@ export class NotificationsService {
     message: string,
     userId?: string
   ) {
-    return this.create({
+    const notification = await this.create({
       tenantId,
       userId,
       type,
@@ -91,6 +95,45 @@ export class NotificationsService {
       message,
       ticketId,
     });
+
+    // Send email if user has email notifications enabled for this type
+    if (userId) {
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { email: true, name: true, emailNotifications: true }
+      });
+
+      if (user && user.emailNotifications) {
+        const emailPrefs = user.emailNotifications as Record<string, boolean>;
+        const typeKey = this.getNotificationTypeKey(type);
+        
+        // Only send email if preferences exist and this type is enabled
+        if (emailPrefs && typeof emailPrefs[typeKey] === 'boolean' && emailPrefs[typeKey]) {
+          await this.emailService.sendTicketNotification(
+            user.email,
+            user.name,
+            type,
+            ticketId,
+            title,
+            message
+          );
+        }
+      }
+    }
+
+    return notification;
+  }
+
+  private getNotificationTypeKey(type: string): string {
+    const typeMap: Record<string, string> = {
+      TICKET_CREATED: 'ticketCreated',
+      TICKET_UPDATED: 'ticketUpdated',
+      TICKET_ASSIGNED: 'ticketAssigned',
+      TICKET_COMMENTED: 'ticketCommented',
+      TICKET_RESOLVED: 'ticketResolved',
+    };
+    // Return undefined if type is not recognized, so email won't be sent for unknown types
+    return typeMap[type] || '';
   }
 
   async dailyRefresh(tenantId: string, userId: string) {

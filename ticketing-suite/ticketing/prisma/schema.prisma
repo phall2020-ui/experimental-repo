@@ -41,6 +41,7 @@ model User {
   name        String
   role        Role      @default(USER)
   lastLoginAt DateTime?
+  emailNotifications Json @default("{\"ticketCreated\":true,\"ticketUpdated\":true,\"ticketAssigned\":true,\"ticketCommented\":true,\"ticketResolved\":true}")
   tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   tickets     Ticket[]  @relation("UserTickets")
 }

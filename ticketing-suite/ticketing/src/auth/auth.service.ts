@@ -2,20 +2,27 @@ import { Injectable, UnauthorizedException, NotFoundException, BadRequestExcepti
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../infra/prisma.service';
+import { EmailService } from '../email/email.service';
 
 @Injectable()
 export class AuthService {
   constructor(
     private prisma: PrismaService,
-    private jwt: JwtService
+    private jwt: JwtService,
+    private emailService: EmailService
   ) {}
 
   async register(email: string, password: string, name: string, role: 'USER' | 'ADMIN', tenantId: string) {
+    // Send welcome email with password before hashing
+    await this.emailService.sendWelcomeEmail(email, name, password);
+    
     const hash = await bcrypt.hash(password, 10);
-    return this.prisma.user.create({
+    const user = await this.prisma.user.create({
       data: { email, password: hash, name, role, tenantId },
       select: { id: true, email: true, name: true, role: true, tenantId: true }
     });
+    
+    return user;
   }
 
   async login(email: string, password: string) {
@@ -83,5 +90,25 @@ export class AuthService {
       data: { password: hash }
     });
     return { success: true };
+  }
+
+  async getUserProfile(id: string) {
+    const user = await this.prisma.user.findUnique({ 
+      where: { id },
+      select: { id: true, email: true, name: true, role: true, tenantId: true, emailNotifications: true }
+    });
+    if (!user) throw new NotFoundException('User not found');
+    return user;
+  }
+
+  async updateEmailNotifications(id: string, emailNotifications: Record<string, boolean>) {
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    if (!user) throw new NotFoundException('User not found');
+    
+    return this.prisma.user.update({
+      where: { id },
+      data: { emailNotifications },
+      select: { id: true, email: true, name: true, role: true, emailNotifications: true }
+    });
   }
 }
