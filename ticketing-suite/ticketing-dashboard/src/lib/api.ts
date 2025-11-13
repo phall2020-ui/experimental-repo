@@ -104,14 +104,20 @@ export const listRecurringTickets = async (params?: { isActive?: boolean }) => {
   return (await client.get<RecurringTicketConfig[]>('/recurring-tickets', { params: cleanParams })).data
 }
 
-export const bulkUpdateRecurringTickets = async (ids: string[], updates: Partial<RecurringTicketPayload> & { isActive?: boolean }) =>
-  (await client.patch<{ updated: number }>('/recurring-tickets/bulk-update', { ids, updates })).data
+export const bulkUpdateRecurringTickets = async (ids: string[], updates: Partial<RecurringTicketPayload> & { isActive?: boolean }) => {
+  console.log('bulkUpdateRecurringTickets called with:', { ids, updates })
+  return (await client.patch<{ updated: number }>('/recurring-tickets/bulk-update', { ids, updates })).data
+}
 
-export const bulkDeleteRecurringTickets = async (ids: string[]) =>
-  (await client.delete<{ deleted: number }>('/recurring-tickets/bulk-delete', { data: { ids } })).data
+export const bulkDeleteRecurringTickets = async (ids: string[]) => {
+  console.log('bulkDeleteRecurringTickets called with:', { ids })
+  return (await client.delete<{ deleted: number }>('/recurring-tickets/bulk-delete', { data: { ids } })).data
+}
 
-export const bulkGroupRecurringTickets = async (ids: string[], groupName: string) =>
-  (await client.patch<{ grouped: number, groupName: string }>('/recurring-tickets/bulk-group', { ids, groupName })).data
+export const bulkGroupRecurringTickets = async (ids: string[], groupName: string) => {
+  console.log('bulkGroupRecurringTickets called with:', { ids, groupName })
+  return (await client.patch<{ grouped: number, groupName: string }>('/recurring-tickets/bulk-group', { ids, groupName })).data
+}
 
 export const updateTicket = async (id: string, patch: Partial<Ticket> & { custom_fields?: any }) => (await client.patch<Ticket>(`/tickets/${id}`, patch)).data
 export const bulkUpdateTickets = async (payload: {
