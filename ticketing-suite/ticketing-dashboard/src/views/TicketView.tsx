@@ -8,6 +8,7 @@ import { useNotifications } from '../lib/notifications'
 import { STATUS_OPTIONS } from '../lib/statuses'
 import { useRecurringByOrigin } from '../hooks/useTickets'
 import { filterFieldDefs, sanitizeCustomFieldValues } from '../lib/customFields'
+import { createTemplate } from '../lib/templates'
 
 type FrequencyValue = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'YEARLY'
 
@@ -70,6 +71,8 @@ export default function TicketView() {
   const [initialData, setInitialData] = React.useState<any>(null)
   const [autoSaving, setAutoSaving] = React.useState(false)
   const saveInProgressRef = React.useRef(false)
+  const [showTemplateDialog, setShowTemplateDialog] = React.useState(false)
+  const [templateName, setTemplateName] = React.useState('')
   
   const load = async () => {
     if (!id) return
@@ -167,6 +170,38 @@ export default function TicketView() {
       saveInProgressRef.current = false
     }
   }, [t, id, recurringEnabled, recurringForm, recurringConfig, refetchRecurring, showNotification])
+
+  // Save as template handler
+  const handleSaveTemplate = async () => {
+    if (!templateName.trim()) {
+      showNotification('error', 'Please enter a template name')
+      return
+    }
+    
+    try {
+      await createTemplate({
+        name: templateName,
+        typeKey: t.typeKey,
+        description: t.description,
+        details: t.details || '',
+        priority: t.priority,
+        status: t.status,
+        assignedUserId: t.assignedUserId || undefined,
+        customFields: t.customFields || {},
+        isRecurring: recurringEnabled,
+        frequency: recurringEnabled ? recurringForm.frequency : undefined,
+        intervalValue: recurringEnabled ? recurringForm.intervalValue : undefined,
+        leadTimeDays: recurringEnabled ? recurringForm.leadTimeDays : undefined,
+        createdBy: undefined,
+      })
+      
+      showNotification('success', `Template "${templateName}" saved successfully`)
+      setShowTemplateDialog(false)
+      setTemplateName('')
+    } catch (e: any) {
+      showNotification('error', e?.response?.data?.message || 'Failed to save template')
+    }
+  }
 
   // Track changes
   React.useEffect(() => {
@@ -293,7 +328,10 @@ export default function TicketView() {
       <div className="panel text-modern">
         <div className="row" style={{justifyContent:'space-between'}}>
           <div className="h1">Ticket</div>
-          <button onClick={()=>nav(-1)}>← Back</button>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button onClick={()=>setShowTemplateDialog(true)}>💾 Save as Template</button>
+            <button onClick={()=>nav(-1)}>← Back</button>
+          </div>
         </div>
         {err && <div className="row" style={{color:'#ffb3b3'}}>{err}</div>}
         <div className="row" style={{marginTop:12}}>
@@ -573,6 +611,49 @@ export default function TicketView() {
           )}
         </div>
       </div>
+
+      {/* Save Template Dialog */}
+      {showTemplateDialog && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div className="panel" style={{ width: 400, maxWidth: '90%' }}>
+            <h3>Save as Template</h3>
+            <p style={{ color: '#666', fontSize: 14, marginBottom: 16 }}>
+              This will save the ticket type, description, details, priority, status, assigned user, and custom fields as a template.
+              {recurringEnabled && ' Recurring settings will also be saved.'}
+            </p>
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: 'block', marginBottom: 8 }}>Template Name</label>
+              <input
+                type="text"
+                value={templateName}
+                onChange={(e) => setTemplateName(e.target.value)}
+                placeholder="Enter template name..."
+                style={{ width: '100%', padding: 8 }}
+                autoFocus
+              />
+            </div>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button onClick={() => { setShowTemplateDialog(false); setTemplateName('') }}>
+                Cancel
+              </button>
+              <button onClick={handleSaveTemplate} style={{ background: '#5b9cff', color: 'white' }}>
+                Save Template
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -22,6 +22,7 @@ import { createRecurringTicket } from '../lib/api'
 import CustomFieldsForm from './CustomFieldsForm'
 import { STATUS_OPTIONS, type TicketStatusValue } from '../lib/statuses'
 import { filterFieldDefs, sanitizeCustomFieldValues } from '../lib/customFields'
+import { listTemplates, type TicketTemplate } from '../lib/templates'
 
 interface CreateTicketProps {
   onClose: () => void
@@ -36,6 +37,8 @@ export default function CreateTicket({ onClose, onSuccess }: CreateTicketProps) 
   const { data: fieldDefs = [] } = useFieldDefinitions()
   const createTicketMutation = useCreateTicket()
   const filteredFieldDefs = React.useMemo(() => filterFieldDefs(fieldDefs), [fieldDefs])
+  const [templates, setTemplates] = React.useState<TicketTemplate[]>([])
+  const [selectedTemplate, setSelectedTemplate] = React.useState('')
   
 const FREQUENCY_OPTIONS = [
   { value: 'DAILY', label: 'Daily' },
@@ -75,6 +78,39 @@ const [recurringSettings, setRecurringSettings] = React.useState({
       setFormData(prev => ({ ...prev, type: types[0].key }))
     }
   }, [sites, types])
+
+  React.useEffect(() => {
+    listTemplates().then(setTemplates).catch(console.error)
+  }, [])
+
+  const handleTemplateSelect = (templateId: string) => {
+    setSelectedTemplate(templateId)
+    if (!templateId) return
+    
+    const template = templates.find(t => t.id === templateId)
+    if (!template) return
+    
+    setFormData(prev => ({
+      ...prev,
+      type: template.typeKey,
+      description: template.description,
+      details: template.details || '',
+      priority: template.priority as any,
+      status: template.status as TicketStatusValue,
+      assignedUserId: template.assignedUserId || '',
+      custom_fields: template.customFields || {}
+    }))
+    
+    if (template.isRecurring) {
+      setIsRecurring(true)
+      setRecurringSettings(prev => ({
+        ...prev,
+        frequency: template.frequency as FrequencyValue,
+        intervalValue: template.intervalValue || 1,
+        leadTimeDays: template.leadTimeDays || 7
+      }))
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -162,6 +198,21 @@ const [recurringSettings, setRecurringSettings] = React.useState({
         )}
 
         <Stack spacing={2}>
+          {templates.length > 0 && (
+            <FormControl fullWidth size="small">
+              <InputLabel id="template-label">Use Template (Optional)</InputLabel>
+              <Select
+                labelId="template-label"
+                value={selectedTemplate}
+                onChange={e => handleTemplateSelect(e.target.value)}
+                label="Use Template (Optional)"
+              >
+                <MenuItem value="">-- None --</MenuItem>
+                {templates.map(t => <MenuItem key={t.id} value={t.id}>{t.name}</MenuItem>)}
+              </Select>
+            </FormControl>
+          )}
+
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}>
             <FormControl fullWidth size="small" required>
               <InputLabel id="site-label">Site</InputLabel>

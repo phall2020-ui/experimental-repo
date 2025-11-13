@@ -19,6 +19,7 @@ model Tenant {
   outboxEntries Outbox[]
   types     IssueType[]
   ticketHistory TicketHistory[]
+  templates TicketTemplate[]
 }
 
 model Site {
@@ -102,6 +103,34 @@ model TicketFieldDef {
   tenant     Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, key])
+}
+
+model TicketTemplate {
+  id              String         @id @default(uuid())
+  tenantId        String
+  name            String
+  typeKey         String
+  description     String
+  details         String?
+  priority        TicketPriority
+  status          TicketStatus
+  assignedUserId  String?
+  customFields    Json           @default("{}")
+  
+  // Recurring fields (if template is for recurring ticket)
+  isRecurring     Boolean        @default(false)
+  frequency       RecurrenceFrequency?
+  intervalValue   Int?
+  leadTimeDays    Int?
+  
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  createdBy       String?
+  
+  tenant          Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([tenantId, name])
 }
 
 model IssueType {

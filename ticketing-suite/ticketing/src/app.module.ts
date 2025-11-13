@@ -10,6 +10,7 @@ import { DirectoryModule } from './directory/directory.module';
 import { FeaturesModule } from './features/features.module';
 import { RecurringTicketsModule } from './recurring-tickets/recurring-tickets.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { TemplatesModule } from './templates/templates.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { NotificationsModule } from './notifications/notifications.module';
     FeaturesModule,
     RecurringTicketsModule,
     NotificationsModule,
+    TemplatesModule,
   ],
   providers: [PrismaService],
 })
