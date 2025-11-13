@@ -79,11 +79,11 @@ const segmentButtonActiveStyle: React.CSSProperties = {
 }
 
 const StatusFilter: React.FC<{ value: string; onChange: (v: string) => void }> = ({ value, onChange }) => (
-  <div style={segmentContainerStyle} role="group" aria-label="Filter by status">
+  <div style={{...segmentContainerStyle, flexWrap: 'wrap', width: '100%', justifyContent: 'center' }} role="group" aria-label="Filter by status">
     <button
       type="button"
       onClick={() => onChange('')}
-      style={{ ...segmentButtonStyle, ...(value === '' ? segmentButtonActiveStyle : {}) }}
+      style={{ ...segmentButtonStyle, ...(value === '' ? segmentButtonActiveStyle : {}), minWidth: 44, minHeight: 44 }}
       aria-pressed={value === ''}
     >
       All
@@ -95,7 +95,7 @@ const StatusFilter: React.FC<{ value: string; onChange: (v: string) => void }> =
           key={option.value}
           type="button"
           onClick={() => onChange(option.value)}
-          style={{ ...segmentButtonStyle, ...(isActive ? segmentButtonActiveStyle : {}) }}
+          style={{ ...segmentButtonStyle, ...(isActive ? segmentButtonActiveStyle : {}), minWidth: 44, minHeight: 44 }}
           aria-pressed={isActive}
         >
           {option.label}
@@ -833,24 +833,24 @@ const statsCardStyle = React.useCallback((accent: string): React.CSSProperties =
   }, [])
 
   return (
-    <div className="container text-modern" style={{ overflowX: 'hidden', maxWidth: '1400px', padding: '32px 24px' }}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-        <div className="panel text-modern" style={{ padding: '24px' }}>
+    <div className="container text-modern" style={{ overflowX: 'hidden', maxWidth: '1400px', padding: 'clamp(12px, 3vw, 32px) clamp(12px, 3vw, 24px)' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'clamp(12px, 3vw, 24px)' }}>
+        <div className="panel text-modern" style={{ padding: 'clamp(12px, 3vw, 24px)' }}>
         <div
           className="row"
           style={{
             marginBottom: 16,
             gap: 12,
             flexWrap: 'wrap',
-            alignItems: 'center'
+            alignItems: 'stretch'
           }}
         >
           <div
             style={{
               position: 'relative',
-              flex: 1,
-              minWidth: 220,
-              maxWidth: 340
+              flex: '1 1 100%',
+              minWidth: '100%',
+              maxWidth: '100%'
             }}
           >
             <span
@@ -879,15 +879,16 @@ const statsCardStyle = React.useCallback((accent: string): React.CSSProperties =
                 background: '#ffffff',
                 color: '#111827',
                 boxShadow: '0 4px 10px rgba(15, 23, 42, 0.06)',
-                height: CONTROL_HEIGHT
+                minHeight: 44,
+                height: 'auto'
               }}
             aria-label="Search tickets"
           />
           </div>
 
-          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', width: '100%' }}>
           <StatusFilter value={status} onChange={setStatus} />
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <span style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>Rows</span>
               <div style={segmentContainerStyle} role="group" aria-label="Rows per page">
                 {[10, 25, 50, 100].map(size => {
@@ -897,7 +898,7 @@ const statsCardStyle = React.useCallback((accent: string): React.CSSProperties =
                       key={size}
                       type="button"
                       onClick={() => setPageSize(size)}
-                      style={{ ...segmentButtonStyle, ...(isActive ? segmentButtonActiveStyle : {}) }}
+                      style={{ ...segmentButtonStyle, ...(isActive ? segmentButtonActiveStyle : {}), minWidth: 44, minHeight: 44 }}
                       aria-pressed={isActive}
                     >
                       {size}
@@ -908,20 +909,20 @@ const statsCardStyle = React.useCallback((accent: string): React.CSSProperties =
             </div>
           </div>
 
-          <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end', gap: 10, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-start', gap: 10, flexWrap: 'wrap', width: '100%' }}>
             <button
               onClick={() => navigate('/recurring')}
-              style={{ ...baseButtonStyle }}
+              style={{ ...baseButtonStyle, minHeight: 44, flex: '1 1 auto', whiteSpace: 'nowrap' }}
               data-border="1px solid #d6d9dd"
               onMouseEnter={buttonHoverIn}
               onMouseLeave={buttonHoverOut}
             >
-              Future Recurring Activities
+              Future Recurring
           </button>
             <button
               onClick={() => setShowAdvancedSearch(true)}
               aria-label="Advanced search"
-              style={{ ...baseButtonStyle }}
+              style={{ ...baseButtonStyle, minHeight: 44, flex: '1 1 auto' }}
               data-border="1px solid #d6d9dd"
               onMouseEnter={buttonHoverIn}
               onMouseLeave={buttonHoverOut}
@@ -931,7 +932,7 @@ const statsCardStyle = React.useCallback((accent: string): React.CSSProperties =
             <button
               onClick={() => setShowFilters(!showFilters)}
               aria-label="Toggle filters"
-              style={{ ...baseButtonStyle }}
+              style={{ ...baseButtonStyle, minHeight: 44, flex: '1 1 auto' }}
               data-border="1px solid #d6d9dd"
               onMouseEnter={buttonHoverIn}
               onMouseLeave={buttonHoverOut}
@@ -941,7 +942,7 @@ const statsCardStyle = React.useCallback((accent: string): React.CSSProperties =
             <button
               onClick={() => handleExport('csv')}
               aria-label="Export to CSV"
-              style={{ ...baseButtonStyle }}
+              style={{ ...baseButtonStyle, minHeight: 44, flex: '0 1 auto' }}
               data-border="1px solid #d6d9dd"
               onMouseEnter={buttonHoverIn}
               onMouseLeave={buttonHoverOut}
@@ -951,7 +952,7 @@ const statsCardStyle = React.useCallback((accent: string): React.CSSProperties =
             <button
               onClick={() => handleExport('json')}
               aria-label="Export to JSON"
-              style={{ ...baseButtonStyle }}
+              style={{ ...baseButtonStyle, minHeight: 44, flex: '0 1 auto' }}
               data-border="1px solid #d6d9dd"
               onMouseEnter={buttonHoverIn}
               onMouseLeave={buttonHoverOut}
@@ -961,7 +962,7 @@ const statsCardStyle = React.useCallback((accent: string): React.CSSProperties =
             <button
               onClick={() => fetchList(true)}
               aria-label="Refresh tickets"
-              style={{ ...primaryButtonStyle }}
+              style={{ ...primaryButtonStyle, minHeight: 44, flex: '1 1 auto' }}
               data-border="1px solid #1d4ed8"
               onMouseEnter={buttonHoverIn}
               onMouseLeave={buttonHoverOut}
@@ -983,59 +984,59 @@ const statsCardStyle = React.useCallback((accent: string): React.CSSProperties =
         </div>
 
         {showFilters && (
-          <div style={{padding: 12, background: '#1a1a1a', borderRadius: 4, marginBottom: 12, border: '1px solid #2a2a2a'}}>
-            <div className="row" style={{marginBottom: 8, flexWrap: 'wrap', gap: 8}}>
-              <div style={{display: 'flex', flexDirection: 'column', gap: 4}}>
-                <label style={{fontSize: 12}}>Priority</label>
-                <select value={priority} onChange={e=>setPriority(e.target.value)} style={{width: 120}} aria-label="Filter by priority">
+          <div style={{padding: 'clamp(12px, 3vw, 16px)', background: '#1a1a1a', borderRadius: 8, marginBottom: 12, border: '1px solid #2a2a2a'}}>
+            <div className="row" style={{marginBottom: 8, flexWrap: 'wrap', gap: 12, alignItems: 'stretch'}}>
+              <div style={{display: 'flex', flexDirection: 'column', gap: 6, flex: '1 1 100%', minWidth: '100%'}}>
+                <label style={{fontSize: 12, fontWeight: 600}}>Priority</label>
+                <select value={priority} onChange={e=>setPriority(e.target.value)} style={{width: '100%', minHeight: 44}} aria-label="Filter by priority">
                   <option value="">All priorities</option>
                 {['P1','P2','P3','P4'].map(p => <option key={p} value={p}>{p}</option>)}
                 </select>
               </div>
-              <div style={{display: 'flex', flexDirection: 'column', gap: 4}}>
-                <label style={{fontSize: 12}}>Type</label>
-                <select value={type} onChange={e=>setType(e.target.value)} style={{width: 150}} aria-label="Filter by type">
+              <div style={{display: 'flex', flexDirection: 'column', gap: 6, flex: '1 1 100%', minWidth: '100%'}}>
+                <label style={{fontSize: 12, fontWeight: 600}}>Type</label>
+                <select value={type} onChange={e=>setType(e.target.value)} style={{width: '100%', minHeight: 44}} aria-label="Filter by type">
                   <option value="">All types</option>
                   {types.map(t => <option key={t.key} value={t.key}>{t.label}</option>)}
                 </select>
               </div>
-              <div style={{display: 'flex', flexDirection: 'column', gap: 4}}>
-                <label style={{fontSize: 12}}>Site</label>
-                <select value={siteId} onChange={e=>setSiteId(e.target.value)} style={{width: 150}} aria-label="Filter by site">
+              <div style={{display: 'flex', flexDirection: 'column', gap: 6, flex: '1 1 100%', minWidth: '100%'}}>
+                <label style={{fontSize: 12, fontWeight: 600}}>Site</label>
+                <select value={siteId} onChange={e=>setSiteId(e.target.value)} style={{width: '100%', minHeight: 44}} aria-label="Filter by site">
                   <option value="">All sites</option>
                   {sites.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
               </div>
-              <div style={{display: 'flex', flexDirection: 'column', gap: 4}}>
-                <label style={{fontSize: 12}}>Assigned User</label>
-                <select value={assignedUserId} onChange={e=>setAssignedUserId(e.target.value)} style={{width: 180}} aria-label="Filter by assigned user">
+              <div style={{display: 'flex', flexDirection: 'column', gap: 6, flex: '1 1 100%', minWidth: '100%'}}>
+                <label style={{fontSize: 12, fontWeight: 600}}>Assigned User</label>
+                <select value={assignedUserId} onChange={e=>setAssignedUserId(e.target.value)} style={{width: '100%', minHeight: 44}} aria-label="Filter by assigned user">
                   <option value="">All users</option>
                   {users.map(u => <option key={u.id} value={u.id}>{u.name || u.email}</option>)}
                 </select>
               </div>
-              <div style={{display: 'flex', flexDirection: 'column', gap: 4}}>
-                <label style={{fontSize: 12}}>Created From</label>
+              <div style={{display: 'flex', flexDirection: 'column', gap: 6, flex: '1 1 100%', minWidth: '100%'}}>
+                <label style={{fontSize: 12, fontWeight: 600}}>Created From</label>
                 <input 
                   type="date" 
                   value={dateFrom} 
                   onChange={e=>setDateFrom(e.target.value)} 
-                  style={{width: 150}}
+                  style={{width: '100%', minHeight: 44}}
                   aria-label="Filter by created date from"
                 />
               </div>
-              <div style={{display: 'flex', flexDirection: 'column', gap: 4}}>
-                <label style={{fontSize: 12}}>Created To</label>
+              <div style={{display: 'flex', flexDirection: 'column', gap: 6, flex: '1 1 100%', minWidth: '100%'}}>
+                <label style={{fontSize: 12, fontWeight: 600}}>Created To</label>
                 <input 
                   type="date" 
                   value={dateTo} 
                   onChange={e=>setDateTo(e.target.value)} 
-                  style={{width: 150}}
+                  style={{width: '100%', minHeight: 44}}
                   aria-label="Filter by created date to"
                 />
               </div>
               {fieldDefs.length > 0 && (
-                <div style={{display: 'flex', flexDirection: 'column', gap: 4}}>
-                  <label style={{fontSize: 12}}>Custom Field</label>
+                <div style={{display: 'flex', flexDirection: 'column', gap: 6, flex: '1 1 100%', minWidth: '100%'}}>
+                  <label style={{fontSize: 12, fontWeight: 600}}>Custom Field</label>
                   <select 
                     value={Object.keys(customFieldFilters)[0] || ''} 
                     onChange={e => {
@@ -1051,7 +1052,7 @@ const statsCardStyle = React.useCallback((accent: string): React.CSSProperties =
                         }
                       }
                     }}
-                    style={{width: 180}}
+                    style={{width: '100%', minHeight: 44}}
                     aria-label="Select custom field to filter"
                   >
                     <option value="">No custom field filter</option>
@@ -1065,13 +1066,13 @@ const statsCardStyle = React.useCallback((accent: string): React.CSSProperties =
                 if (!field) return null
                 
                 return (
-                  <div style={{display: 'flex', flexDirection: 'column', gap: 4}}>
-                    <label style={{fontSize: 12}}>Value</label>
+                  <div style={{display: 'flex', flexDirection: 'column', gap: 6, flex: '1 1 100%', minWidth: '100%'}}>
+                    <label style={{fontSize: 12, fontWeight: 600}}>Value</label>
                     {field.datatype === 'enum' && field.enumOptions ? (
                       <select
                         value={customFieldFilters[cfKey] || ''}
                         onChange={e => setCustomFieldFilters({ [cfKey]: e.target.value })}
-                        style={{width: 150}}
+                        style={{width: '100%', minHeight: 44}}
                         aria-label={`Filter by ${field.label}`}
                       >
                         {field.enumOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
@@ -1081,15 +1082,15 @@ const statsCardStyle = React.useCallback((accent: string): React.CSSProperties =
                         type={field.datatype === 'number' ? 'number' : field.datatype === 'date' ? 'date' : 'text'}
                         value={customFieldFilters[cfKey] || ''}
                         onChange={e => setCustomFieldFilters({ [cfKey]: e.target.value })}
-                        style={{width: 150}}
+                        style={{width: '100%', minHeight: 44}}
                         aria-label={`Filter by ${field.label}`}
                       />
                     )}
                   </div>
                 )
               })()}
-              <div style={{display: 'flex', alignItems: 'flex-end'}}>
-                <button onClick={clearFilters} style={{height: 32}} aria-label="Clear all filters">Clear All</button>
+              <div style={{display: 'flex', alignItems: 'flex-end', flex: '1 1 100%', minWidth: '100%'}}>
+                <button onClick={clearFilters} style={{minHeight: 44, width: '100%'}} aria-label="Clear all filters">Clear All</button>
               </div>
             </div>
             {activeFilters > 0 && (
@@ -1130,8 +1131,16 @@ const statsCardStyle = React.useCallback((accent: string): React.CSSProperties =
           Showing {visibleTickets.length} ticket{visibleTickets.length !== 1 ? 's' : ''}
         </div>
 
-        <div style={{ overflowX: 'auto', marginLeft: '-24px', marginRight: '-24px', paddingLeft: '24px', paddingRight: '24px' }}>
-        <table style={{ tableLayout: 'fixed', width: '100%', borderSpacing: '0 8px' }}>
+        <div style={{ 
+          overflowX: 'auto', 
+          marginLeft: 'clamp(-24px, -3vw, -12px)', 
+          marginRight: 'clamp(-24px, -3vw, -12px)', 
+          paddingLeft: 'clamp(12px, 3vw, 24px)', 
+          paddingRight: 'clamp(12px, 3vw, 24px)',
+          WebkitOverflowScrolling: 'touch',
+          scrollbarWidth: 'thin'
+        }}>
+        <table style={{ tableLayout: 'fixed', width: '100%', minWidth: '900px', borderSpacing: '0 8px' }}>
           <colgroup>
             <col style={{ width: TABLE_COLUMN_WIDTHS.select }} />
             <col style={{ width: TABLE_COLUMN_WIDTHS.id }} />
@@ -1232,14 +1241,14 @@ const statsCardStyle = React.useCallback((accent: string): React.CSSProperties =
         )}
       </div>
 
-      <div className="panel text-modern" style={{ padding: '24px' }}>
-        <div className="panel text-modern" style={{ padding: '24px' }}>
-        <div className="h1" style={{ marginBottom: 20, fontSize: '24px' }}>Statistics</div>
+      <div className="panel text-modern" style={{ padding: 'clamp(12px, 3vw, 24px)' }}>
+        <div className="panel text-modern" style={{ padding: 'clamp(12px, 3vw, 24px)' }}>
+        <div className="h1" style={{ marginBottom: 20, fontSize: 'clamp(18px, 4vw, 24px)' }}>Statistics</div>
         <div
           style={{
             display: 'grid',
-            gap: 20,
-            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))'
+            gap: 'clamp(12px, 3vw, 20px)',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))'
           }}
         >
           <div style={statsCardStyle('#5B8DEF')}>

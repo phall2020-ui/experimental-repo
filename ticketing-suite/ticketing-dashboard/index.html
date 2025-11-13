@@ -69,15 +69,17 @@
       @media (max-width: 768px) {
         .container { padding: 12px; }
         .grid { grid-template-columns: 1fr !important; }
-        table { font-size: 12px; }
-        th, td { padding: 6px; }
-        .row { flex-direction: column; align-items: stretch; }
+        table { font-size: 12px; overflow-x: auto; display: block; }
+        th, td { padding: 8px 4px; font-size: 11px; }
+        .row { flex-direction: column; align-items: stretch; gap: 8px; }
         .row > * { width: 100%; }
-        input, select, button { width: 100%; }
+        input, select, button { width: 100%; min-height: 44px; }
+        .panel { padding: 12px; border-radius: 8px; }
       }
       @media (max-width: 480px) {
         .h1 { font-size: 18px; }
         .panel { padding: 12px; }
+        body { font-size: 13px; }
       }
       [role="button"], button, a { 
         -webkit-tap-highlight-color: rgba(0, 102, 255, 0.3);
