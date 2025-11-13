@@ -55,15 +55,57 @@ Go to your Neon dashboard: https://console.neon.tech/
 ### Step 2: Open SQL Editor
 Click on your project → SQL Editor
 
-### Step 3: Run This SQL
+### Step 3: Run Required Migrations
+
+#### For plainPassword feature:
 ```sql
 -- Add plainPassword column to User table
 ALTER TABLE "User" ADD COLUMN "plainPassword" TEXT;
+```
 
--- Verify the column was added
+#### For Ticket Templates feature:
+```sql
+-- Add TicketTemplate table
+CREATE TABLE "TicketTemplate" (
+    "id" TEXT NOT NULL,
+    "tenantId" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "typeKey" TEXT NOT NULL,
+    "description" TEXT NOT NULL,
+    "details" TEXT,
+    "priority" "TicketPriority" NOT NULL,
+    "status" "TicketStatus" NOT NULL,
+    "assignedUserId" TEXT,
+    "customFields" JSONB NOT NULL DEFAULT '{}',
+    "isRecurring" BOOLEAN NOT NULL DEFAULT false,
+    "frequency" "RecurrenceFrequency",
+    "intervalValue" INTEGER,
+    "leadTimeDays" INTEGER,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "createdBy" TEXT,
+
+    CONSTRAINT "TicketTemplate_pkey" PRIMARY KEY ("id")
+);
+
+CREATE INDEX "TicketTemplate_tenantId_idx" ON "TicketTemplate"("tenantId");
+CREATE INDEX "TicketTemplate_tenantId_name_idx" ON "TicketTemplate"("tenantId", "name");
+
+ALTER TABLE "TicketTemplate" ADD CONSTRAINT "TicketTemplate_tenantId_fkey" 
+    FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+```
+
+### Step 4: Verify
+```sql
+-- Verify User table
 SELECT column_name, data_type, is_nullable 
 FROM information_schema.columns 
 WHERE table_name = 'User';
+
+-- Verify TicketTemplate table
+SELECT column_name, data_type, is_nullable 
+FROM information_schema.columns 
+WHERE table_name = 'TicketTemplate';
 ```
 
 ### Step 4: Update Migration History (Optional)
