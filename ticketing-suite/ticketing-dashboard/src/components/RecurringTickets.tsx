@@ -24,6 +24,7 @@ export default function RecurringTickets() {
   const [showBulkMenu, setShowBulkMenu] = React.useState(false)
   const [showGroupDialog, setShowGroupDialog] = React.useState(false)
   const [groupName, setGroupName] = React.useState('')
+  const [isNewGroup, setIsNewGroup] = React.useState(true)
   const [showStatusDialog, setShowStatusDialog] = React.useState(false)
   const [showPriorityDialog, setShowPriorityDialog] = React.useState(false)
   const [showAssignDialog, setShowAssignDialog] = React.useState(false)
@@ -38,6 +39,16 @@ export default function RecurringTickets() {
         return triggerDate > now && schedule.isActive
       })
       .sort((a, b) => new Date(a.nextScheduledAt).getTime() - new Date(b.nextScheduledAt).getTime())
+  }, [schedules])
+
+  const existingGroups = React.useMemo(() => {
+    const groups = new Set<string>()
+    schedules.forEach(schedule => {
+      if ((schedule as any).groupName) {
+        groups.add((schedule as any).groupName)
+      }
+    })
+    return Array.from(groups).sort()
   }, [schedules])
 
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -228,7 +239,7 @@ export default function RecurringTickets() {
             <span style={{ color: '#f8fafc', fontSize: 14 }}>
               {selectedIds.length} selected
             </span>
-            <button onClick={() => setShowGroupDialog(true)}>
+            <button onClick={() => { setShowGroupDialog(true); setIsNewGroup(true); setGroupName('') }}>
               📁 Group
             </button>
             <button onClick={() => setShowStatusDialog(true)}>
@@ -266,25 +277,69 @@ export default function RecurringTickets() {
             <div className="panel" style={{ width: 400, maxWidth: '90%' }}>
               <h3>Group Recurring Tickets</h3>
               <p style={{ color: '#666', fontSize: 14, marginBottom: 16 }}>
-                Enter a name to group {selectedIds.length} recurring ticket(s) together.
+                {isNewGroup ? 'Create a new group' : 'Add to existing group'} for {selectedIds.length} recurring ticket(s).
               </p>
+              
+              {existingGroups.length > 0 && (
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
+                    <button 
+                      onClick={() => { setIsNewGroup(true); setGroupName('') }}
+                      style={{ 
+                        flex: 1, 
+                        background: isNewGroup ? '#5b9cff' : 'transparent',
+                        color: isNewGroup ? 'white' : '#666',
+                        border: '1px solid #5b9cff'
+                      }}
+                    >
+                      New Group
+                    </button>
+                    <button 
+                      onClick={() => { setIsNewGroup(false); setGroupName('') }}
+                      style={{ 
+                        flex: 1, 
+                        background: !isNewGroup ? '#5b9cff' : 'transparent',
+                        color: !isNewGroup ? 'white' : '#666',
+                        border: '1px solid #5b9cff'
+                      }}
+                    >
+                      Existing Group
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div style={{ marginBottom: 16 }}>
                 <label style={{ display: 'block', marginBottom: 8 }}>Group Name</label>
-                <input
-                  type="text"
-                  value={groupName}
-                  onChange={(e) => setGroupName(e.target.value)}
-                  placeholder="e.g., Monthly Maintenance"
-                  style={{ width: '100%', padding: 8 }}
-                  autoFocus
-                />
+                {isNewGroup ? (
+                  <input
+                    type="text"
+                    value={groupName}
+                    onChange={(e) => setGroupName(e.target.value)}
+                    placeholder="e.g., Monthly Maintenance"
+                    style={{ width: '100%', padding: 8 }}
+                    autoFocus
+                  />
+                ) : (
+                  <select
+                    value={groupName}
+                    onChange={(e) => setGroupName(e.target.value)}
+                    style={{ width: '100%', padding: 8 }}
+                    autoFocus
+                  >
+                    <option value="">Select existing group...</option>
+                    {existingGroups.map(group => (
+                      <option key={group} value={group}>{group}</option>
+                    ))}
+                  </select>
+                )}
               </div>
               <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-                <button onClick={() => { setShowGroupDialog(false); setGroupName('') }}>
+                <button onClick={() => { setShowGroupDialog(false); setGroupName(''); setIsNewGroup(true) }}>
                   Cancel
                 </button>
                 <button onClick={handleBulkGroup} style={{ background: '#5b9cff', color: 'white' }}>
-                  Group
+                  {isNewGroup ? 'Create Group' : 'Add to Group'}
                 </button>
               </div>
             </div>
