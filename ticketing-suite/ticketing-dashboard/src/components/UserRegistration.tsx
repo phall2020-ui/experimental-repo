@@ -288,8 +288,7 @@ export default function UserRegistration({ onClose, onSuccess }: UserRegistratio
                           <span style={{ fontFamily: 'monospace', fontSize: 12 }}>
                             {visiblePasswords.has(u.id) ? u.plainPassword : '••••••••'}
                           </span>
-                          <Button
-                            size="small"
+                          <button
                             onClick={() => {
                               const newSet = new Set(visiblePasswords);
                               if (newSet.has(u.id)) {
@@ -299,10 +298,10 @@ export default function UserRegistration({ onClose, onSuccess }: UserRegistratio
                               }
                               setVisiblePasswords(newSet);
                             }}
-                            sx={{ minWidth: 'auto', fontSize: '0.7rem', padding: '2px 8px' }}
+                            style={{ fontSize: 11, padding: '2px 8px' }}
                           >
                             {visiblePasswords.has(u.id) ? 'Hide' : 'Show'}
-                          </Button>
+                          </button>
                         </div>
                       ) : (
                         <span style={{ color: '#888', fontSize: 12 }}>Not available</span>
