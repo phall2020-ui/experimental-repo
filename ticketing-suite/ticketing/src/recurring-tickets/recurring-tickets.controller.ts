@@ -75,7 +75,7 @@ export class RecurringTicketsController {
     }
   }
 
-  @Delete('bulk-delete')
+  @Post('bulk-delete')
   @Roles('AssetManager', 'OandM', 'ADMIN')
   async bulkDelete(@Req() req: any, @Body() body: { ids: string[] }) {
     try {

@@ -111,7 +111,7 @@ export const bulkUpdateRecurringTickets = async (ids: string[], updates: Partial
 
 export const bulkDeleteRecurringTickets = async (ids: string[]) => {
   console.log('bulkDeleteRecurringTickets called with:', { ids })
-  return (await client.delete<{ deleted: number }>('/recurring-tickets/bulk-delete', { data: { ids } })).data
+  return (await client.post<{ deleted: number }>('/recurring-tickets/bulk-delete', { ids })).data
 }
 
 export const bulkGroupRecurringTickets = async (ids: string[], groupName: string) => {
