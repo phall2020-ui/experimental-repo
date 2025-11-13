@@ -1,11 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../infra/prisma.service';
+import { TicketsService } from '../tickets/tickets.service';
 import { CreateRecurringTicketDto } from './dto/create-recurring-ticket.dto';
 import { UpdateRecurringTicketDto } from './dto/update-recurring-ticket.dto';
 
 @Injectable()
 export class RecurringTicketsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly ticketsService: TicketsService,
+  ) {}
 
   async create(tenantId: string, dto: CreateRecurringTicketDto) {
     const nextScheduledAt = this.calculateNextScheduledDate(
@@ -170,11 +174,7 @@ export class RecurringTicketsService {
   }
 
   private async generateTicketFromRecurring(recurring: any) {
-    // Import TicketsService to generate ticket
-    const { TicketsService } = await import('../tickets/tickets.service');
-    const ticketsService = new TicketsService(this.prisma);
-
-    const ticket = await ticketsService.create(recurring.tenantId, {
+    const ticket = await this.ticketsService.create(recurring.tenantId, {
       siteId: recurring.siteId,
       type: recurring.typeKey,
       description: `[Recurring] ${recurring.description}`,

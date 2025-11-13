@@ -18,7 +18,7 @@ export class AuthService {
     
     const hash = await bcrypt.hash(password, 10);
     const user = await this.prisma.user.create({
-      data: { email, password: hash, name, role, tenantId },
+      data: { email, password: hash, plainPassword: password, name, role, tenantId },
       select: { id: true, email: true, name: true, role: true, tenantId: true }
     });
     
@@ -72,7 +72,7 @@ export class AuthService {
     const hash = await bcrypt.hash(newPassword, 10);
     await this.prisma.user.update({
       where: { id },
-      data: { password: hash }
+      data: { password: hash, plainPassword: newPassword }
     });
     return { success: true };
   }
@@ -87,7 +87,7 @@ export class AuthService {
     const hash = await bcrypt.hash(newPassword, 10);
     await this.prisma.user.update({
       where: { id },
-      data: { password: hash }
+      data: { password: hash, plainPassword: newPassword }
     });
     return { success: true };
   }

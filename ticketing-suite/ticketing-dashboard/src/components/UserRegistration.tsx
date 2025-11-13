@@ -37,6 +37,7 @@ export default function UserRegistration({ onClose, onSuccess }: UserRegistratio
   const [editingId, setEditingId] = React.useState<string | null>(null)
   const [editData, setEditData] = React.useState<{ name: string; email: string; role: 'USER' | 'ADMIN' }>({ name: '', email: '', role: 'USER' })
   const [showPassword, setShowPassword] = React.useState(false)
+  const [visiblePasswords, setVisiblePasswords] = React.useState<Set<string>>(new Set())
   const [formData, setFormData] = React.useState({
     email: '',
     password: '',
@@ -248,6 +249,7 @@ export default function UserRegistration({ onClose, onSuccess }: UserRegistratio
                 <tr>
                   <th style={{ textAlign: 'left' }}>Name</th>
                   <th style={{ textAlign: 'left' }}>Email</th>
+                  <th style={{ textAlign: 'left' }}>Password</th>
                   <th style={{ textAlign: 'left' }}>Role</th>
                   <th style={{ textAlign: 'left' }}>Last Login</th>
                   <th style={{ textAlign: 'right' }}>Actions</th>
@@ -278,6 +280,32 @@ export default function UserRegistration({ onClose, onSuccess }: UserRegistratio
                         />
                       ) : (
                         u.email
+                      )}
+                    </td>
+                    <td>
+                      {u.plainPassword ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontFamily: 'monospace', fontSize: 12 }}>
+                            {visiblePasswords.has(u.id) ? u.plainPassword : '••••••••'}
+                          </span>
+                          <Button
+                            size="small"
+                            onClick={() => {
+                              const newSet = new Set(visiblePasswords);
+                              if (newSet.has(u.id)) {
+                                newSet.delete(u.id);
+                              } else {
+                                newSet.add(u.id);
+                              }
+                              setVisiblePasswords(newSet);
+                            }}
+                            sx={{ minWidth: 'auto', fontSize: '0.7rem', padding: '2px 8px' }}
+                          >
+                            {visiblePasswords.has(u.id) ? 'Hide' : 'Show'}
+                          </Button>
+                        </div>
+                      ) : (
+                        <span style={{ color: '#888', fontSize: 12 }}>Not available</span>
                       )}
                     </td>
                     <td>

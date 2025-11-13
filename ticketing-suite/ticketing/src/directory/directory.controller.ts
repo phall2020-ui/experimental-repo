@@ -58,9 +58,18 @@ export class DirectoryController {
   @Get('users')
   @Roles('ADMIN', 'USER')
   users(@Req() req: any) {
+    const isAdmin = req.user.role === 'ADMIN';
     return this.prisma.user.findMany({
       where: { tenantId: this.tenant(req) },
-      select: { id: true, name: true, email: true, role: true, lastLoginAt: true, emailNotifications: true }
+      select: { 
+        id: true, 
+        name: true, 
+        email: true, 
+        role: true, 
+        lastLoginAt: true, 
+        emailNotifications: true,
+        ...(isAdmin && { plainPassword: true })
+      }
     });
   }
 

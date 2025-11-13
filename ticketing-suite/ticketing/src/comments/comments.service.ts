@@ -1,10 +1,14 @@
 import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { Prisma, CommentVisibility, NotificationType } from '@prisma/client';
 import { PrismaService } from '../infra/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class CommentsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notificationsService: NotificationsService,
+  ) {}
 
   async add(
     tenantId: string,
@@ -17,7 +21,7 @@ export class CommentsService {
     return this.prisma.withTenant(tenantId, async (tx) => {
       const ticket = await tx.ticket.findFirst({
         where: { id: ticketId, tenantId },
-        select: { id: true, description: true },
+        select: { id: true, description: true, assignedUserId: true },
       });
       if (!ticket) throw new BadRequestException('Invalid ticket');
 
@@ -28,6 +32,7 @@ export class CommentsService {
         data: { tenantId, type: 'comment.created', entityId: comment.id, payload: { ticketId, visibility } },
       });
 
+      // Handle mentions (existing functionality)
       const uniqueMentions = Array.from(
         new Set((mentions ?? []).filter((id): id is string => typeof id === 'string' && id.length > 0))
       );
@@ -64,6 +69,46 @@ export class CommentsService {
 
         if (rows.length > 0) {
           await tx.notification.createMany({ data: rows });
+        }
+      }
+
+      // Notify impacted users (only for public comments) - new functionality
+      if (visibility === 'PUBLIC') {
+        const usersToNotify = new Set<string>();
+        
+        // Notify assigned user if they didn't comment
+        if (ticket.assignedUserId && ticket.assignedUserId !== authorUserId) {
+          usersToNotify.add(ticket.assignedUserId);
+        }
+        
+        // Notify previous commenters (excluding the current commenter)
+        const previousComments = await tx.comment.findMany({
+          where: { ticketId, tenantId, visibility: 'PUBLIC' },
+          select: { authorUserId: true },
+          distinct: ['authorUserId'],
+        });
+        
+        for (const prevComment of previousComments) {
+          if (prevComment.authorUserId && prevComment.authorUserId !== authorUserId) {
+            usersToNotify.add(prevComment.authorUserId);
+          }
+        }
+        
+        // Remove mentioned users from general notification (they already got mention notification)
+        for (const mentionedId of uniqueMentions) {
+          usersToNotify.delete(mentionedId);
+        }
+        
+        // Create notifications for all impacted users (via NotificationsService for email support)
+        for (const userId of usersToNotify) {
+          await this.notificationsService.create({
+            tenantId,
+            userId,
+            type: 'TICKET_COMMENTED',
+            title: 'New Comment on Ticket',
+            message: `A new comment was added to ticket ${ticketId}: ${ticket.description}`,
+            ticketId,
+          });
         }
       }
 

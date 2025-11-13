@@ -19,7 +19,7 @@ export class NotificationsService {
     ticketId?: string;
     metadata?: Record<string, any>;
   }) {
-    return this.prisma.notification.create({
+    const notification = await this.prisma.notification.create({
       data: {
         tenantId: data.tenantId,
         userId: data.userId,
@@ -30,6 +30,33 @@ export class NotificationsService {
         metadata: data.metadata || {},
       },
     });
+
+    // Send email notification if user is specified
+    if (data.userId && data.ticketId) {
+      try {
+        // Get user details for email
+        const user = await this.prisma.user.findFirst({
+          where: { id: data.userId, tenantId: data.tenantId },
+          select: { email: true, name: true },
+        });
+        
+        if (user) {
+          await this.emailService.sendTicketNotification(
+            user.email,
+            user.name || user.email,
+            data.type,
+            data.ticketId,
+            data.title,
+            data.message,
+          );
+        }
+      } catch (error) {
+        console.error('Failed to send email notification:', error);
+        // Don't fail the notification creation if email fails
+      }
+    }
+
+    return notification;
   }
 
   async findAll(tenantId: string, userId?: string, unreadOnly?: boolean) {

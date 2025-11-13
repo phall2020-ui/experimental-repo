@@ -15,6 +15,7 @@ export type UserOpt = {
   role: 'ADMIN' | 'USER'; 
   lastLoginAt?: string | null;
   emailNotifications?: Record<string, boolean>;
+  plainPassword?: string;
 }
 export type IssueTypeOpt = { key: string; label: string }
 export type FieldDefOpt = {

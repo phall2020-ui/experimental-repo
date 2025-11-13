@@ -2,6 +2,7 @@ import { Injectable, BadRequestException, NotFoundException } from '@nestjs/comm
 import { PrismaService } from '../infra/prisma.service';
 import { Prisma, TicketStatus, TicketPriority, NotificationType } from '@prisma/client';
 import { allocateTicketId } from './ticket-id.util';
+import { NotificationsService } from '../notifications/notifications.service';
 
 type CFDefs = Record<string, {
   datatype: 'string' | 'number' | 'boolean' | 'date' | 'enum';
@@ -25,7 +26,10 @@ function buildChanges(before: any | null, after: any) {
 
 @Injectable()
 export class TicketsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationsService: NotificationsService,
+  ) {}
 
   private async loadFieldDefs(tx: any, tenantId: string): Promise<CFDefs> {
     const defs = await tx.ticketFieldDef.findMany({ where: { tenantId }});
@@ -128,6 +132,18 @@ export class TicketsService {
           changes: buildChanges(null, t),
         }
       });
+      
+      // Notify assigned user if ticket is created with assignment
+      if (t.assignedUserId) {
+        await this.notificationsService.create({
+          tenantId,
+          userId: t.assignedUserId,
+          type: 'TICKET_ASSIGNED',
+          title: 'New Ticket Assigned',
+          message: `You have been assigned to ticket ${t.id}: ${t.description}`,
+          ticketId: t.id,
+        });
+      }
       
       return t;
     });
@@ -252,23 +268,46 @@ export class TicketsService {
       });
     }
 
-    if (
-      patch.assignedUserId !== undefined &&
-      updated.assignedUserId &&
-      updated.assignedUserId !== before.assignedUserId
-    ) {
-      await tx.notification.create({
-        data: {
+    // Notify impacted users
+    const actorUserId = (global as any).__actorUserId;
+    
+    // Assignment change notification
+    if (changes.assignedUserId) {
+      const newAssignee = changes.assignedUserId.to;
+      // Only notify if assigned to someone and they're not the one making the change
+      if (newAssignee && newAssignee !== actorUserId) {
+        await this.notificationsService.create({
           tenantId,
-          userId: updated.assignedUserId,
-          type: NotificationType.TICKET_ASSIGNED,
-          title: `Ticket assigned · ${updated.id}`,
-          message: `You have been assigned "${updated.description}"`,
+          userId: newAssignee,
+          type: 'TICKET_ASSIGNED',
+          title: 'Ticket Assigned to You',
+          message: `You have been assigned to ticket ${updated.id}: ${updated.description}`,
           ticketId: updated.id,
-          metadata: {
-            generatedAt: new Date().toISOString(),
-          } as Prisma.JsonObject,
-        },
+        });
+      }
+    }
+    
+    // Status change to resolved
+    if (changes.status && changes.status.to === 'RESOLVED' && updated.assignedUserId && updated.assignedUserId !== actorUserId) {
+      await this.notificationsService.create({
+        tenantId,
+        userId: updated.assignedUserId,
+        type: 'TICKET_RESOLVED',
+        title: 'Ticket Resolved',
+        message: `Ticket ${updated.id} has been resolved: ${updated.description}`,
+        ticketId: updated.id,
+      });
+    }
+    
+    // General update notification (only if assigned user exists and didn't make the change)
+    if (Object.keys(changes).length > 0 && updated.assignedUserId && updated.assignedUserId !== actorUserId && !changes.assignedUserId) {
+      await this.notificationsService.create({
+        tenantId,
+        userId: updated.assignedUserId,
+        type: 'TICKET_UPDATED',
+        title: 'Ticket Updated',
+        message: `Ticket ${updated.id} has been updated: ${updated.description}`,
+        ticketId: updated.id,
       });
     }
 
