@@ -36,6 +36,8 @@ export default function UserProfile() {
   const { showNotification } = useNotifications()
   const { language, setLanguage } = useI18n()
   const [user, setUser] = React.useState<{ name?: string; email?: string; role?: string } | null>(null)
+  const [editedUser, setEditedUser] = React.useState<{ name: string; email: string }>({ name: '', email: '' })
+  const [isEditingProfile, setIsEditingProfile] = React.useState(false)
   const [emailNotifications, setEmailNotifications] = React.useState({
     ticketCreated: true,
     ticketUpdated: true,
@@ -54,33 +56,60 @@ export default function UserProfile() {
   })
 
   React.useEffect(() => {
-    // Try to decode user info from JWT
-    const token = localStorage.getItem('token')
-    if (token) {
-      try {
-        const payload = JSON.parse(atob(token.split('.')[1]))
-        setUser({
-          email: payload.email || 'Unknown',
-          name: payload.name || 'Unknown',
-          role: payload.role || 'USER'
-        })
-        
-        // Fetch email notification preferences
-        fetchEmailNotifications()
-      } catch {
-        setUser({ email: 'Unknown', name: 'Unknown', role: 'USER' })
-      }
-    }
+    // Fetch user profile from backend
+    fetchUserProfile()
   }, [])
 
-  const fetchEmailNotifications = async () => {
+  const fetchUserProfile = async () => {
     try {
       const response = await client.get('/users/profile')
+      const userData = {
+        email: response.data.email || 'Unknown',
+        name: response.data.name || 'Unknown',
+        role: response.data.role || 'USER'
+      }
+      setUser(userData)
+      setEditedUser({ name: userData.name, email: userData.email })
+      
       if (response.data?.emailNotifications) {
         setEmailNotifications(response.data.emailNotifications)
       }
     } catch (error) {
-      console.error('Failed to fetch email notifications:', error)
+      console.error('Failed to fetch user profile:', error)
+      // Fallback to JWT decoding
+      const token = localStorage.getItem('token')
+      if (token) {
+        try {
+          const payload = JSON.parse(atob(token.split('.')[1]))
+          const userData = {
+            email: payload.email || 'Unknown',
+            name: payload.name || 'Unknown',
+            role: payload.role || 'USER'
+          }
+          setUser(userData)
+          setEditedUser({ name: userData.name, email: userData.email })
+        } catch {
+          setUser({ email: 'Unknown', name: 'Unknown', role: 'USER' })
+          setEditedUser({ name: 'Unknown', email: 'Unknown' })
+        }
+      }
+    }
+  }
+
+  const saveUserProfile = async () => {
+    try {
+      await client.patch('/users/profile', {
+        name: editedUser.name,
+        email: editedUser.email
+      })
+      setUser({ ...user, name: editedUser.name, email: editedUser.email })
+      setIsEditingProfile(false)
+      showNotification('success', 'Profile updated successfully')
+      
+      // Refresh user profile
+      await fetchUserProfile()
+    } catch (error: any) {
+      showNotification('error', error?.response?.data?.message || 'Failed to update profile')
     }
   }
 
@@ -117,23 +146,76 @@ export default function UserProfile() {
 
           {/* User Info */}
           <Paper variant="outlined" sx={{ p: 3, mb: 3 }}>
-            <Typography variant="h6" gutterBottom>
-              User Information
-            </Typography>
-            <Stack spacing={2}>
-              <Box display="flex">
-                <Typography sx={{ width: 150, color: 'text.secondary' }}>Name:</Typography>
-                <Typography>{user?.name || 'Not available'}</Typography>
-              </Box>
-              <Box display="flex">
-                <Typography sx={{ width: 150, color: 'text.secondary' }}>Email:</Typography>
-                <Typography>{user?.email || 'Not available'}</Typography>
-              </Box>
-              <Box display="flex">
-                <Typography sx={{ width: 150, color: 'text.secondary' }}>Role:</Typography>
-                <Typography>{user?.role || 'USER'}</Typography>
-              </Box>
-            </Stack>
+            <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+              <Typography variant="h6">
+                User Information
+              </Typography>
+              {!isEditingProfile && (
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={() => setIsEditingProfile(true)}
+                >
+                  Edit Profile
+                </Button>
+              )}
+            </Box>
+            
+            {isEditingProfile ? (
+              <Stack spacing={2}>
+                <TextField
+                  label="Name"
+                  value={editedUser.name}
+                  onChange={e => setEditedUser({ ...editedUser, name: e.target.value })}
+                  size="small"
+                  fullWidth
+                />
+                <TextField
+                  label="Email"
+                  value={editedUser.email}
+                  onChange={e => setEditedUser({ ...editedUser, email: e.target.value })}
+                  size="small"
+                  fullWidth
+                  type="email"
+                />
+                <Box display="flex">
+                  <Typography sx={{ width: 150, color: 'text.secondary' }}>Role:</Typography>
+                  <Typography>{user?.role || 'USER'}</Typography>
+                </Box>
+                <Box display="flex" gap={1}>
+                  <Button
+                    variant="contained"
+                    onClick={saveUserProfile}
+                  >
+                    Save Changes
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    onClick={() => {
+                      setEditedUser({ name: user?.name || '', email: user?.email || '' })
+                      setIsEditingProfile(false)
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                </Box>
+              </Stack>
+            ) : (
+              <Stack spacing={2}>
+                <Box display="flex">
+                  <Typography sx={{ width: 150, color: 'text.secondary' }}>Name:</Typography>
+                  <Typography>{user?.name || 'Not available'}</Typography>
+                </Box>
+                <Box display="flex">
+                  <Typography sx={{ width: 150, color: 'text.secondary' }}>Email:</Typography>
+                  <Typography>{user?.email || 'Not available'}</Typography>
+                </Box>
+                <Box display="flex">
+                  <Typography sx={{ width: 150, color: 'text.secondary' }}>Role:</Typography>
+                  <Typography>{user?.role || 'USER'}</Typography>
+                </Box>
+              </Stack>
+            )}
           </Paper>
 
           {/* Preferences */}

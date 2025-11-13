@@ -155,6 +155,8 @@ const TicketRow: React.FC<{
 }> = ({ ticket, users, sites, types, recurringSchedule, isSelected = false, onToggleSelect, onQuickView }) => {
   const assignedUser = users.find(u => u.id === ticket.assignedUserId)
   const typeLabel = types.find(t => t.key === ticket.typeKey)?.label ?? ticket.typeKey.replace(/_/g, ' ')
+  const isClosed = ticket.status === 'CLOSED'
+  
   const priorityColorMap: Record<Ticket['priority'], string> = {
     P1: '#dc2626',
     P2: '#f97316',
@@ -190,7 +192,9 @@ const TicketRow: React.FC<{
   return (
     <tr style={{ 
       backgroundColor: isSelected ? 'rgba(25, 118, 210, 0.08)' : undefined,
-      borderBottom: '1px solid #e5e7eb'
+      borderBottom: '1px solid #e5e7eb',
+      opacity: isClosed ? 0.5 : 1,
+      color: isClosed ? '#6b7280' : 'inherit'
     }}>
       {onToggleSelect && (
         <td style={{ padding: '12px 8px' }}>
@@ -245,7 +249,7 @@ const TicketRow: React.FC<{
             gap: 6,
             padding: '4px 12px',
             borderRadius: 999,
-            background: priorityColorMap[ticket.priority],
+            background: isClosed ? '#9ca3af' : priorityColorMap[ticket.priority],
             color: '#fff',
             fontSize: 12,
             fontWeight: 600,
@@ -499,28 +503,36 @@ export default function Dashboard() {
   const userMap = React.useMemo(() => Object.fromEntries(users.map(u => [u.id, u])), [users])
 
   const sortedTickets = React.useMemo(() => {
-    if (!sortColumn) return sortTickets(tickets, userId || undefined, cfg)
-    const sorted = [...tickets].sort((a, b) => {
-      if (sortColumn === 'siteId') {
-        const aName = (siteMap[a.siteId]?.name || '').toLowerCase()
-        const bName = (siteMap[b.siteId]?.name || '').toLowerCase()
-        if (aName < bName) return sortDirection === 'asc' ? -1 : 1
-        if (aName > bName) return sortDirection === 'asc' ? 1 : -1
+    let sorted: Ticket[]
+    if (!sortColumn) {
+      sorted = sortTickets(tickets, userId || undefined, cfg)
+    } else {
+      sorted = [...tickets].sort((a, b) => {
+        if (sortColumn === 'siteId') {
+          const aName = (siteMap[a.siteId]?.name || '').toLowerCase()
+          const bName = (siteMap[b.siteId]?.name || '').toLowerCase()
+          if (aName < bName) return sortDirection === 'asc' ? -1 : 1
+          if (aName > bName) return sortDirection === 'asc' ? 1 : -1
+          return 0
+        }
+        let aVal: any = (a as any)[sortColumn]
+        let bVal: any = (b as any)[sortColumn]
+        if (sortColumn === 'createdAt' || sortColumn === 'updatedAt' || sortColumn === 'dueAt') {
+          aVal = aVal ? new Date(aVal).getTime() : 0
+          bVal = bVal ? new Date(bVal).getTime() : 0
+        }
+        if (typeof aVal === 'string') aVal = aVal.toLowerCase()
+        if (typeof bVal === 'string') bVal = bVal.toLowerCase()
+        if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1
+        if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1
         return 0
-      }
-      let aVal: any = (a as any)[sortColumn]
-      let bVal: any = (b as any)[sortColumn]
-      if (sortColumn === 'createdAt' || sortColumn === 'updatedAt' || sortColumn === 'dueAt') {
-        aVal = aVal ? new Date(aVal).getTime() : 0
-        bVal = bVal ? new Date(bVal).getTime() : 0
-      }
-      if (typeof aVal === 'string') aVal = aVal.toLowerCase()
-      if (typeof bVal === 'string') bVal = bVal.toLowerCase()
-      if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1
-      if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1
-      return 0
-    })
-    return sorted
+      })
+    }
+    
+    // Separate closed and non-closed tickets, then pin closed to bottom
+    const openTickets = sorted.filter(t => t.status !== 'CLOSED')
+    const closedTickets = sorted.filter(t => t.status === 'CLOSED')
+    return [...openTickets, ...closedTickets]
   }, [tickets, sortColumn, sortDirection, userId, cfg, siteMap])
 
   const handleSort = (column: string) => {
