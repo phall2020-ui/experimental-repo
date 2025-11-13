@@ -38,7 +38,6 @@ model User {
   tenantId    String
   email       String    @unique
   password    String
-  plainPassword String?
   name        String
   role        Role      @default(USER)
   lastLoginAt DateTime?

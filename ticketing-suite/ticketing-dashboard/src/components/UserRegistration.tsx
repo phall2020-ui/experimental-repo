@@ -249,7 +249,6 @@ export default function UserRegistration({ onClose, onSuccess }: UserRegistratio
                 <tr>
                   <th style={{ textAlign: 'left' }}>Name</th>
                   <th style={{ textAlign: 'left' }}>Email</th>
-                  <th style={{ textAlign: 'left' }}>Password</th>
                   <th style={{ textAlign: 'left' }}>Role</th>
                   <th style={{ textAlign: 'left' }}>Last Login</th>
                   <th style={{ textAlign: 'right' }}>Actions</th>
@@ -280,31 +279,6 @@ export default function UserRegistration({ onClose, onSuccess }: UserRegistratio
                         />
                       ) : (
                         u.email
-                      )}
-                    </td>
-                    <td>
-                      {u.plainPassword ? (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <span style={{ fontFamily: 'monospace', fontSize: 12 }}>
-                            {visiblePasswords.has(u.id) ? u.plainPassword : '••••••••'}
-                          </span>
-                          <button
-                            onClick={() => {
-                              const newSet = new Set(visiblePasswords);
-                              if (newSet.has(u.id)) {
-                                newSet.delete(u.id);
-                              } else {
-                                newSet.add(u.id);
-                              }
-                              setVisiblePasswords(newSet);
-                            }}
-                            style={{ fontSize: 11, padding: '2px 8px' }}
-                          >
-                            {visiblePasswords.has(u.id) ? 'Hide' : 'Show'}
-                          </button>
-                        </div>
-                      ) : (
-                        <span style={{ color: '#888', fontSize: 12 }}>Not available</span>
                       )}
                     </td>
                     <td>
