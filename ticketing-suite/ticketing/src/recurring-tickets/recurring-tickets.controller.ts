@@ -69,9 +69,9 @@ export class RecurringTicketsController {
         throw new HttpException('Invalid updates object', HttpStatus.BAD_REQUEST);
       }
       return this.service.bulkUpdate(this.tenant(req), body.ids, body.updates);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof HttpException) throw error;
-      throw new HttpException(error.message || 'Bulk update failed', HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new HttpException(error?.message || 'Bulk update failed', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
@@ -83,9 +83,9 @@ export class RecurringTicketsController {
         throw new HttpException('Invalid or empty IDs array', HttpStatus.BAD_REQUEST);
       }
       return this.service.bulkDelete(this.tenant(req), body.ids);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof HttpException) throw error;
-      throw new HttpException(error.message || 'Bulk delete failed', HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new HttpException(error?.message || 'Bulk delete failed', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
@@ -97,9 +97,9 @@ export class RecurringTicketsController {
         throw new HttpException('Invalid or empty IDs array', HttpStatus.BAD_REQUEST);
       }
       return this.service.bulkGroup(this.tenant(req), body.ids, body.groupName);
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof HttpException) throw error;
-      throw new HttpException(error.message || 'Bulk group failed', HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new HttpException(error?.message || 'Bulk group failed', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 }
