@@ -30,6 +30,7 @@ export default function RecurringTickets() {
   const [showAssignDialog, setShowAssignDialog] = React.useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = React.useState(false)
   const [selectedValue, setSelectedValue] = React.useState('')
+  const [expandedGroups, setExpandedGroups] = React.useState<Set<string>>(new Set())
 
   const upcoming = React.useMemo(() => {
     const now = new Date()
@@ -50,6 +51,46 @@ export default function RecurringTickets() {
     })
     return Array.from(groups).sort()
   }, [schedules])
+
+  // Group upcoming tickets by groupName
+  const groupedTickets = React.useMemo(() => {
+    const groups: { [key: string]: typeof upcoming } = {}
+    const ungrouped: typeof upcoming = []
+    
+    upcoming.forEach(ticket => {
+      const groupName = (ticket as any).groupName
+      if (groupName) {
+        if (!groups[groupName]) {
+          groups[groupName] = []
+        }
+        groups[groupName].push(ticket)
+      } else {
+        ungrouped.push(ticket)
+      }
+    })
+    
+    return { groups, ungrouped }
+  }, [upcoming])
+
+  const toggleGroup = (groupName: string) => {
+    setExpandedGroups(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(groupName)) {
+        newSet.delete(groupName)
+      } else {
+        newSet.add(groupName)
+      }
+      return newSet
+    })
+  }
+
+  const toggleAllGroups = (expand: boolean) => {
+    if (expand) {
+      setExpandedGroups(new Set(Object.keys(groupedTickets.groups)))
+    } else {
+      setExpandedGroups(new Set())
+    }
+  }
 
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.checked) {
@@ -139,6 +180,17 @@ export default function RecurringTickets() {
             No future activities scheduled.
           </div>
         ) : (
+          <>
+            {Object.keys(groupedTickets.groups).length > 0 && (
+              <div style={{ marginBottom: 12, display: 'flex', gap: 8 }}>
+                <button onClick={() => toggleAllGroups(true)} style={{ padding: '4px 12px', fontSize: 13 }}>
+                  ↓ Expand All
+                </button>
+                <button onClick={() => toggleAllGroups(false)} style={{ padding: '4px 12px', fontSize: 13 }}>
+                  → Collapse All
+                </button>
+              </div>
+            )}
             <table>
               <thead>
                 <tr>
@@ -161,7 +213,113 @@ export default function RecurringTickets() {
                 </tr>
               </thead>
               <tbody>
-                {upcoming.map(schedule => {
+                {/* Render grouped tickets */}
+                {Object.entries(groupedTickets.groups).map(([groupName, tickets]) => {
+                  const isExpanded = expandedGroups.has(groupName)
+                  const allGroupSelected = tickets.every(t => selectedIds.includes(t.id))
+                  const someGroupSelected = tickets.some(t => selectedIds.includes(t.id)) && !allGroupSelected
+                  
+                  return (
+                    <React.Fragment key={`group-${groupName}`}>
+                      {/* Group Header Row */}
+                      <tr style={{ 
+                        background: '#1e293b', 
+                        fontWeight: 'bold',
+                        cursor: 'pointer'
+                      }}>
+                        <td>
+                          <input 
+                            type="checkbox" 
+                            checked={allGroupSelected}
+                            ref={input => {
+                              if (input) {
+                                input.indeterminate = someGroupSelected
+                              }
+                            }}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedIds(prev => [...new Set([...prev, ...tickets.map(t => t.id)])])
+                              } else {
+                                setSelectedIds(prev => prev.filter(id => !tickets.map(t => t.id).includes(id)))
+                              }
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        </td>
+                        <td 
+                          colSpan={9} 
+                          onClick={() => toggleGroup(groupName)}
+                          style={{ cursor: 'pointer' }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{ fontSize: 16 }}>{isExpanded ? '▼' : '▶'}</span>
+                            <span style={{ background: '#5b9cff', color: 'white', padding: '4px 12px', borderRadius: 4 }}>
+                              {groupName}
+                            </span>
+                            <span style={{ color: '#94a3b8', fontSize: 14, fontWeight: 'normal' }}>
+                              ({tickets.length} {tickets.length === 1 ? 'ticket' : 'tickets'})
+                            </span>
+                          </div>
+                        </td>
+                      </tr>
+                      
+                      {/* Group Items (only show when expanded) */}
+                      {isExpanded && tickets.map(schedule => {
+                        const dueDate = new Date(schedule.nextScheduledAt)
+                        dueDate.setDate(dueDate.getDate() + schedule.leadTimeDays)
+                        const assignedUser = users.find(u => u.id === schedule.assignedUserId)
+                        const issueType = issueTypes.find(t => t.key === schedule.typeKey)
+                        const site = sites.find(s => s.id === schedule.siteId)
+                        return (
+                          <tr key={schedule.id} style={{ background: '#0f172a' }}>
+                            <td>
+                              <input 
+                                type="checkbox" 
+                                checked={selectedIds.includes(schedule.id)}
+                                onChange={() => handleSelectOne(schedule.id)}
+                              />
+                            </td>
+                            <td style={{ fontFamily: 'monospace', fontSize: 12 }}>
+                              {schedule.originTicketId ? (
+                                <Link to={`/tickets/${schedule.originTicketId}`}>
+                                  {schedule.originTicketId.slice(0, 8)}
+                                  {schedule.originTicketId.length > 8 ? '…' : ''}
+                                </Link>
+                              ) : (
+                                '—'
+                              )}
+                            </td>
+                            <td className="text-modern">
+                              {schedule.originTicketId ? (
+                                <div className="linkish">
+                                  <Link to={`/tickets/${schedule.originTicketId}`}>
+                                    {schedule.description}
+                                  </Link>
+                                </div>
+                              ) : (
+                                schedule.description
+                              )}
+                            </td>
+                            <td className="text-modern">{site?.name || schedule.siteId}</td>
+                            <td className="text-modern">{issueType?.label || schedule.typeKey.replace(/_/g, ' ')}</td>
+                            <td className="text-modern">{assignedUser ? assignedUser.name || assignedUser.email : 'Unassigned'}</td>
+                            <td className="text-modern">{new Date(schedule.nextScheduledAt).toLocaleDateString()}</td>
+                            <td className="text-modern">{dueDate.toLocaleDateString()}</td>
+                            <td className="text-modern">{frequencyLabels[schedule.frequency] ?? schedule.frequency}</td>
+                            <td className="text-modern">
+                              <span style={{ background: '#5b9cff', color: 'white', padding: '2px 8px', borderRadius: 4, fontSize: 12 }}>
+                                {groupName}
+                              </span>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </React.Fragment>
+                  )
+                })}
+
+                {/* Render ungrouped tickets */}
+                {groupedTickets.ungrouped.map(schedule => {
                   const dueDate = new Date(schedule.nextScheduledAt)
                   dueDate.setDate(dueDate.getDate() + schedule.leadTimeDays)
                   const assignedUser = users.find(u => u.id === schedule.assignedUserId)
@@ -204,19 +362,14 @@ export default function RecurringTickets() {
                       <td className="text-modern">{dueDate.toLocaleDateString()}</td>
                       <td className="text-modern">{frequencyLabels[schedule.frequency] ?? schedule.frequency}</td>
                       <td className="text-modern">
-                        {(schedule as any).groupName ? (
-                          <span style={{ background: '#5b9cff', color: 'white', padding: '2px 8px', borderRadius: 4, fontSize: 12 }}>
-                            {(schedule as any).groupName}
-                          </span>
-                        ) : (
-                          <span style={{ color: '#888' }}>—</span>
-                        )}
+                        <span style={{ color: '#888' }}>—</span>
                       </td>
                     </tr>
                   )
                 })}
               </tbody>
             </table>
+          </>
         )}
 
         {/* Bulk Actions Bar */}
