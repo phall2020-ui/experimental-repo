@@ -816,17 +816,16 @@
                 <div class="chart-card" style="max-width: 600px;">
                     <h3 style="margin-bottom: 8px;">Import from Excel</h3>
                     <p style="color: var(--text-muted); margin-bottom: 24px;">Upload your Clearsol O&M Framework Tracker spreadsheet to import site data.</p>
-                    
                     <div style="border: 2px dashed var(--border); border-radius: 12px; padding: 40px; text-align: center; cursor: pointer;" onclick="document.getElementById('fileInput').click()">
                         <input type="file" id="fileInput" accept=".xlsx,.xls" style="display: none;">
                         <div style="font-size: 48px; margin-bottom: 16px;">📊</div>
                         <p><strong style="color: var(--blue);">Click to upload</strong> or drag and drop</p>
                         <p style="font-size: 12px; color: var(--text-muted);">Excel files only (.xlsx, .xls)</p>
                     </div>
-                    
-                    <button style="width: 100%; padding: 12px; background: var(--blue); color: white; border: none; border-radius: 8px; font-weight: 600; margin-top: 20px; cursor: pointer;" disabled>
+                    <button id="importBtn" style="width: 100%; padding: 12px; background: var(--blue); color: white; border: none; border-radius: 8px; font-weight: 600; margin-top: 20px; cursor: pointer;" disabled>
                         📥 Import Sites
                     </button>
+                    <div id="importStatus" style="margin-top: 12px; color: var(--green);"></div>
                 </div>
                 
                 <div class="chart-card" style="max-width: 600px; margin-top: 20px;">
@@ -1032,6 +1031,27 @@
     </main>
 
     <script>
+
+                // Enable import button when file is selected
+                document.addEventListener('DOMContentLoaded', function() {
+                    var fileInput = document.getElementById('fileInput');
+                    var importBtn = document.getElementById('importBtn');
+                    var importStatus = document.getElementById('importStatus');
+                    if (fileInput && importBtn) {
+                        fileInput.addEventListener('change', function() {
+                            if (fileInput.files.length > 0) {
+                                importBtn.disabled = false;
+                                importStatus.textContent = fileInput.files[0].name + ' selected.';
+                            } else {
+                                importBtn.disabled = true;
+                                importStatus.textContent = '';
+                            }
+                        });
+                        importBtn.addEventListener('click', function() {
+                            importStatus.textContent = 'Import feature coming soon!';
+                        });
+                    }
+                });
         // ========================================
         // SHAREPOINT REST API INTEGRATION
         // O&M Portfolio Tracker - SharePoint Version
@@ -1049,6 +1069,39 @@
         let rateTiers = [];
         let portfolio = {};
         let dashboard = {};
+
+        // Mock Data for Local Testing
+        const MOCK_SITES = [
+            { ID: 1, Title: 'Meadow Solar Farm', SystemSizeKwp: 2450, SiteType: 'Ground Mount', ContractStatus: 'Yes', OnboardDate: '2023-01-15', PMCost: 500, CCTVCost: 200, CleaningCost: 300, SPVCode: 'OS2' },
+            { ID: 2, Title: 'Hilltop Energy Park', SystemSizeKwp: 1850, SiteType: 'Rooftop', ContractStatus: 'Yes', OnboardDate: '2023-02-20', PMCost: 450, CCTVCost: 150, CleaningCost: 250, SPVCode: 'AD1' },
+            { ID: 3, Title: 'Valley View Solar', SystemSizeKwp: 3200, SiteType: 'Ground Mount', ContractStatus: 'Yes', OnboardDate: '2023-03-10', PMCost: 600, CCTVCost: 250, CleaningCost: 400, SPVCode: 'OS2' },
+            { ID: 4, Title: 'Riverside Solar', SystemSizeKwp: 1500, SiteType: 'Rooftop', ContractStatus: 'No', OnboardDate: null, PMCost: 350, CCTVCost: 100, CleaningCost: 150, SPVCode: 'EM3' },
+            { ID: 5, Title: 'Lakeside Power', SystemSizeKwp: 2100, SiteType: 'Ground Mount', ContractStatus: 'Yes', OnboardDate: '2023-05-12', PMCost: 480, CCTVCost: 180, CleaningCost: 280, SPVCode: 'ESI10' },
+            { ID: 6, Title: 'Forest Edge', SystemSizeKwp: 950, SiteType: 'Rooftop', ContractStatus: 'Yes', OnboardDate: '2023-06-08', PMCost: 280, CCTVCost: 80, CleaningCost: 120, SPVCode: 'FS' },
+            { ID: 7, Title: 'Ocean View', SystemSizeKwp: 3600, SiteType: 'Ground Mount', ContractStatus: 'Yes', OnboardDate: '2023-07-18', PMCost: 700, CCTVCost: 300, CleaningCost: 450, SPVCode: 'AD1' },
+            { ID: 8, Title: 'Mountain Ridge', SystemSizeKwp: 2200, SiteType: 'Ground Mount', ContractStatus: 'No', OnboardDate: null, PMCost: 500, CCTVCost: 200, CleaningCost: 300, SPVCode: 'OS2' }
+        ];
+
+        const MOCK_SPVS = [
+            { Title: 'OS2', SPVName: 'Olympus Solar 2 Ltd' },
+            { Title: 'AD1', SPVName: 'Artemis Development Ltd' },
+            { Title: 'EM3', SPVName: 'Ember Energy 3' },
+            { Title: 'ESI10', SPVName: 'Enviro Solar Investments 10' },
+            { Title: 'FS', SPVName: 'Frontier Solar' }
+        ];
+
+        const MOCK_RATE_TIERS = [
+            { Title: '30-40MW', MinCapacityMW: 30, MaxCapacityMW: 40, RatePerKwp: 1.70, IsActive: true },
+            { Title: '20-30MW', MinCapacityMW: 20, MaxCapacityMW: 30, RatePerKwp: 1.80, IsActive: true },
+            { Title: '<20MW', MinCapacityMW: 0, MaxCapacityMW: 20, RatePerKwp: 2.00, IsActive: true }
+        ];
+        const DEFAULT_RATE_TIER = {
+            tierName: '<20MW',
+            minCapacityMW: 0,
+            maxCapacityMW: null,
+            ratePerKwp: 2.00,
+            isActive: true
+        };
 
         // Get Request Digest for POST/UPDATE/DELETE operations
         function getRequestDigest() {
@@ -1090,9 +1143,15 @@
             }
         }
 
-        // Load Sites from SharePoint
+        // Load Sites from SharePoint (or use mock data locally)
         async function loadSites() {
-            const spSites = await spGet('Sites', '$select=*&$top=5000&$orderby=Title');
+            let spSites = await spGet('Sites', '$select=*&$top=5000&$orderby=Title');
+
+            // Use mock data as fallback if no data from SharePoint
+            if (!spSites || spSites.length === 0) {
+                console.log('📋 Using mock data for Sites (SharePoint not connected)');
+                spSites = MOCK_SITES;
+            }
 
             sites = spSites.map(site => ({
                 id: site.ID,
@@ -1111,9 +1170,15 @@
             return sites;
         }
 
-        // Load SPVs from SharePoint
+        // Load SPVs from SharePoint (or use mock data locally)
         async function loadSPVs() {
-            const spSPVs = await spGet('SPVs', '$select=*&$orderby=Title');
+            let spSPVs = await spGet('SPVs', '$select=*&$orderby=Title');
+
+            // Use mock data as fallback if no data from SharePoint
+            if (!spSPVs || spSPVs.length === 0) {
+                console.log('📋 Using mock data for SPVs (SharePoint not connected)');
+                spSPVs = MOCK_SPVS;
+            }
 
             spvs = spSPVs.map(spv => ({
                 code: spv.Title,
@@ -1123,9 +1188,15 @@
             return spvs;
         }
 
-        // Load Rate Tiers from SharePoint
+        // Load Rate Tiers from SharePoint (or use mock data locally)
         async function loadRateTiers() {
-            const spTiers = await spGet('RateTiers', '$select=*&$filter=IsActive eq true&$orderby=MinCapacityMW desc');
+            let spTiers = await spGet('RateTiers', '$select=*&$filter=IsActive eq true&$orderby=MinCapacityMW desc');
+
+            // Use mock data as fallback if no data from SharePoint
+            if (!spTiers || spTiers.length === 0) {
+                console.log('📋 Using mock data for Rate Tiers (SharePoint not connected)');
+                spTiers = MOCK_RATE_TIERS;
+            }
 
             rateTiers = spTiers.map(tier => ({
                 tierName: tier.Title,
@@ -1135,11 +1206,19 @@
                 isActive: tier.IsActive
             }));
 
+            if (!rateTiers.length) {
+                console.warn('No rate tiers returned from SharePoint. Using default tier.');
+                rateTiers = [DEFAULT_RATE_TIER];
+            }
+
             return rateTiers;
         }
 
         // Get applicable rate tier for given capacity
         function getRateTier(contractedMW) {
+            if (!rateTiers || !rateTiers.length) {
+                return DEFAULT_RATE_TIER;
+            }
             for (let tier of rateTiers) {
                 if (contractedMW >= tier.minCapacityMW) {
                     if (!tier.maxCapacityMW || contractedMW < tier.maxCapacityMW) {
@@ -1147,7 +1226,7 @@
                     }
                 }
             }
-            return rateTiers[rateTiers.length - 1] || { tierName: '<20MW', ratePerKwp: 2.00 };
+            return rateTiers[rateTiers.length - 1] || DEFAULT_RATE_TIER;
         }
 
         // Calculate fees for a site
@@ -1334,6 +1413,17 @@
         function renderSitesTable() {
             const tbody = document.getElementById('sitesBody');
             if (!tbody) return;
+
+            if (!sites.length) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="9" style="text-align: center; padding: 16px; color: var(--text-muted);">
+                            No site data loaded from SharePoint. Check the Sites list or your permissions.
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
 
             tbody.innerHTML = sites.map(site => `
                 <tr>
