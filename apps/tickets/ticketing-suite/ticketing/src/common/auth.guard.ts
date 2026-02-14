@@ -1,0 +1,54 @@
+import { Injectable, ExecutionContext, UnauthorizedException } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
+
+@Injectable() 
+export class JwtAuthGuard extends AuthGuard('jwt') {
+  canActivate(context: ExecutionContext) {
+    // In dev mode without OIDC, decode JWT manually without verification
+    if (!process.env.OIDC_ISSUER) {
+      const request = context.switchToHttp().getRequest();
+      const authHeader = request.headers.authorization;
+      
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        throw new UnauthorizedException('No token provided');
+      }
+      
+      try {
+        const token = authHeader.substring(7);
+        const parts = token.split('.');
+        
+        if (parts.length !== 3) {
+          throw new UnauthorizedException('Invalid token format');
+        }
+        
+        // Decode payload (base64url decode)
+        const payload = JSON.parse(
+          Buffer.from(parts[1].replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString()
+        );
+        
+        // Determine roles from payload (support both `role` and `roles`)
+        const payloadRoles = Array.isArray(payload.roles)
+          ? payload.roles
+          : payload.role
+          ? [payload.role]
+          : ['USER'];
+
+        // Set user on request
+        request.user = {
+          sub: payload.sub || 'dev-user',
+          tenantId: payload.tenantId || 'tenant-1',
+          role: payload.role || payloadRoles[0] || 'USER',
+          roles: payloadRoles,
+          email: payload.email || 'dev@example.com'
+        };
+        
+        return true;
+      } catch (error) {
+        throw new UnauthorizedException('Invalid token');
+      }
+    }
+    
+    // In production with OIDC, use normal JWT verification
+    return super.canActivate(context);
+  }
+}

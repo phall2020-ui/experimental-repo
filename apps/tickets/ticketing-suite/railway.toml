@@ -1,0 +1,9 @@
+[build]
+# Use Dockerfile explicitly instead of auto-detection
+builder = "dockerfile"
+
+# Path to your backend Dockerfile
+dockerfilePath = "ticketing-suite/ticketing/Dockerfile"
+
+# Directory used as build context (where Dockerfile and package.json live)
+buildContext = "ticketing-suite/ticketing"

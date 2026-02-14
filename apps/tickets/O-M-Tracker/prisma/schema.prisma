@@ -1,0 +1,120 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// User model for authentication
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  password  String
+  role      Role     @default(VIEWER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  auditLogs AuditLog[]
+}
+
+// SPV (Special Purpose Vehicle) - Solar portfolio companies
+model SPV {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  sites     Site[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Solar installation site
+model Site {
+  id             String         @id @default(cuid())
+  name           String
+  systemSizeKwp  Float
+  siteType       SiteType       @default(ROOFTOP)
+  contractStatus ContractStatus @default(NO)
+  onboardDate    DateTime?
+  pmCost         Float          @default(0)
+  cctvCost       Float          @default(0)
+  cleaningCost   Float          @default(0)
+  spv            SPV?           @relation(fields: [spvId], references: [id])
+  spvId          String?
+  sourceSheet    String?
+  sourceRow      Int?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  auditLogs AuditLog[]
+
+  @@index([spvId])
+  @@index([contractStatus])
+}
+
+// Rate tiers for portfolio cost calculations
+model RateTier {
+  id            String    @id @default(cuid())
+  tierName      String
+  minCapacityMW Float
+  maxCapacityMW Float?
+  ratePerKwp    Float
+  effectiveFrom DateTime  @default(now())
+  effectiveTo   DateTime?
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([isActive])
+}
+
+// Audit log for tracking changes
+model AuditLog {
+  id         String      @id @default(cuid())
+  action     AuditAction
+  entityType String
+  entityId   String
+  oldValues  Json?
+  newValues  Json?
+  user       User        @relation(fields: [userId], references: [id])
+  userId     String
+  site       Site?       @relation(fields: [siteId], references: [id], onDelete: SetNull)
+  siteId     String?
+  createdAt  DateTime    @default(now())
+
+  @@index([userId])
+  @@index([siteId])
+  @@index([createdAt])
+}
+
+// Enums
+enum Role {
+  ADMIN
+  MANAGER
+  VIEWER
+}
+
+enum SiteType {
+  ROOFTOP
+  GROUND_MOUNT
+}
+
+enum ContractStatus {
+  YES
+  NO
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  IMPORT
+  LOGIN
+  LOGOUT
+}
+

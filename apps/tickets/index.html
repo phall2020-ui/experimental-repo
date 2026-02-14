@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clearsol Platform - Asset Management Suite</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-dark: #0a0a0f;
+            --bg-card: #12121a;
+            --bg-card-hover: #1a1a24;
+            --border: #2a2a3a;
+            --text-primary: #f0f0f5;
+            --text-secondary: #8a8a9a;
+            --accent-blue: #3b82f6;
+            --accent-amber: #f59e0b;
+            --accent-emerald: #10b981;
+            --accent-purple: #8b5cf6;
+            --accent-rose: #f43f5e;
+            --gradient-blue: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+            --gradient-amber: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            --gradient-emerald: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            --gradient-purple: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: 'Space Grotesk', -apple-system, sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-primary);
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+        
+        /* Animated background */
+        .bg-pattern {
+            position: fixed;
+            inset: 0;
+            background-image: 
+                radial-gradient(ellipse at 20% 30%, rgba(59, 130, 246, 0.08) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 70%, rgba(139, 92, 246, 0.08) 0%, transparent 50%),
+                radial-gradient(ellipse at 50% 50%, rgba(16, 185, 129, 0.05) 0%, transparent 70%);
+            pointer-events: none;
+            z-index: 0;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 24px;
+            position: relative;
+            z-index: 1;
+        }
+        
+        /* Header */
+        header {
+            padding: 32px 0;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .logo-icon {
+            width: 48px;
+            height: 48px;
+            background: var(--gradient-amber);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            box-shadow: 0 8px 32px rgba(245, 158, 11, 0.3);
+        }
+        
+        .logo-text {
+            font-size: 24px;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+        }
+        
+        .logo-subtitle {
+            font-size: 13px;
+            color: var(--text-secondary);
+            font-weight: 400;
+        }
+        
+        /* Hero */
+        .hero {
+            padding: 80px 0 60px;
+            text-align: center;
+        }
+        
+        .hero h1 {
+            font-size: clamp(36px, 6vw, 56px);
+            font-weight: 700;
+            letter-spacing: -0.03em;
+            margin-bottom: 16px;
+            background: linear-gradient(135deg, #fff 0%, #a0a0b0 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .hero p {
+            font-size: 18px;
+            color: var(--text-secondary);
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        /* Stats */
+        .stats {
+            display: flex;
+            justify-content: center;
+            gap: 48px;
+            padding: 40px 0;
+            flex-wrap: wrap;
+        }
+        
+        .stat {
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 36px;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+            background: var(--gradient-blue);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .stat-label {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+        
+        /* Projects Grid */
+        .projects {
+            padding: 40px 0 80px;
+        }
+        
+        .section-title {
+            font-size: 14px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-secondary);
+            margin-bottom: 24px;
+        }
+        
+        .projects-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+            gap: 24px;
+        }
+        
+        .project-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 28px;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            text-decoration: none;
+            color: inherit;
+            display: block;
+        }
+        
+        .project-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        .project-card:hover {
+            background: var(--bg-card-hover);
+            border-color: #3a3a4a;
+            transform: translateY(-4px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        }
+        
+        .project-card:hover::before {
+            opacity: 1;
+        }
+        
+        .project-card.blue::before { background: var(--gradient-blue); }
+        .project-card.amber::before { background: var(--gradient-amber); }
+        .project-card.emerald::before { background: var(--gradient-emerald); }
+        .project-card.purple::before { background: var(--gradient-purple); }
+        
+        .project-icon {
+            width: 56px;
+            height: 56px;
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            margin-bottom: 20px;
+        }
+        
+        .project-icon.blue { background: rgba(59, 130, 246, 0.15); }
+        .project-icon.amber { background: rgba(245, 158, 11, 0.15); }
+        .project-icon.emerald { background: rgba(16, 185, 129, 0.15); }
+        .project-icon.purple { background: rgba(139, 92, 246, 0.15); }
+        
+        .project-title {
+            font-size: 22px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            letter-spacing: -0.01em;
+        }
+        
+        .project-desc {
+            font-size: 15px;
+            color: var(--text-secondary);
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+        
+        .project-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .tag {
+            padding: 4px 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 12px;
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--text-secondary);
+        }
+        
+        .project-meta {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding-top: 16px;
+            border-top: 1px solid var(--border);
+        }
+        
+        .project-status {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+        }
+        
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+        
+        .status-dot.active { background: var(--accent-emerald); }
+        .status-dot.beta { background: var(--accent-amber); }
+        .status-dot.dev { background: var(--accent-purple); }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .project-arrow {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+        
+        .project-card:hover .project-arrow {
+            background: var(--accent-blue);
+            transform: translateX(4px);
+        }
+        
+        /* New Badge */
+        .new-badge {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            padding: 4px 10px;
+            background: var(--gradient-emerald);
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        
+        /* Footer */
+        footer {
+            padding: 32px 0;
+            border-top: 1px solid var(--border);
+            text-align: center;
+        }
+        
+        footer p {
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+        
+        footer a {
+            color: var(--accent-blue);
+            text-decoration: none;
+        }
+        
+        footer a:hover {
+            text-decoration: underline;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .projects-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .stats {
+                gap: 32px;
+            }
+            
+            .hero {
+                padding: 60px 0 40px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-pattern"></div>
+    
+    <header>
+        <div class="container">
+            <div class="logo">
+                <div class="logo-icon">⚡</div>
+                <div>
+                    <div class="logo-text">Clearsol Platform</div>
+                    <div class="logo-subtitle">Asset Management Suite</div>
+                </div>
+            </div>
+        </div>
+    </header>
+    
+    <main>
+        <section class="hero">
+            <div class="container">
+                <h1>Enterprise Asset Management</h1>
+                <p>A comprehensive suite of tools for solar portfolio management, ticketing, and predictive maintenance.</p>
+            </div>
+        </section>
+        
+        <section class="container">
+            <div class="stats">
+                <div class="stat">
+                    <div class="stat-value">4</div>
+                    <div class="stat-label">Applications</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">100+</div>
+                    <div class="stat-label">API Endpoints</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">284</div>
+                    <div class="stat-label">Commits</div>
+                </div>
+            </div>
+        </section>
+        
+        <section class="projects">
+            <div class="container">
+                <div class="section-title">Applications</div>
+                <div class="projects-grid">
+                    <!-- O&M Tracker - NEW -->
+                    <a href="O-M-Tracker/demo.html" class="project-card amber">
+                        <span class="new-badge">New</span>
+                        <div class="project-icon amber">☀️</div>
+                        <h3 class="project-title">O&M Portfolio Tracker</h3>
+                        <p class="project-desc">Solar portfolio management with automatic fee calculations, SPV invoice breakdown, and interactive dashboard charts.</p>
+                        <div class="project-tags">
+                            <span class="tag">Next.js 16</span>
+                            <span class="tag">Prisma</span>
+                            <span class="tag">NextAuth</span>
+                            <span class="tag">Recharts</span>
+                        </div>
+                        <div class="project-meta">
+                            <div class="project-status">
+                                <span class="status-dot beta"></span>
+                                <span>Phase 2-3 Complete</span>
+                            </div>
+                            <div class="project-arrow">→</div>
+                        </div>
+                    </a>
+                    
+                    <!-- Ticketing Suite -->
+                    <a href="ticketing-suite/ticketing-dashboard/" class="project-card blue">
+                        <div class="project-icon blue">🎫</div>
+                        <h3 class="project-title">Ticketing Suite</h3>
+                        <p class="project-desc">Multi-tenant ticketing system with custom fields, attachments, comments, and advanced search capabilities.</p>
+                        <div class="project-tags">
+                            <span class="tag">NestJS</span>
+                            <span class="tag">React</span>
+                            <span class="tag">PostgreSQL</span>
+                            <span class="tag">OpenSearch</span>
+                        </div>
+                        <div class="project-meta">
+                            <div class="project-status">
+                                <span class="status-dot active"></span>
+                                <span>Production Ready</span>
+                            </div>
+                            <div class="project-arrow">→</div>
+                        </div>
+                    </a>
+                    
+                    <!-- Solar Predictive Maintenance -->
+                    <a href="solar-predictive-maintenance/" class="project-card emerald">
+                        <div class="project-icon emerald">📊</div>
+                        <h3 class="project-title">Predictive Maintenance</h3>
+                        <p class="project-desc">ML-powered predictive maintenance for solar installations with anomaly detection and performance forecasting.</p>
+                        <div class="project-tags">
+                            <span class="tag">Python</span>
+                            <span class="tag">TensorFlow</span>
+                            <span class="tag">FastAPI</span>
+                        </div>
+                        <div class="project-meta">
+                            <div class="project-status">
+                                <span class="status-dot dev"></span>
+                                <span>In Development</span>
+                            </div>
+                            <div class="project-arrow">→</div>
+                        </div>
+                    </a>
+                    
+                    <!-- Bitcoin Tracker -->
+                    <a href="mstr-bitcoin-tracker/" class="project-card purple">
+                        <div class="project-icon purple">₿</div>
+                        <h3 class="project-title">MSTR Bitcoin Tracker</h3>
+                        <p class="project-desc">Real-time tracking of MicroStrategy's Bitcoin holdings with price analysis and portfolio visualization.</p>
+                        <div class="project-tags">
+                            <span class="tag">React</span>
+                            <span class="tag">Chart.js</span>
+                            <span class="tag">REST API</span>
+                        </div>
+                        <div class="project-meta">
+                            <div class="project-status">
+                                <span class="status-dot dev"></span>
+                                <span>In Development</span>
+                            </div>
+                            <div class="project-arrow">→</div>
+                        </div>
+                    </a>
+                </div>
+            </div>
+        </section>
+    </main>
+    
+    <footer>
+        <div class="container">
+            <p>© 2025 Clearsol Platform. View on <a href="https://github.com/phall2020-ui/Tickets" target="_blank">GitHub</a></p>
+        </div>
+    </footer>
+</body>
+</html>
+

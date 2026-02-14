@@ -1,0 +1,312 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Tenant {
+  id        String      @id @default(uuid())
+  name      String
+  sites     Site[]
+  fields    TicketFieldDef[]
+  users     User[]
+  tickets   Ticket[]
+  comments  Comment[]
+  attachments Attachment[]
+  outboxEntries Outbox[]
+  types     IssueType[]
+  ticketHistory TicketHistory[]
+  templates TicketTemplate[]
+}
+
+model Site {
+  id              String               @id @default(uuid())
+  tenantId        String
+  name            String
+  location        String?
+  tenant          Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tickets         Ticket[]
+  ticketSequence  SiteTicketSequence?
+
+  @@index([tenantId, name])
+}
+
+model User {
+  id          String    @id @default(uuid())
+  tenantId    String
+  email       String    @unique
+  password    String
+  plainPassword String?
+  name        String
+  role        Role      @default(USER)
+  lastLoginAt DateTime?
+  emailNotifications Json @default("{\"ticketCreated\":true,\"ticketUpdated\":true,\"ticketAssigned\":true,\"ticketCommented\":true,\"ticketResolved\":true}")
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tickets     Ticket[]  @relation("UserTickets")
+}
+
+model Ticket {
+  id              String   @id
+  tenantId        String
+  siteId          String
+  typeKey         String
+  description     String
+  status          TicketStatus
+  priority        TicketPriority
+  details         String?
+  assignedUserId  String?
+  customFields    Json      @default("{}")
+  dueAt           DateTime?
+  firstResponseAt DateTime?
+  resolvedAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  tenant          Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  site            Site      @relation(fields: [siteId], references: [id], onDelete: Restrict)
+  assignedUser    User?     @relation("UserTickets", fields: [assignedUserId], references: [id])
+  comments        Comment[]
+  attachments     Attachment[]
+  outboxEntries   Outbox[]
+  history         TicketHistory[]
+  recurringConfig RecurringTicket? @relation("TicketRecurringLink")
+
+  @@index([tenantId, status, priority, createdAt])
+  @@index([tenantId, siteId, createdAt])
+  @@index([tenantId, typeKey, createdAt])
+  @@index([tenantId, assignedUserId])
+}
+
+model SiteTicketSequence {
+  siteId    String   @id
+  tenantId  String
+  prefix    String
+  nextValue Int      @default(1)
+  site      Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+}
+
+model TicketFieldDef {
+  id         String        @id @default(uuid())
+  tenantId   String
+  key        String
+  label      String
+  datatype   FieldDatatype
+  required   Boolean       @default(false)
+  enumOptions String[]
+  validation Json?
+  uiHints    Json?
+  isIndexed  Boolean       @default(false)
+  tenant     Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, key])
+}
+
+model TicketTemplate {
+  id              String         @id @default(uuid())
+  tenantId        String
+  name            String
+  typeKey         String
+  description     String
+  details         String?
+  priority        TicketPriority
+  status          TicketStatus
+  assignedUserId  String?
+  customFields    Json           @default("{}")
+  
+  // Recurring fields (if template is for recurring ticket)
+  isRecurring     Boolean        @default(false)
+  frequency       RecurrenceFrequency?
+  intervalValue   Int?
+  leadTimeDays    Int?
+  
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  createdBy       String?
+  
+  tenant          Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([tenantId, name])
+}
+
+model IssueType {
+  id        String  @id @default(uuid())
+  tenantId  String
+  key       String
+  label     String
+  active    Boolean @default(true)
+  tenant    Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  
+  @@unique([tenantId, key])
+}
+
+enum TicketStatus {
+  AWAITING_RESPONSE
+  ADE_TO_RESPOND
+  CLOSED
+  ON_HOLD
+}
+
+enum TicketPriority {
+  P1
+  P2
+  P3
+  P4
+}
+
+enum Role {
+  ADMIN
+  USER
+}
+
+enum FieldDatatype {
+  string
+  number
+  boolean
+  date
+  enum
+}
+
+model Comment {
+  id          String            @id @default(uuid())
+  tenantId    String
+  ticketId    String
+  authorUserId String?
+  visibility  CommentVisibility
+  body        String
+  createdAt   DateTime          @default(now())
+  tenant      Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  ticket      Ticket            @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  attachments Attachment[]
+
+  @@index([tenantId, ticketId, createdAt])
+}
+
+enum CommentVisibility {
+  PUBLIC
+  INTERNAL
+}
+
+enum NotificationType {
+  TICKET_CREATED
+  TICKET_UPDATED
+  TICKET_ASSIGNED
+  TICKET_COMMENTED
+  TICKET_RESOLVED
+  RECURRING_TICKET_GENERATED
+  TICKET_ACTIVITY_DIGEST
+  TICKET_DUE_SOON
+}
+
+model Attachment {
+  id            String   @id @default(uuid())
+  tenantId      String
+  ticketId      String
+  commentId     String?
+  objectKey     String
+  filename      String
+  mimeType      String
+  sizeBytes     Int
+  checksumSha256 String
+  createdAt     DateTime @default(now())
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  ticket        Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  comment       Comment? @relation(fields: [commentId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, ticketId])
+}
+
+model Outbox {
+  id          String   @id @default(uuid())
+  tenantId    String
+  ticketId    String?
+  type        String
+  entityId    String
+  payload     Json
+  occurredAt  DateTime @default(now())
+  publishedAt DateTime?
+  retryCount  Int      @default(0)
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  ticket      Ticket?  @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, type, occurredAt])
+}
+
+model TicketHistory {
+  id          String   @id @default(uuid())
+  tenantId    String
+  ticketId    String
+  actorUserId String?
+  at          DateTime @default(now())
+  changes     Json
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  ticket      Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, ticketId, at])
+}
+
+model RecurringTicket {
+  id                    String              @id @default(uuid())
+  tenantId              String
+  siteId                String
+  typeKey               String
+  description           String
+  priority              TicketPriority
+  details               String?
+  assignedUserId        String?
+  customFields          Json                @default("{}")
+  frequency             RecurrenceFrequency
+  intervalValue         Int                 @default(1)
+  startDate             DateTime
+  endDate               DateTime?
+  leadTimeDays          Int                 @default(0)
+  isActive              Boolean             @default(true)
+  lastGeneratedAt       DateTime?
+  nextScheduledAt       DateTime
+  groupName             String?
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  originTicketId        String?             @unique
+  originTicket          Ticket?             @relation("TicketRecurringLink", fields: [originTicketId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, isActive, nextScheduledAt])
+  @@index([tenantId, siteId])
+  @@index([tenantId, groupName])
+}
+
+enum RecurrenceFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+  YEARLY
+}
+
+model Notification {
+  id          String             @id @default(uuid())
+  tenantId    String
+  userId      String?
+  type        NotificationType
+  title       String
+  message     String
+  ticketId    String?
+  metadata    Json               @default("{}")
+  isRead      Boolean            @default(false)
+  createdAt   DateTime           @default(now())
+
+  @@index([tenantId, userId, isRead, createdAt])
+  @@index([tenantId, ticketId])
+}
+
+model NotificationDigest {
+  tenantId  String
+  userId    String
+  lastRunAt DateTime @default(now())
+
+  @@id([tenantId, userId])
+  @@index([lastRunAt])
+}

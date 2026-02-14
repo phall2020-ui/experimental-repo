@@ -1,0 +1,38 @@
+build
+RUN npx prisma generate
+1s
+Tip: Want real-time updates to your database without manual polling? Discover how with Pulse: https://pris.ly/tip-0-pulse
+
+build
+COPY . .
+21ms
+
+build
+RUN npm run build
+8s
+> ticketing@1.0.0 build
+> nest build
+prisma/seed.ts:37:7 - error TS2353: Object literal may only specify known properties, and 'isActive' does not exist in type 'Without<UserCreateInput, UserUncheckedCreateInput> & UserUncheckedCreateInput'.
+37       isActive: true,
+         ~~~~~~~~
+  node_modules/.prisma/client/index.d.ts:4808:5
+    4808     data: XOR<UserCreateInput, UserUncheckedCreateInput>
+             ~~~~
+    The expected type comes from property 'data' which is declared here on type '{ select?: UserSelect<DefaultArgs> | null | undefined; include?: UserInclude<DefaultArgs> | null | undefined; data: (Without<UserCreateInput, UserUncheckedCreateInput> & UserUncheckedCreateInput) | (Without<...> & UserCreateInput); }'
+prisma/seed.ts:49:7 - error TS2353: Object literal may only specify known properties, and 'isActive' does not exist in type 'Without<UserCreateInput, UserUncheckedCreateInput> & UserUncheckedCreateInput'.
+49       isActive: true,
+         ~~~~~~~~
+  node_modules/.prisma/client/index.d.ts:4808:5
+    4808     data: XOR<UserCreateInput, UserUncheckedCreateInput>
+             ~~~~
+    The expected type comes from property 'data' which is declared here on type '{ select?: UserSelect<DefaultArgs> | null | undefined; include?: UserInclude<DefaultArgs> | null | undefined; data: (Without<UserCreateInput, UserUncheckedCreateInput> & UserUncheckedCreateInput) | (Without<...> & UserCreateInput); }'
+Found 2 error(s).
+Dockerfile:19
+-------------------
+17 |     # Copy source and build Nest
+18 |     COPY . .
+19 | >>> RUN npm run build
+20 |
+21 |     # ---- Runtime Stage ----
+-------------------
+ERROR: failed to build: failed to solve: process "/bin/sh -c npm run build" did not complete successfully: exit code: 1

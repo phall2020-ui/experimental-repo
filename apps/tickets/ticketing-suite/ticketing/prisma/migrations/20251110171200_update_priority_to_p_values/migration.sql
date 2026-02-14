@@ -1,0 +1,1 @@
+-- Enum already correct in init migration, no changes needed

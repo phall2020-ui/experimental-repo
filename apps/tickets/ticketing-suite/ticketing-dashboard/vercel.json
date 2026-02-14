@@ -1,0 +1,29 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/notion/:path*",
+      "destination": "/api/notion/:path*"
+    },
+    {
+      "source": "/((?!api/).*)",
+      "destination": "/"
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/recurring-tickets",
+      "schedule": "0 0 * * *"
+    }
+  ],
+  "env": {
+    "NOTION_TOKEN": "@notion-token",
+    "NOTION_SITES_DB": "@notion-sites-db",
+    "NOTION_USERS_DB": "@notion-users-db",
+    "NOTION_TYPES_DB": "@notion-types-db",
+    "NOTION_TICKETS_DB": "@notion-tickets-db",
+    "NOTION_COMMENTS_DB": "@notion-comments-db",
+    "NOTION_NOTIFICATIONS_DB": "@notion-notifications-db",
+    "NOTION_RECURRING_DB": "@notion-recurring-db",
+    "NOTION_HISTORY_DB": "@notion-history-db"
+  }
+}
