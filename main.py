@@ -11,7 +11,12 @@ from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from web3 import Web3
 from py_clob_client.client import ClobClient
-from py_clob_client.clob_types import MarketOrderArgs, OrderType
+from py_clob_client.clob_types import OrderArgs
+import enum
+class OrderType(enum.Enum):
+    FOK = "FOK"
+    GTC = "GTC"
+
 from py_clob_client.order_builder.constants import BUY, SELL
 from typing import Dict, List, Tuple, Optional, Any, Union
 from collections import deque, defaultdict
@@ -127,31 +132,69 @@ def validate_config() -> None:
         raise ValueError(" | ".join(error_msg))
 
 # Global configuration
-validate_config()
+# Global configuration
+TRADE_UNIT = 0.0
+SLIPPAGE_TOLERANCE = 0.0
+PCT_PROFIT = 0.0
+PCT_LOSS = 0.0
+CASH_PROFIT = 0.0
+CASH_LOSS = 0.0
+SPIKE_THRESHOLD = 0.0
+SOLD_POSITION_TIME = 0.0
+HOLDING_TIME_LIMIT = 0.0
+PRICE_HISTORY_SIZE = 100
+COOLDOWN_PERIOD = 0
+KEEP_MIN_SHARES = 0
+MAX_CONCURRENT_TRADES = 0
+MIN_LIQUIDITY_REQUIREMENT = 0.0
 
-TRADE_UNIT = float(os.getenv("trade_unit"))
-SLIPPAGE_TOLERANCE = float(os.getenv("slippage_tolerance"))
-PCT_PROFIT = float(os.getenv("pct_profit"))
-PCT_LOSS = float(os.getenv("pct_loss"))
-CASH_PROFIT = float(os.getenv("cash_profit"))
-CASH_LOSS = float(os.getenv("cash_loss"))
-SPIKE_THRESHOLD = float(os.getenv("spike_threshold"))
-SOLD_POSITION_TIME = float(os.getenv("sold_position_time"))
-HOLDING_TIME_LIMIT = float(os.getenv("holding_time_limit"))
-PRICE_HISTORY_SIZE = int(os.getenv("price_history_size"))
-COOLDOWN_PERIOD = int(os.getenv("cooldown_period"))
-KEEP_MIN_SHARES = int(os.getenv("keep_min_shares"))
-MAX_CONCURRENT_TRADES = int(os.getenv("max_concurrent_trades"))
-MIN_LIQUIDITY_REQUIREMENT = float(os.getenv("min_liquidity_requirement"))
+def load_config():
+    global TRADE_UNIT, SLIPPAGE_TOLERANCE, PCT_PROFIT, PCT_LOSS, CASH_PROFIT, CASH_LOSS
+    global SPIKE_THRESHOLD, SOLD_POSITION_TIME, HOLDING_TIME_LIMIT, PRICE_HISTORY_SIZE
+    global COOLDOWN_PERIOD, KEEP_MIN_SHARES, MAX_CONCURRENT_TRADES, MIN_LIQUIDITY_REQUIREMENT
+    
+    validate_config()
+    
+    TRADE_UNIT = float(os.getenv("trade_unit"))
+    SLIPPAGE_TOLERANCE = float(os.getenv("slippage_tolerance"))
+    PCT_PROFIT = float(os.getenv("pct_profit"))
+    PCT_LOSS = float(os.getenv("pct_loss"))
+    CASH_PROFIT = float(os.getenv("cash_profit"))
+    CASH_LOSS = float(os.getenv("cash_loss"))
+    SPIKE_THRESHOLD = float(os.getenv("spike_threshold"))
+    SOLD_POSITION_TIME = float(os.getenv("sold_position_time"))
+    HOLDING_TIME_LIMIT = float(os.getenv("holding_time_limit"))
+    PRICE_HISTORY_SIZE = int(os.getenv("price_history_size"))
+    COOLDOWN_PERIOD = int(os.getenv("cooldown_period"))
+    KEEP_MIN_SHARES = int(os.getenv("keep_min_shares"))
+    MAX_CONCURRENT_TRADES = int(os.getenv("max_concurrent_trades"))
+    MIN_LIQUIDITY_REQUIREMENT = float(os.getenv("min_liquidity_requirement"))
+
+# validate_config() is called inside load_config
+# Web3 and API setup
 # Web3 and API setup
 WEB3_PROVIDER = "https://polygon-rpc.com"
-YOUR_PROXY_WALLET = Web3.to_checksum_address(os.getenv("YOUR_PROXY_WALLET"))
-BOT_TRADER_ADDRESS = Web3.to_checksum_address(os.getenv("BOT_TRADER_ADDRESS"))
-USDC_CONTRACT_ADDRESS = os.getenv("USDC_CONTRACT_ADDRESS")
-POLYMARKET_SETTLEMENT_CONTRACT = os.getenv("POLYMARKET_SETTLEMENT_CONTRACT")
-PRIVATE_KEY = os.getenv("PK")
+YOUR_PROXY_WALLET = None
+BOT_TRADER_ADDRESS = None
+USDC_CONTRACT_ADDRESS = None
+POLYMARKET_SETTLEMENT_CONTRACT = None
+PRIVATE_KEY = None
+web3 = None
 
-web3 = Web3(Web3.HTTPProvider(WEB3_PROVIDER))
+def load_web3_config():
+    global YOUR_PROXY_WALLET, BOT_TRADER_ADDRESS, USDC_CONTRACT_ADDRESS
+    global POLYMARKET_SETTLEMENT_CONTRACT, PRIVATE_KEY, web3
+    
+    YOUR_PROXY_WALLET = Web3.to_checksum_address(os.getenv("YOUR_PROXY_WALLET"))
+    BOT_TRADER_ADDRESS = Web3.to_checksum_address(os.getenv("BOT_TRADER_ADDRESS"))
+    USDC_CONTRACT_ADDRESS = os.getenv("USDC_CONTRACT_ADDRESS")
+    POLYMARKET_SETTLEMENT_CONTRACT = os.getenv("POLYMARKET_SETTLEMENT_CONTRACT")
+    PRIVATE_KEY = os.getenv("PK")
+    
+    web3 = Web3(Web3.HTTPProvider(WEB3_PROVIDER))
+
+# Call this only when running logic
+
 # Setup logging
 def setup_logging() -> logging.Logger:
     """Setup enhanced logging configuration with both file and console handlers"""
@@ -483,7 +526,14 @@ def initialize_clob_client(max_retries: int = 3) -> ClobClient:
             time.sleep(2 ** attempt)
     raise RuntimeError("Failed to initialize ClobClient after maximum retries")
 
-client = initialize_clob_client()
+# Initialize client as None
+client = None
+
+def get_client():
+    global client
+    if client is None:
+        client = initialize_clob_client()
+    return client
 
 # API functions with retry mechanism
 def fetch_positions_with_retry(max_retries: int = MAX_RETRIES) -> Dict[str, List[PositionInfo]]:
@@ -619,8 +669,8 @@ def ensure_usdc_allowance(required_amount: float) -> bool:
 def refresh_api_credentials() -> bool:
     """Refresh API credentials with proper error handling"""
     try:
-        api_creds = client.create_or_derive_api_creds()
-        client.set_api_creds(api_creds)
+        api_creds = get_client().create_or_derive_api_creds()
+        get_client().set_api_creds(api_creds)
         logger.info("✅ API credentials refreshed successfully")
         return True
     except Exception as e:
@@ -629,9 +679,9 @@ def refresh_api_credentials() -> bool:
 
 def get_min_ask_data(asset: str) -> Optional[Dict[str, Any]]:
     try:
-        order = client.get_order_book(asset)
+        order = get_client().get_order_book(asset)
         if order.asks:
-            buy_price = client.get_price(asset, "BUY")
+            buy_price = get_client().get_price(asset, "BUY")
             min_ask_price = order.asks[-1].price
             min_ask_size = order.asks[-1].size
             logger.info(f"min_ask_price: {min_ask_price}, min_ask_size: {min_ask_size}")
@@ -649,9 +699,9 @@ def get_min_ask_data(asset: str) -> Optional[Dict[str, Any]]:
 
 def get_max_bid_data(asset: str) -> Optional[Dict[str, Any]]:
     try:
-        order = client.get_order_book(asset)
+        order = get_client().get_order_book(asset)
         if order.bids:
-            sell_price = client.get_price(asset, "SELL")
+            sell_price = get_client().get_price(asset, "SELL")
             max_bid_price = order.bids[-1].price
             max_bid_size = order.bids[-1].size
             logger.info(f"max_bid_price: {max_bid_price}, max_bid_size: {max_bid_size}")
@@ -748,13 +798,14 @@ def place_buy_order(state: ThreadSafeState, asset: str, reason: str) -> bool:
                 if not ensure_usdc_allowance(amount_in_dollars):
                     raise TradingError(f"Failed to ensure USDC allowance for {asset}")
 
-                order_args = MarketOrderArgs(
+                order_args = OrderArgs(
                     token_id=str(asset),
-                    amount=float(amount_in_dollars),
+                    size=float(amount_in_dollars) / min_ask_price,
+                    price=min_ask_price,
                     side=BUY,
                 )
-                signed_order = client.create_market_order(order_args)
-                response = client.post_order(signed_order, OrderType.FOK)
+                signed_order = get_client().create_order(order_args)
+                response = get_client().post_order(signed_order, OrderType.FOK)
                 if response.get("success"):
                     filled = response.get("data", {}).get("filledAmount", amount_in_dollars)
                     logger.info(f"🛒 [{reason}] Order placed: BUY {filled:.4f} shares of {asset} at ${min_ask_price:.4f}")
@@ -841,8 +892,8 @@ def place_sell_order(state: ThreadSafeState, asset: str, reason: str) -> bool:
                     amount=float(sell_amount_in_shares),
                     side=SELL,
                 )
-                signed_order = client.create_market_order(order_args)
-                response = client.post_order(signed_order, OrderType.FOK)
+                signed_order = get_client().create_market_order(order_args)
+                response = get_client().post_order(signed_order, OrderType.FOK)
                 if response.get("success"):
                     filled = response.get("data", {}).get("filledAmount", sell_amount_in_shares)
                     logger.info(f"🛒 [{reason}] Order placed: SELL {filled:.4f} shares of {asset}")
@@ -1253,7 +1304,9 @@ def main() -> None:
     state = None
     thread_manager = None
     try:
-        state = ThreadSafeState()
+        load_config()
+        load_web3_config()
+        state = ThreadSafeState(max_price_history_size=PRICE_HISTORY_SIZE, keep_min_shares=KEEP_MIN_SHARES)
         thread_manager = ThreadManager(state)
         print_spikebot_banner()
         
