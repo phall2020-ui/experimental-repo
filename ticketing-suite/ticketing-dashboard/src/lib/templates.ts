@@ -1,6 +1,6 @@
 import axios from 'axios'
 
-const API = import.meta.env.VITE_API_BASE || 'http://localhost:3000'
+const API = '/api/notion'
 const client = axios.create({ baseURL: API })
 
 client.interceptors.request.use(cfg => {
