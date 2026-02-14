@@ -1,0 +1,32 @@
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+.pytest_cache/
+
+# Node
+node_modules/
+dist/
+build/
+
+# Xcode / Swift
+DerivedData/
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+*.xcuserstate
+
+# IDE
+.vscode/
+.idea/
+
+# Env / secrets
+.env
+.env.*
+*.pem
+*.key
