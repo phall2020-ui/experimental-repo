@@ -1,0 +1,541 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 70;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		0EB7F882831D879700F0DF47 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F2E2713118FB8A2B7C994E48 /* Assets.xcassets */; };
+		2D2A1A88EAEED3CEA960C9A1 /* IntelligenceSummarizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDA35FF5E36C1610B656F41B /* IntelligenceSummarizer.swift */; };
+		39236907BDC9E0C0C09C0213 /* VoiceToNotionApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D79CDAB2D23E85254DD266B /* VoiceToNotionApp.swift */; };
+		5B9387E2B7C3275A4100939F /* NotionClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B89A3137077B4F19825039C6 /* NotionClient.swift */; };
+		6F6C0C2E6886DFFCC24DE6CD /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B12CE290C88F5A77986DD8B /* SettingsView.swift */; };
+		717AB726A5B2A674FFCC1891 /* NetworkMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E00028D7843F1C1707A4FD5 /* NetworkMonitor.swift */; };
+		86AE6A16A3293FBB47633F6E /* ActionButtonHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDD429112DC3F3D23A31BD82 /* ActionButtonHandler.swift */; };
+		8D413C9C2EFB3A4600C96696 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8D413C9B2EFB3A4600C96696 /* WidgetKit.framework */; };
+		8D413C9E2EFB3A4600C96696 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8D413C9D2EFB3A4600C96696 /* SwiftUI.framework */; };
+		8D413CAD2EFB3A4700C96696 /* VoiceToNotionWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 8D413C992EFB3A4600C96696 /* VoiceToNotionWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		9A4C3D71819C37C88FEFDC91 /* AutoTagger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F274D44864E5859AC126485 /* AutoTagger.swift */; };
+		AA1234567890ABCD12345678 /* ActionExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB1234567890ABCD12345678 /* ActionExtractor.swift */; };
+		C3586AE7A3480D3211965B8A /* OfflineQueue.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A6124F7B7B414424BE0ACA1 /* OfflineQueue.swift */; };
+		EA5A98152AB5479A9B670804 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E7B719CF6159876A50548B8 /* ContentView.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		8D413CAB2EFB3A4700C96696 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = D3BCAC7FD0D3DBD93A7769ED /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 8D413C982EFB3A4600C96696;
+			remoteInfo = VoiceToNotionWidgetExtension;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		8D413CAE2EFB3A4700C96696 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				8D413CAD2EFB3A4700C96696 /* VoiceToNotionWidgetExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		0A6124F7B7B414424BE0ACA1 /* OfflineQueue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflineQueue.swift; sourceTree = "<group>"; };
+		2E7B719CF6159876A50548B8 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		35D001F070C88CEA67386C75 /* Preview Content */ = {isa = PBXFileReference; lastKnownFileType = folder; path = "Preview Content"; sourceTree = "<group>"; };
+		5D79CDAB2D23E85254DD266B /* VoiceToNotionApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceToNotionApp.swift; sourceTree = "<group>"; };
+		6E00028D7843F1C1707A4FD5 /* NetworkMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkMonitor.swift; sourceTree = "<group>"; };
+		6F274D44864E5859AC126485 /* AutoTagger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoTagger.swift; sourceTree = "<group>"; };
+		7B12CE290C88F5A77986DD8B /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		8B9E01014E113999BABB8E8B /* VoiceToNotion.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = VoiceToNotion.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		8D413C992EFB3A4600C96696 /* VoiceToNotionWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = VoiceToNotionWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		8D413C9B2EFB3A4600C96696 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		8D413C9D2EFB3A4600C96696 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
+		B89A3137077B4F19825039C6 /* NotionClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotionClient.swift; sourceTree = "<group>"; };
+		BDA35FF5E36C1610B656F41B /* IntelligenceSummarizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntelligenceSummarizer.swift; sourceTree = "<group>"; };
+		CDD429112DC3F3D23A31BD82 /* ActionButtonHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActionButtonHandler.swift; sourceTree = "<group>"; };
+		BB1234567890ABCD12345678 /* ActionExtractor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActionExtractor.swift; sourceTree = "<group>"; };
+		E4A403F4532C9BCB52072875 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		F2E2713118FB8A2B7C994E48 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		8D413CB12EFB3A4700C96696 /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 8D413C982EFB3A4600C96696 /* VoiceToNotionWidgetExtension */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		8D413C9F2EFB3A4600C96696 /* VoiceToNotionWidget */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (8D413CB12EFB3A4700C96696 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = VoiceToNotionWidget; sourceTree = "<group>"; };
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		8D413C962EFB3A4600C96696 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8D413C9E2EFB3A4600C96696 /* SwiftUI.framework in Frameworks */,
+				8D413C9C2EFB3A4600C96696 /* WidgetKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		9F190B1583453D0E2166A2D9 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		395C49DA716E6D4CCFA312C9 /* VoiceToNotion */ = {
+			isa = PBXGroup;
+			children = (
+				5D79CDAB2D23E85254DD266B /* VoiceToNotionApp.swift */,
+				2E7B719CF6159876A50548B8 /* ContentView.swift */,
+				B89A3137077B4F19825039C6 /* NotionClient.swift */,
+				6E00028D7843F1C1707A4FD5 /* NetworkMonitor.swift */,
+				0A6124F7B7B414424BE0ACA1 /* OfflineQueue.swift */,
+				6F274D44864E5859AC126485 /* AutoTagger.swift */,
+				BDA35FF5E36C1610B656F41B /* IntelligenceSummarizer.swift */,
+				CDD429112DC3F3D23A31BD82 /* ActionButtonHandler.swift */,
+				BB1234567890ABCD12345678 /* ActionExtractor.swift */,
+				7B12CE290C88F5A77986DD8B /* SettingsView.swift */,
+				E4A403F4532C9BCB52072875 /* Info.plist */,
+				F2E2713118FB8A2B7C994E48 /* Assets.xcassets */,
+				35D001F070C88CEA67386C75 /* Preview Content */,
+			);
+			path = VoiceToNotion;
+			sourceTree = "<group>";
+		};
+		863B45C2E0FC372FC8BDD777 = {
+			isa = PBXGroup;
+			children = (
+				395C49DA716E6D4CCFA312C9 /* VoiceToNotion */,
+				8D413C9F2EFB3A4600C96696 /* VoiceToNotionWidget */,
+				8D413C9A2EFB3A4600C96696 /* Frameworks */,
+				8B89802E679650030A30A83E /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		8B89802E679650030A30A83E /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				8B9E01014E113999BABB8E8B /* VoiceToNotion.app */,
+				8D413C992EFB3A4600C96696 /* VoiceToNotionWidgetExtension.appex */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		8D413C9A2EFB3A4600C96696 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				8D413C9B2EFB3A4600C96696 /* WidgetKit.framework */,
+				8D413C9D2EFB3A4600C96696 /* SwiftUI.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		8CFBE6CAA7E1E4AE5BF10E2D /* VoiceToNotion */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = CF5D038645A36285B1C42053 /* Build configuration list for PBXNativeTarget "VoiceToNotion" */;
+			buildPhases = (
+				9270C33643D056E1D5123F5D /* Sources */,
+				9F190B1583453D0E2166A2D9 /* Frameworks */,
+				0E8427DF35E1955D1772F376 /* Resources */,
+				8D413CAE2EFB3A4700C96696 /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				8D413CAC2EFB3A4700C96696 /* PBXTargetDependency */,
+			);
+			name = VoiceToNotion;
+			productName = VoiceToNotion;
+			productReference = 8B9E01014E113999BABB8E8B /* VoiceToNotion.app */;
+			productType = "com.apple.product-type.application";
+		};
+		8D413C982EFB3A4600C96696 /* VoiceToNotionWidgetExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 8D413CB22EFB3A4700C96696 /* Build configuration list for PBXNativeTarget "VoiceToNotionWidgetExtension" */;
+			buildPhases = (
+				8D413C952EFB3A4600C96696 /* Sources */,
+				8D413C962EFB3A4600C96696 /* Frameworks */,
+				8D413C972EFB3A4600C96696 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				8D413C9F2EFB3A4600C96696 /* VoiceToNotionWidget */,
+			);
+			name = VoiceToNotionWidgetExtension;
+			packageProductDependencies = (
+			);
+			productName = VoiceToNotionWidgetExtension;
+			productReference = 8D413C992EFB3A4600C96696 /* VoiceToNotionWidgetExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		D3BCAC7FD0D3DBD93A7769ED /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2620;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+					8CFBE6CAA7E1E4AE5BF10E2D = {
+						CreatedOnToolsVersion = 16.0;
+					};
+					8D413C982EFB3A4600C96696 = {
+						CreatedOnToolsVersion = 26.2;
+					};
+				};
+			};
+			buildConfigurationList = 2C3CACFADE0E0DFBEAFBCE4E /* Build configuration list for PBXProject "VoiceToNotion" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 863B45C2E0FC372FC8BDD777;
+			productRefGroup = 8B89802E679650030A30A83E /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				8CFBE6CAA7E1E4AE5BF10E2D /* VoiceToNotion */,
+				8D413C982EFB3A4600C96696 /* VoiceToNotionWidgetExtension */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		0E8427DF35E1955D1772F376 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0EB7F882831D879700F0DF47 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8D413C972EFB3A4600C96696 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		8D413C952EFB3A4600C96696 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		9270C33643D056E1D5123F5D /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				39236907BDC9E0C0C09C0213 /* VoiceToNotionApp.swift in Sources */,
+				EA5A98152AB5479A9B670804 /* ContentView.swift in Sources */,
+				5B9387E2B7C3275A4100939F /* NotionClient.swift in Sources */,
+				717AB726A5B2A674FFCC1891 /* NetworkMonitor.swift in Sources */,
+				C3586AE7A3480D3211965B8A /* OfflineQueue.swift in Sources */,
+				9A4C3D71819C37C88FEFDC91 /* AutoTagger.swift in Sources */,
+				2D2A1A88EAEED3CEA960C9A1 /* IntelligenceSummarizer.swift in Sources */,
+				86AE6A16A3293FBB47633F6E /* ActionButtonHandler.swift in Sources */,
+				AA1234567890ABCD12345678 /* ActionExtractor.swift in Sources */,
+				6F6C0C2E6886DFFCC24DE6CD /* SettingsView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		8D413CAC2EFB3A4700C96696 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 8D413C982EFB3A4600C96696 /* VoiceToNotionWidgetExtension */;
+			targetProxy = 8D413CAB2EFB3A4700C96696 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		752B58E17B4E24C842E4A850 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CODE_SIGN_STYLE = Automatic;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		8D413CAF2EFB3A4700C96696 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = GL3XK52ZPB;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = VoiceToNotionWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = VoiceToNotionWidget;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MARKETING_VERSION = 1.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.VoiceToNotion.VoiceToNotionWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		8D413CB02EFB3A4700C96696 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = GL3XK52ZPB;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = VoiceToNotionWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = VoiceToNotionWidget;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MARKETING_VERSION = 1.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.VoiceToNotion.VoiceToNotionWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		A3A55671652242A4123C90B6 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CODE_SIGN_STYLE = Automatic;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		D0229F6C9B4D158DD04F3519 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = GL3XK52ZPB;
+				INFOPLIST_FILE = VoiceToNotion/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.VoiceToNotion;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		F7FBF8EC8546A996B95C75A6 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = GL3XK52ZPB;
+				INFOPLIST_FILE = VoiceToNotion/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.VoiceToNotion;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		2C3CACFADE0E0DFBEAFBCE4E /* Build configuration list for PBXProject "VoiceToNotion" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A3A55671652242A4123C90B6 /* Debug */,
+				752B58E17B4E24C842E4A850 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		8D413CB22EFB3A4700C96696 /* Build configuration list for PBXNativeTarget "VoiceToNotionWidgetExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8D413CAF2EFB3A4700C96696 /* Debug */,
+				8D413CB02EFB3A4700C96696 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		CF5D038645A36285B1C42053 /* Build configuration list for PBXNativeTarget "VoiceToNotion" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D0229F6C9B4D158DD04F3519 /* Debug */,
+				F7FBF8EC8546A996B95C75A6 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = D3BCAC7FD0D3DBD93A7769ED /* Project object */;
+}
