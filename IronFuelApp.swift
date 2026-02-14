@@ -739,6 +739,254 @@ public struct HTTPFoodBackendClient: FoodBackendClient {
     }
 }
 
+// 3.4.1 OpenFoodFactsDirectClient - Direct API calls without backend server
+
+/// A client that directly calls the OpenFoodFacts API, eliminating the need for a local backend server.
+/// This enables barcode scanning to work on real iOS devices where localhost isn't accessible.
+public struct OpenFoodFactsDirectClient: FoodBackendClient {
+    private let session: URLSession
+    private let baseURL = "https://world.openfoodfacts.org/api/v2"
+    
+    public init(session: URLSession = .shared) {
+        self.session = session
+    }
+    
+    public func fetchByGTIN14(_ gtin14: String) async throws -> FoodProductDTO? {
+        // Try multiple barcode formats: original, stripped leading zeros, and padded
+        let lookupCodes = generateLookupCodes(from: gtin14)
+        
+        for code in lookupCodes {
+            if let product = try await fetchProduct(barcode: code, originalGTIN: gtin14) {
+                return product
+            }
+        }
+        
+        return nil
+    }
+    
+    private func generateLookupCodes(from gtin14: String) -> [String] {
+        var codes: [String] = []
+        
+        // Original code
+        codes.append(gtin14)
+        
+        // Stripped leading zeros (common EAN-13, UPC-A format)
+        let stripped = gtin14.drop(while: { $0 == "0" })
+        if !stripped.isEmpty && String(stripped) != gtin14 {
+            codes.append(String(stripped))
+        }
+        
+        // 13-digit EAN format (if we have GTIN-14)
+        if gtin14.count == 14 && gtin14.hasPrefix("0") {
+            codes.append(String(gtin14.dropFirst()))
+        }
+        
+        // 12-digit UPC format
+        if gtin14.count >= 12 {
+            let upc12 = String(gtin14.suffix(12))
+            if !codes.contains(upc12) {
+                codes.append(upc12)
+            }
+        }
+        
+        return codes
+    }
+    
+    private func fetchProduct(barcode: String, originalGTIN: String) async throws -> FoodProductDTO? {
+        guard let url = URL(string: "\(baseURL)/product/\(barcode)") else { return nil }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("IronFuel-iOS-App/1.0", forHTTPHeaderField: "User-Agent")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        
+        let (data, response) = try await session.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            return nil
+        }
+        
+        return parseOpenFoodFactsResponse(data: data, originalGTIN: originalGTIN)
+    }
+    
+    private func parseOpenFoodFactsResponse(data: Data, originalGTIN: String) -> FoodProductDTO? {
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let status = json["status"] as? Int, status == 1,
+              let product = json["product"] as? [String: Any] else {
+            return nil
+        }
+        
+        // Extract product name
+        let name = (product["product_name"] as? String)
+            ?? (product["product_name_en"] as? String)
+            ?? "Unknown Product"
+        
+        // Extract brand
+        let brand = product["brands"] as? String
+        
+        // Extract image URL
+        let imageURL = product["image_url"] as? String
+        
+        // Extract nutrients
+        let nutriments = product["nutriments"] as? [String: Any] ?? [:]
+        
+        let nutrients = FoodNutrients(
+            kcalPer100g: safeDouble(nutriments["energy-kcal_100g"]),
+            proteinPer100g: safeDouble(nutriments["proteins_100g"]),
+            carbsPer100g: safeDouble(nutriments["carbohydrates_100g"]),
+            fatPer100g: safeDouble(nutriments["fat_100g"]),
+            fibrePer100g: safeDouble(nutriments["fiber_100g"])
+        )
+        
+        // Extract serving size
+        var servingSizeG: Double? = nil
+        if let servingDesc = product["serving_size"] as? String {
+            // Try to extract numeric value from serving size string (e.g., "30g" -> 30)
+            let pattern = #"(\d+(?:\.\d+)?)\s*g"#
+            if let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive),
+               let match = regex.firstMatch(in: servingDesc, range: NSRange(servingDesc.startIndex..., in: servingDesc)),
+               let range = Range(match.range(at: 1), in: servingDesc) {
+                servingSizeG = Double(servingDesc[range])
+            }
+        }
+        
+        // Normalize to GTIN-14
+        let gtin14 = originalGTIN.count < 14 ? originalGTIN.leftPadding(toLength: 14, withPad: "0") : originalGTIN
+        
+        return FoodProductDTO(
+            gtin14: gtin14,
+            name: name,
+            brand: brand,
+            imageURL: imageURL,
+            servingSizeG: servingSizeG,
+            servingDescription: product["serving_size"] as? String,
+            nutrients: nutrients,
+            source: "OpenFoodFacts",
+            lastVerifiedAt: Date()
+        )
+    }
+    
+    private func safeDouble(_ value: Any?) -> Double? {
+        if let d = value as? Double { return d }
+        if let i = value as? Int { return Double(i) }
+        if let s = value as? String { return Double(s) }
+        return nil
+    }
+    
+    // MARK: - Search by Name
+    
+    /// Search for foods by name using OpenFoodFacts text search
+    public func searchFoods(query: String, limit: Int = 10) async throws -> [FoodProductDTO] {
+        guard !query.trimmingCharacters(in: .whitespaces).isEmpty else { return [] }
+        
+        var components = URLComponents(string: "\(baseURL)/search")!
+        components.queryItems = [
+            URLQueryItem(name: "search_terms", value: query),
+            URLQueryItem(name: "page_size", value: String(limit)),
+            URLQueryItem(name: "json", value: "true")
+        ]
+        
+        guard let url = components.url else { return [] }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("IronFuel-iOS-App/1.0", forHTTPHeaderField: "User-Agent")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        
+        let (data, response) = try await session.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            return []
+        }
+        
+        return parseSearchResults(data: data)
+    }
+    
+    private func parseSearchResults(data: Data) -> [FoodProductDTO] {
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let products = json["products"] as? [[String: Any]] else {
+            return []
+        }
+        
+        var results: [FoodProductDTO] = []
+        for product in products {
+            guard let barcode = product["code"] as? String, !barcode.isEmpty else { continue }
+            if let dto = parseProductDict(product, barcode: barcode) {
+                results.append(dto)
+            }
+        }
+        
+        return results
+    }
+    
+    /// Parse a product dictionary (shared by both single product and search results)
+    private func parseProductDict(_ product: [String: Any], barcode: String) -> FoodProductDTO? {
+        // Extract product name
+        let name = (product["product_name"] as? String)
+            ?? (product["product_name_en"] as? String)
+            ?? "Unknown Product"
+        
+        // Skip products with no name
+        if name == "Unknown Product" || name.isEmpty { return nil }
+        
+        // Extract brand
+        let brand = product["brands"] as? String
+        
+        // Extract image URL
+        let imageURL = product["image_url"] as? String
+        
+        // Extract nutrients
+        let nutriments = product["nutriments"] as? [String: Any] ?? [:]
+        
+        let nutrients = FoodNutrients(
+            kcalPer100g: safeDouble(nutriments["energy-kcal_100g"]),
+            proteinPer100g: safeDouble(nutriments["proteins_100g"]),
+            carbsPer100g: safeDouble(nutriments["carbohydrates_100g"]),
+            fatPer100g: safeDouble(nutriments["fat_100g"]),
+            fibrePer100g: safeDouble(nutriments["fiber_100g"])
+        )
+        
+        // Extract serving size
+        var servingSizeG: Double? = nil
+        if let servingDesc = product["serving_size"] as? String {
+            let pattern = #"(\d+(?:\.\d+)?)\s*g"#
+            if let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive),
+               let match = regex.firstMatch(in: servingDesc, range: NSRange(servingDesc.startIndex..., in: servingDesc)),
+               let range = Range(match.range(at: 1), in: servingDesc) {
+                servingSizeG = Double(servingDesc[range])
+            }
+        }
+        
+        // Normalize to GTIN-14
+        let gtin14 = barcode.count < 14 ? barcode.leftPadding(toLength: 14, withPad: "0") : barcode
+        
+        return FoodProductDTO(
+            gtin14: gtin14,
+            name: name,
+            brand: brand,
+            imageURL: imageURL,
+            servingSizeG: servingSizeG,
+            servingDescription: product["serving_size"] as? String,
+            nutrients: nutrients,
+            source: "OpenFoodFacts",
+            lastVerifiedAt: Date()
+        )
+    }
+}
+
+// String extension for left padding
+private extension String {
+    func leftPadding(toLength: Int, withPad character: Character) -> String {
+        let stringLength = self.count
+        if stringLength < toLength {
+            return String(repeating: character, count: toLength - stringLength) + self
+        }
+        return self
+    }
+}
+
 // 3.5 FoodLookupService.swift
 
 public enum FoodLookupSource: String, Sendable {
@@ -2740,9 +2988,6 @@ struct FoodScanSheet: View {
     
     @StateObject private var vm: FoodScanViewModel
     
-    // Set your backend base URL here
-    private let backendBaseURL = URL(string: "http://localhost:8000")!
-    
     init(selectedMealCategory: MealCategory, onLogged: @escaping () -> Void) {
         self.selectedMealCategory = selectedMealCategory
         self.onLogged = onLogged
@@ -2827,7 +3072,8 @@ struct FoodScanSheet: View {
             }
             .onAppear {
                 let cache = SwiftDataFoodCache(context: modelContext)
-                let backend = HTTPFoodBackendClient(baseURL: backendBaseURL)
+                // Use direct OpenFoodFacts API - works on real devices without localhost backend
+                let backend = OpenFoodFactsDirectClient()
                 let service = FoodLookupService(cache: cache, backend: backend)
                 _vm.wrappedValue = FoodScanViewModel(lookupService: service)
             }
@@ -3824,6 +4070,7 @@ struct QuickAddFoodSheet: View {
     
     @State private var showScanSheet = false
     @State private var showVoiceSheet = false
+    @State private var showSearchSheet = false
     
     var recentFoods: [FoodLog] {
         // Get unique food names from last 20 logs
@@ -3904,6 +4151,12 @@ struct QuickAddFoodSheet: View {
                 }
             }
         }
+        .sheet(isPresented: $showSearchSheet) {
+            FoodSearchSheet(mealCategory: mealCategory) { loggedFood in
+                // Food was logged successfully, dismiss this sheet too
+                dismiss()
+            }
+        }
     }
     
     private func logFood(name: String, cal: Int, p: Double, c: Double, f: Double, serving: Double) {
@@ -3950,13 +4203,21 @@ struct QuickAddFoodSheet: View {
     }
     
     private var quickActions: some View {
-        HStack(spacing: 16) {
+        HStack(spacing: 12) {
             QuickActionButton(
                 title: "Scan",
                 systemImage: "barcode.viewfinder",
                 gradient: LinearGradient(colors: [.ironWarning, .orange], startPoint: .topLeading, endPoint: .bottomTrailing)
             ) {
                 showScanSheet = true
+            }
+            
+            QuickActionButton(
+                title: "Search",
+                systemImage: "magnifyingglass",
+                gradient: LinearGradient(colors: [.blue, .purple], startPoint: .topLeading, endPoint: .bottomTrailing)
+            ) {
+                showSearchSheet = true
             }
             
             QuickActionButton(
@@ -4104,6 +4365,244 @@ struct QuickAddFoodSheet: View {
                 .cornerRadius(Layout.cornerRadius)
                 .shadow(color: .black.opacity(0.3), radius: 8, x: 0, y: 6)
             }
+        }
+    }
+}
+
+// MARK: - Food Search Sheet (Internet Search)
+
+struct FoodSearchSheet: View {
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
+    
+    let mealCategory: MealCategory
+    let onLogged: (FoodLog) -> Void
+    
+    @State private var searchText: String = ""
+    @State private var searchResults: [FoodProductDTO] = []
+    @State private var isSearching = false
+    @State private var hasSearched = false
+    @State private var searchTask: Task<Void, Never>?
+    
+    private let searchClient = OpenFoodFactsDirectClient()
+    
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                Color.ironBackground.ignoresSafeArea()
+                
+                VStack(spacing: 0) {
+                    // Search field
+                    HStack {
+                        Image(systemName: "magnifyingglass")
+                            .foregroundColor(.ironTextSecondary)
+                        TextField("Search foods...", text: $searchText)
+                            .textInputAutocapitalization(.never)
+                            .disableAutocorrection(true)
+                            .submitLabel(.search)
+                            .onSubmit {
+                                performSearch()
+                            }
+                        
+                        if !searchText.isEmpty {
+                            Button {
+                                searchText = ""
+                                searchResults = []
+                                hasSearched = false
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundColor(.ironTextSecondary)
+                            }
+                        }
+                    }
+                    .padding()
+                    .background(Color.white.opacity(0.08))
+                    .cornerRadius(12)
+                    .padding()
+                    
+                    if isSearching {
+                        Spacer()
+                        ProgressView("Searching OpenFoodFacts...")
+                            .foregroundColor(.ironTextSecondary)
+                        Spacer()
+                    } else if searchResults.isEmpty && hasSearched {
+                        Spacer()
+                        VStack(spacing: 12) {
+                            Image(systemName: "magnifyingglass")
+                                .font(.system(size: 48))
+                                .foregroundColor(.ironTextSecondary)
+                            Text("No results found")
+                                .font(.headline)
+                                .foregroundColor(.ironTextPrimary)
+                            Text("Try a different search term")
+                                .font(.subheadline)
+                                .foregroundColor(.ironTextSecondary)
+                        }
+                        Spacer()
+                    } else if searchResults.isEmpty {
+                        Spacer()
+                        VStack(spacing: 12) {
+                            Image(systemName: "fork.knife")
+                                .font(.system(size: 48))
+                                .foregroundColor(.ironTextSecondary)
+                            Text("Search for foods")
+                                .font(.headline)
+                                .foregroundColor(.ironTextPrimary)
+                            Text("Type a food name and press Search")
+                                .font(.subheadline)
+                                .foregroundColor(.ironTextSecondary)
+                        }
+                        Spacer()
+                    } else {
+                        ScrollView {
+                            LazyVStack(spacing: 12) {
+                                ForEach(searchResults, id: \.gtin14) { product in
+                                    SearchResultRow(product: product) {
+                                        logProduct(product)
+                                    }
+                                }
+                            }
+                            .padding()
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Search Foods")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Cancel") { dismiss() }
+                        .foregroundColor(.ironTextPrimary)
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Search") { performSearch() }
+                        .disabled(searchText.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+            }
+            .preferredColorScheme(.dark)
+        }
+    }
+    
+    private func performSearch() {
+        let query = searchText.trimmingCharacters(in: .whitespaces)
+        guard !query.isEmpty else { return }
+        
+        searchTask?.cancel()
+        isSearching = true
+        hasSearched = true
+        
+        searchTask = Task {
+            do {
+                let results = try await searchClient.searchFoods(query: query, limit: 20)
+                if !Task.isCancelled {
+                    await MainActor.run {
+                        searchResults = results
+                        isSearching = false
+                    }
+                }
+            } catch {
+                if !Task.isCancelled {
+                    await MainActor.run {
+                        searchResults = []
+                        isSearching = false
+                    }
+                }
+            }
+        }
+    }
+    
+    private func logProduct(_ product: FoodProductDTO) {
+        let servingG = product.servingSizeG ?? 100
+        let n = product.nutrients ?? FoodNutrients()
+        
+        let kcalPer100 = n.kcalPer100g ?? 0
+        let pPer100 = n.proteinPer100g ?? 0
+        let cPer100 = n.carbsPer100g ?? 0
+        let fPer100 = n.fatPer100g ?? 0
+        
+        let factor = servingG / 100.0
+        
+        let entry = FoodLog(
+            timestamp: Date(),
+            foodName: product.name,
+            servingSize: servingG,
+            calories: Int((kcalPer100 * factor).rounded()),
+            protein: pPer100 * factor,
+            carbs: cPer100 * factor,
+            fats: fPer100 * factor,
+            category: mealCategory
+        )
+        
+        modelContext.insert(entry)
+        try? modelContext.save()
+        
+        onLogged(entry)
+        dismiss()
+    }
+}
+
+private struct SearchResultRow: View {
+    let product: FoodProductDTO
+    let onTap: () -> Void
+    
+    var body: some View {
+        Button(action: onTap) {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(product.name)
+                            .font(.headline)
+                            .foregroundColor(.ironTextPrimary)
+                            .lineLimit(2)
+                        
+                        if let brand = product.brand {
+                            Text(brand)
+                                .font(.caption)
+                                .foregroundColor(.ironTextSecondary)
+                        }
+                    }
+                    
+                    Spacer()
+                    
+                    Image(systemName: "plus.circle.fill")
+                        .font(.title2)
+                        .foregroundColor(.ironWarning)
+                }
+                
+                if let nutrients = product.nutrients {
+                    HStack(spacing: 16) {
+                        NutrientBadge(label: "Cal", value: nutrients.kcalPer100g ?? 0, unit: "", isInt: true)
+                        NutrientBadge(label: "P", value: nutrients.proteinPer100g ?? 0, unit: "g")
+                        NutrientBadge(label: "C", value: nutrients.carbsPer100g ?? 0, unit: "g")
+                        NutrientBadge(label: "F", value: nutrients.fatPer100g ?? 0, unit: "g")
+                    }
+                    .font(.caption)
+                }
+                
+                Text("per 100g")
+                    .font(.caption2)
+                    .foregroundColor(.ironTextSecondary)
+            }
+            .padding()
+            .background(Color.ironCardBg)
+            .cornerRadius(12)
+        }
+    }
+}
+
+private struct NutrientBadge: View {
+    let label: String
+    let value: Double
+    let unit: String
+    var isInt: Bool = false
+    
+    var body: some View {
+        HStack(spacing: 2) {
+            Text(label)
+                .fontWeight(.bold)
+                .foregroundColor(.ironWarning)
+            Text(isInt ? "\(Int(value))\(unit)" : String(format: "%.1f%@", value, unit))
+                .foregroundColor(.ironTextSecondary)
         }
     }
 }

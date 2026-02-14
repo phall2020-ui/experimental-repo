@@ -4,9 +4,9 @@ import SwiftData
 struct FoodHistoryView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \FoodLog.timestamp, order: .reverse) private var allLogs: [FoodLog]
-    
+
     @State private var searchText = ""
-    
+
     var filteredLogs: [FoodLog] {
         if searchText.isEmpty {
             return allLogs
@@ -14,7 +14,7 @@ struct FoodHistoryView: View {
             return allLogs.filter { $0.foodName.localizedCaseInsensitiveContains(searchText) }
         }
     }
-    
+
     var body: some View {
         List {
             ForEach(filteredLogs) { log in
