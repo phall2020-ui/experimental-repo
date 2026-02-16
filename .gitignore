@@ -21,6 +21,12 @@ DerivedData/
 *.xcodeproj/xcuserdata/
 *.xcuserstate
 
+# FusionSolar Monitor logs
+logs/
+
+# Config contains credentials - do NOT commit
+config.json
+
 # IDE
 .vscode/
 .idea/
@@ -30,3 +36,9 @@ DerivedData/
 .env.*
 *.pem
 *.key
+
+# OS
+Thumbs.db
+
+# Unrelated files
+spyware_scanner.py

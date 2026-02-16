@@ -1,0 +1,31 @@
+{
+    "station_code": "NE=YOUR_STATION_CODE",
+    "station_name": "Your Solar Farm Name",
+    "domain": "eu5.fusionsolar.huawei.com",
+    "portal_base": "https://uni001eu5.fusionsolar.huawei.com/uniportal/pvmswebsite/assets/build/cloud.html",
+    "portal_params": "app-id=smartpvms&instance-id=smartpvms&zone-id=YOUR_ZONE_ID",
+    "credentials": {
+        "username": "YOUR_USERNAME",
+        "password": "YOUR_PASSWORD"
+    },
+    "location": {
+        "latitude": 51.5,
+        "longitude": -0.1,
+        "timezone": "Europe/London"
+    },
+    "schedule": {
+        "check_times": [
+            "08:00",
+            "10:30",
+            "13:00",
+            "15:30"
+        ],
+        "report_time": "22:00"
+    },
+    "logging": {
+        "log_dir": "logs",
+        "inverter_csv": "logs/inverter_checks.csv",
+        "generation_csv": "logs/daily_generation.csv",
+        "log_file": "logs/monitor.log"
+    }
+}
