@@ -18,6 +18,7 @@ import logging
 import os
 import re
 import sys
+import subprocess
 import time
 from datetime import datetime, date
 from pathlib import Path
@@ -648,6 +649,7 @@ Examples:
     parser.add_argument("--report", action="store_true", help="Run generation report")
     parser.add_argument("--test-login", action="store_true", help="Test login only")
     parser.add_argument("--dry-run", action="store_true", help="Don't write to CSV files")
+    parser.add_argument("--no-sync", action="store_true", help="Skip Notion sync")
 
     args = parser.parse_args()
 
@@ -667,6 +669,19 @@ Examples:
 
     if args.report:
         success = run_generation_report(cfg, dry_run=args.dry_run)
+        
+        # Trigger Notion sync if report was successful and not disabled
+        if success and not args.no_sync and not args.dry_run:
+            sync_script = SCRIPT_DIR / "notion_sync.py"
+            if sync_script.exists():
+                print(f"\\n[INFO] Triggering Notion sync...")
+                try:
+                    subprocess.run([sys.executable, str(sync_script), "--sync-today"], check=False)
+                except Exception as e:
+                    print(f"[WARN] Notion sync failed to start: {e}")
+            else:
+                print(f"[WARN] notion_sync.py not found at {sync_script}")
+
         sys.exit(0 if success else 1)
 
 
