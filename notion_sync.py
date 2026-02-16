@@ -86,18 +86,37 @@ def load_db_id():
 # Notion database operations
 # ---------------------------------------------------------------------------
 
-def find_or_create_notion_db():
-    """Find existing DB by name, or create a new one in the workspace."""
+def find_or_create_notion_db(target_parent_id=None):
+    """
+    Find existing database by name OR create a new one.
+    If target_parent_id is provided, only return a DB if it resides under that parent.
+    Otherwise create a new one under that parent.
+    """
     headers = get_notion_headers()
 
-    # Check cached ID first
+    # Check cache first
     cached_id = load_db_id()
     if cached_id:
-        # Verify it still exists
-        r = requests.get(f"https://api.notion.com/v1/databases/{cached_id}", headers=headers)
-        if r.status_code == 200:
-            log.info("Using cached Notion DB: %s", cached_id)
-            return cached_id
+        # Verify it still exists and check parent if needed
+        try:
+            r = requests.get(f"https://api.notion.com/v1/databases/{cached_id}", headers=headers)
+            if r.status_code == 200:
+                data = r.json()
+                # If target parent specified, verify parent matches
+                if target_parent_id:
+                    parent = data.get("parent", {})
+                    # Parent type can be 'page_id', 'workspace', etc.
+                    # We usually look for 'page_id' match
+                    if parent.get("type") == "page_id" and parent.get("page_id") == target_parent_id:
+                        log.info("Using cached Notion DB (parent matches): %s", cached_id)
+                        return cached_id
+                    else:
+                        log.warning("Cached DB %s is not under target parent %s. Ignoring cache.", cached_id, target_parent_id)
+                else:
+                    log.info("Using cached Notion DB: %s", cached_id)
+                    return cached_id
+        except Exception as e:
+            log.warning("Failed to verify cached DB: %s", e)
 
     # Search for existing database by name
     r = requests.post(
@@ -105,34 +124,48 @@ def find_or_create_notion_db():
         headers=headers,
         json={"query": DB_NAME, "filter": {"value": "database", "property": "object"}},
     )
+    
+    # Iterate through results to find one with matching parent (if specified)
     for db in r.json().get("results", []):
         title_arr = db.get("title", [])
         if title_arr and title_arr[0].get("plain_text") == DB_NAME:
             db_id = db["id"]
-            log.info("Found existing Notion DB: %s", db_id)
-            save_db_id(db_id)
-            return db_id
+            
+            if target_parent_id:
+                parent = db.get("parent", {})
+                if parent.get("type") == "page_id" and parent.get("page_id") == target_parent_id:
+                    log.info("Found existing Notion DB under target parent: %s", db_id)
+                    save_db_id(db_id)
+                    return db_id
+                else:
+                    log.info("Found DB '%s' (%s) but parent mismatch. Skipping.", DB_NAME, db_id)
+                    continue
+            else:
+                log.info("Found existing Notion DB: %s", db_id)
+                save_db_id(db_id)
+                return db_id
 
-    # Create new database — we need a parent page
-    # First find a page where we can create the DB
+    # Create new database
     log.info("Creating new Notion database: %s", DB_NAME)
-
-    # Search for any page the integration has access to
-    r = requests.post(
-        "https://api.notion.com/v1/search",
-        headers=headers,
-        json={"filter": {"value": "page", "property": "object"}, "page_size": 5},
-    )
-    pages = r.json().get("results", [])
-    # Find a top-level page (parent is workspace)
-    parent_page_id = None
-    for p in pages:
-        parent = p.get("parent", {})
-        if parent.get("type") == "workspace":
-            parent_page_id = p["id"]
-            break
-    if not parent_page_id and pages:
-        parent_page_id = pages[0]["id"]
+    
+    parent_page_id = target_parent_id
+    
+    if not parent_page_id:
+        # Search for any page the integration has access to
+        r = requests.post(
+            "https://api.notion.com/v1/search",
+            headers=headers,
+            json={"filter": {"value": "page", "property": "object"}, "page_size": 5},
+        )
+        pages = r.json().get("results", [])
+        # Find a top-level page (parent is workspace)
+        for p in pages:
+            parent = p.get("parent", {})
+            if parent.get("type") == "workspace":
+                parent_page_id = p["id"]
+                break
+        if not parent_page_id and pages:
+            parent_page_id = pages[0]["id"]
 
     if not parent_page_id:
         # Create as a top-level page first
@@ -541,7 +574,7 @@ def main():
         sys.exit(1)
 
     # Find or create the Notion database
-    db_id = find_or_create_notion_db()
+    db_id = find_or_create_notion_db(target_parent_id=cfg.get("notion_parent_page_id"))
     log.info("Notion DB ID: %s", db_id)
 
     if args.backfill:
