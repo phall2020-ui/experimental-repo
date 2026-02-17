@@ -20,6 +20,8 @@ on:
           - '--check'
           - '--report'
           - '--report --no-sync'
+          - '--backfill'
+          - '--backfill --start-date 2025-12-01'
 
 jobs:
   monitor:
@@ -96,9 +98,18 @@ jobs:
             echo "command=--check" >> $GITHUB_OUTPUT
           fi
 
-      - name: Run FusionSolar Monitor
+      - name: Run FusionSolar Task
         continue-on-error: true
-        run: python fusionsolar_monitor.py ${{ steps.task.outputs.command }}
+        shell: bash
+        run: |
+          CMD="${{ steps.task.outputs.command }}"
+          if [[ "$CMD" == *"--backfill"* ]]; then
+            echo "Running Backfill: python notion_sync.py $CMD"
+            python notion_sync.py $CMD
+          else
+            echo "Running Monitor: python fusionsolar_monitor.py $CMD"
+            python fusionsolar_monitor.py $CMD
+          fi
 
       - name: Upload logs
         if: always()
