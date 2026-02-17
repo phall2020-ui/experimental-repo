@@ -583,14 +583,20 @@ def scrape_historical_data(cfg, start_date, end_date):
     return all_data
 
 
-def sync_today_from_overview(cfg, db_id):
+def sync_today_from_report(cfg, db_id):
     """
-    Quick sync of today's data using the overview page (same as --report).
-    Faster than scraping the full report table.
+    Sync today's data using the Report page for the richest data:
+    separate PV yield, inverter yield, and irradiance.
+    Falls back to overview-based sync if the report page fails.
     """
     from playwright.sync_api import sync_playwright
 
-    log.info("Syncing today's generation to Notion...")
+    today = date.today()
+    today_str = today.isoformat()
+    station_name = cfg.get("station_name", "Point Lane Solar Farm")
+    capacity_kwp = cfg.get("installed_capacity_kwp")
+
+    log.info("Syncing today's generation to Notion (via Report page)...")
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
@@ -602,12 +608,63 @@ def sync_today_from_overview(cfg, db_id):
 
         try:
             sys.path.insert(0, str(SCRIPT_DIR))
-            from fusionsolar_monitor import login, navigate_to_page, extract_overview_data
+            from fusionsolar_monitor import login, navigate_to_page, extract_overview_data, extract_station_irradiance
 
             if not login(page, cfg):
                 log.error("Login failed -- cannot sync today")
                 return False
 
+            # --- Primary: Report page (richer data) ---
+            try:
+                navigate_to_page(page, cfg, "report")
+                time.sleep(3)
+
+                month_data = scrape_monthly_report(page, today.year, today.month, is_first_month=True)
+                today_row = None
+                for row in month_data:
+                    if row.get("date") == today_str:
+                        today_row = row
+                        break
+
+                if today_row:
+                    pv_kwh = today_row.get("pv_kwh", 0)
+                    inv_kwh = today_row.get("inv_kwh", 0)
+                    irradiance_kwh_m2 = today_row.get("irradiance_kwh_m2")
+                    if irradiance_kwh_m2 == 0:
+                        irradiance_kwh_m2 = None
+
+                    log.info("  Report page data -- PV: %.1f kWh, Inv: %.1f kWh, Irr: %s",
+                             pv_kwh, inv_kwh,
+                             f"{irradiance_kwh_m2:.3f} kWh/m²" if irradiance_kwh_m2 else "N/A")
+
+                    # Also get alarms from overview page
+                    alarms = {}
+                    try:
+                        navigate_to_page(page, cfg, "overview")
+                        overview_data = extract_overview_data(page)
+                        alarms = overview_data.get("alarms", {})
+                    except Exception as e:
+                        log.warning("  Could not fetch alarms from overview: %s", e)
+
+                    upsert_notion_row(
+                        db_id,
+                        today_str,
+                        pv_kwh=pv_kwh,
+                        inv_kwh=inv_kwh,
+                        station_name=station_name,
+                        alarms=alarms,
+                        irradiance_kwh_m2=irradiance_kwh_m2,
+                        capacity_kwp=capacity_kwp if capacity_kwp else None,
+                    )
+                    return True
+                else:
+                    log.warning("  Today's date (%s) not found in report data -- falling back to overview",
+                                today_str)
+            except Exception as e:
+                log.warning("  Report page scrape failed: %s -- falling back to overview", e)
+
+            # --- Fallback: Overview page + Plants list irradiance ---
+            log.info("  Using overview page fallback...")
             navigate_to_page(page, cfg, "overview")
             data = extract_overview_data(page)
 
@@ -615,7 +672,6 @@ def sync_today_from_overview(cfg, db_id):
             yield_unit = data.get("yield_today_unit", "kWh")
             alarms = data.get("alarms", {})
 
-            # Convert to kWh
             try:
                 kwh = float(yield_val.replace(",", ""))
                 if yield_unit.lower() == "mwh":
@@ -625,14 +681,17 @@ def sync_today_from_overview(cfg, db_id):
             except (ValueError, AttributeError):
                 kwh = 0
 
-            today_str = date.today().isoformat()
+            irradiance_kwh_m2 = extract_station_irradiance(page, cfg)
+
             upsert_notion_row(
                 db_id,
                 today_str,
                 pv_kwh=kwh,
-                inv_kwh=kwh,  # Overview doesn't split PV vs Inverter
-                station_name=cfg.get("station_name", "Point Lane Solar Farm"),
+                inv_kwh=kwh,
+                station_name=station_name,
                 alarms=alarms,
+                irradiance_kwh_m2=irradiance_kwh_m2,
+                capacity_kwp=capacity_kwp if capacity_kwp else None,
             )
             return True
 
@@ -725,9 +784,10 @@ def main():
         log.info("=" * 60)
         log.info("SYNC TODAY: %s", date.today())
         log.info("=" * 60)
-        sync_today_from_overview(cfg, db_id)
+        sync_today_from_report(cfg, db_id)
         log.info("Today sync complete")
 
 
 if __name__ == "__main__":
     main()
+

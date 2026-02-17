@@ -2,13 +2,16 @@ name: FusionSolar Monitoring
 
 on:
   schedule:
-    # Inverter checks (UK time = UTC in winter, UTC+1 in summer)
-    - cron: '0 8 * * *'     # Check 1 — 08:00 UTC
-    - cron: '30 10 * * *'   # Check 2 — 10:30 UTC
-    - cron: '0 13 * * *'    # Check 3 — 13:00 UTC
-    - cron: '30 15 * * *'   # Check 4 — 15:30 UTC
-    # Daily generation report + Notion sync
-    - cron: '0 22 * * *'    # Report  — 22:00 UTC
+    # Inverter checks during UK daylight hours
+    # Note: cron is in UTC. During BST (late Mar–late Oct) these run 1h later UK time.
+    # Winter (GMT):  08:00, 10:30, 13:00, 15:30 UK
+    # Summer (BST):  09:00, 11:30, 14:00, 16:30 UK  (still within daylight)
+    - cron: '0 8 * * *'     # Check 1
+    - cron: '30 10 * * *'   # Check 2
+    - cron: '0 13 * * *'    # Check 3
+    - cron: '30 15 * * *'   # Check 4
+    # Daily generation report + Notion sync (22:00 UTC = 22:00 GMT / 23:00 BST)
+    - cron: '0 22 * * *'    # Report
   workflow_dispatch:
     inputs:
       task:
@@ -20,8 +23,12 @@ on:
           - '--check'
           - '--report'
           - '--report --no-sync'
+          - '--test-login'
           - '--backfill'
           - '--backfill --start-date 2025-12-01'
+
+env:
+  NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
 
 jobs:
   monitor:
@@ -31,6 +38,17 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Validate secrets
+        run: |
+          missing=""
+          if [ -z "${{ secrets.FUSIONSOLAR_USERNAME }}" ]; then missing="$missing FUSIONSOLAR_USERNAME"; fi
+          if [ -z "${{ secrets.FUSIONSOLAR_PASSWORD }}" ]; then missing="$missing FUSIONSOLAR_PASSWORD"; fi
+          if [ -z "${{ secrets.NOTION_TOKEN }}" ]; then missing="$missing NOTION_TOKEN"; fi
+          if [ -n "$missing" ]; then
+            echo "::error::Missing required secrets:$missing"
+            exit 1
+          fi
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -97,18 +115,33 @@ jobs:
           else
             echo "command=--check" >> $GITHUB_OUTPUT
           fi
+          echo "Task: $(cat $GITHUB_OUTPUT)"
 
       - name: Run FusionSolar Task
-        continue-on-error: true
+        id: run_task
         shell: bash
         run: |
           CMD="${{ steps.task.outputs.command }}"
+          EXIT_CODE=0
           if [[ "$CMD" == *"--backfill"* ]]; then
-            echo "Running Backfill: python notion_sync.py $CMD"
-            python notion_sync.py $CMD
+            echo "::group::Running Backfill"
+            echo "Command: python notion_sync.py $CMD"
+            python notion_sync.py $CMD || EXIT_CODE=$?
+            echo "::endgroup::"
+          elif [[ "$CMD" == *"--test-login"* ]]; then
+            echo "::group::Testing Login"
+            python fusionsolar_monitor.py --test-login || EXIT_CODE=$?
+            echo "::endgroup::"
           else
-            echo "Running Monitor: python fusionsolar_monitor.py $CMD"
-            python fusionsolar_monitor.py $CMD
+            echo "::group::Running Monitor"
+            echo "Command: python fusionsolar_monitor.py $CMD"
+            python fusionsolar_monitor.py $CMD || EXIT_CODE=$?
+            echo "::endgroup::"
+          fi
+
+          echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
+          if [ $EXIT_CODE -ne 0 ]; then
+            echo "::warning::Task exited with code $EXIT_CODE"
           fi
 
       - name: Upload logs
@@ -118,3 +151,15 @@ jobs:
           name: fusionsolar-logs-${{ github.run_id }}
           path: logs/
           retention-days: 30
+
+      - name: Report status
+        if: always()
+        run: |
+          EXIT_CODE="${{ steps.run_task.outputs.exit_code }}"
+          CMD="${{ steps.task.outputs.command }}"
+          if [ "$EXIT_CODE" != "0" ] && [ -n "$EXIT_CODE" ]; then
+            echo "::error::FusionSolar task '$CMD' failed (exit code: $EXIT_CODE). Check logs artifact for details."
+            exit 1
+          else
+            echo "FusionSolar task '$CMD' completed successfully."
+          fi

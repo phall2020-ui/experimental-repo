@@ -342,6 +342,141 @@ def extract_overview_data(page):
     return data
 
 
+def extract_station_irradiance(page, cfg):
+    """
+    Extract today's Global Irradiation (kWh/m²) from the FusionSolar Plants list table.
+    The overview page does NOT show irradiance -- it only appears as a column
+    in the Plants list view (#/view/station).
+    Returns the irradiance value as a float, or None if not found.
+    """
+    station_name = cfg.get("station_name", "")
+    station_code = cfg.get("station_code", "")
+
+    # Navigate to the plants list page
+    base = cfg["portal_base"]
+    params = cfg["portal_params"]
+    plants_url = f"{base}?{params}#/view/station"
+    log.info("Navigating to Plants list for irradiance: %s", plants_url)
+    page.goto(plants_url, wait_until="networkidle", timeout=20000)
+    time.sleep(5)  # Allow full table render
+
+    try:
+        # Extract headers and rows from the plants table
+        table_data = page.evaluate("""
+            (() => {
+                // Get column headers
+                const headers = [];
+                const thead = document.querySelector('.nco-monitor-station-table thead') ||
+                              document.querySelector('.ant-table-thead') ||
+                              document.querySelector('table thead');
+                if (thead) {
+                    const ths = thead.querySelectorAll('th');
+                    for (const th of ths) {
+                        headers.push(th.textContent.trim().toLowerCase());
+                    }
+                }
+
+                // Get all rows
+                const rows = [];
+                const tbody = document.querySelector('.nco-monitor-station-table tbody') ||
+                              document.querySelector('.ant-table-tbody') ||
+                              document.querySelector('table tbody');
+                if (tbody) {
+                    const trs = Array.from(tbody.querySelectorAll('tr'))
+                        .filter(tr => !tr.classList.contains('ant-table-measure-row'));
+                    for (const tr of trs) {
+                        const cells = tr.querySelectorAll('td');
+                        const row = [];
+                        for (const cell of cells) {
+                            row.push(cell.textContent.trim());
+                        }
+                        // Also try to get the station link href for matching
+                        const link = tr.querySelector('a[href*="station"]');
+                        const href = link ? link.getAttribute('href') : '';
+                        rows.push({ cells: row, href: href });
+                    }
+                }
+                return { headers, rows };
+            })()
+        """)
+
+        headers = table_data.get("headers", [])
+        rows = table_data.get("rows", [])
+        log.info("  Plants list headers: %s", headers)
+        log.info("  Found %d plant rows", len(rows))
+
+        # Find the irradiance column index
+        irr_col_idx = None
+        irr_keywords = ['global irrad', 'irradiance', 'irradiation', 'ghi', 'poa',
+                        'solar radiation', 'total radiation']
+        for idx, hdr in enumerate(headers):
+            if any(kw in hdr for kw in irr_keywords):
+                irr_col_idx = idx
+                log.info("  Found irradiance column at index %d: '%s'", idx, hdr)
+                break
+
+        if irr_col_idx is None:
+            log.warning("  No irradiance column found in plants list headers")
+            return None
+
+        # Find the plant name column index
+        name_col_idx = None
+        for idx, hdr in enumerate(headers):
+            if 'plant name' in hdr or 'name' in hdr:
+                name_col_idx = idx
+                break
+
+        # Match our station by name or station code in href
+        for row in rows:
+            cells = row.get("cells", [])
+            href = row.get("href", "")
+
+            # Match by station code in link href
+            if station_code and station_code in href:
+                if irr_col_idx < len(cells):
+                    try:
+                        val = cells[irr_col_idx].replace(",", "")
+                        irradiance = float(val) if val else None
+                        log.info("  Matched station by code. Irradiance: %s kWh/m²", irradiance)
+                        return irradiance
+                    except (ValueError, TypeError):
+                        log.warning("  Could not parse irradiance value: '%s'", cells[irr_col_idx])
+                        return None
+
+            # Match by station name in cells
+            if name_col_idx is not None and name_col_idx < len(cells):
+                cell_name = cells[name_col_idx].lower()
+                if station_name.lower() in cell_name or cell_name in station_name.lower():
+                    if irr_col_idx < len(cells):
+                        try:
+                            val = cells[irr_col_idx].replace(",", "")
+                            irradiance = float(val) if val else None
+                            log.info("  Matched station by name. Irradiance: %s kWh/m²", irradiance)
+                            return irradiance
+                        except (ValueError, TypeError):
+                            log.warning("  Could not parse irradiance value: '%s'", cells[irr_col_idx])
+                            return None
+
+        # Fallback: if only one station, use that row
+        if len(rows) == 1:
+            cells = rows[0].get("cells", [])
+            if irr_col_idx < len(cells):
+                try:
+                    val = cells[irr_col_idx].replace(",", "")
+                    irradiance = float(val) if val else None
+                    log.info("  Single station fallback. Irradiance: %s kWh/m²", irradiance)
+                    return irradiance
+                except (ValueError, TypeError):
+                    pass
+
+        log.warning("  Could not match station '%s' in plants list", station_name)
+        return None
+
+    except Exception as e:
+        log.warning("  Failed to extract irradiance from plants list: %s", e)
+        return None
+
+
 def extract_inverter_report(page):
     """
     Extract per-inverter yield data from the Report page (Inverter tab).
@@ -586,6 +721,12 @@ def run_generation_report(cfg, dry_run=False):
             data = extract_overview_data(page)
             log.info("Overview data: %s", json.dumps(data, indent=2, default=str))
 
+            # Irradiance is NOT on the overview page -- fetch from Plants list
+            irradiance_kwh_m2 = extract_station_irradiance(page, cfg)
+            if irradiance_kwh_m2 is not None:
+                data["irradiance_value"] = str(irradiance_kwh_m2)
+                data["irradiance_unit"] = "kWh/m²"
+
             # Print summary
             yield_val = data.get("yield_today_value", "N/A")
             yield_unit = data.get("yield_today_unit", "")
@@ -593,12 +734,16 @@ def run_generation_report(cfg, dry_run=False):
             total_unit = data.get("total_yield_unit", "")
             alarms = data.get("alarms", {})
 
+            irr_val = data.get("irradiance_value", "N/A")
+            irr_unit = data.get("irradiance_unit", "")
+
             print("\n" + "=" * 50)
             print(f"  DAILY GENERATION REPORT -- {date.today().isoformat()}")
             print(f"  Station: {cfg['station_name']}")
             print("=" * 50)
             print(f"  Yield today:   {yield_val} {yield_unit}")
             print(f"  Total yield:   {total_val} {total_unit}")
+            print(f"  Irradiance:    {irr_val} {irr_unit}")
             if alarms:
                 alarm_str = ", ".join(f"{k}: {v}" for k, v in alarms.items() if v is not None)
                 print(f"  Alarms:        {alarm_str}")
@@ -699,13 +844,22 @@ Examples:
         if success and not args.no_sync and not args.dry_run:
             sync_script = SCRIPT_DIR / "notion_sync.py"
             if sync_script.exists():
-                print(f"\\n[INFO] Triggering Notion sync...")
+                print(f"\n[INFO] Triggering Notion sync...")
+                sync_cmd = [sys.executable, str(sync_script), "--sync-today"]
+                # Forward Notion token if available in config or environment
+                notion_token = cfg.get("notion_token") or os.environ.get("NOTION_TOKEN")
+                if notion_token:
+                    sync_cmd.extend(["--notion-token", notion_token])
                 try:
-                    subprocess.run([sys.executable, str(sync_script), "--sync-today"], check=False)
+                    result = subprocess.run(sync_cmd, check=False, timeout=120)
+                    if result.returncode != 0:
+                        log.warning("Notion sync exited with code %d", result.returncode)
+                except subprocess.TimeoutExpired:
+                    log.warning("Notion sync timed out after 120s")
                 except Exception as e:
-                    print(f"[WARN] Notion sync failed to start: {e}")
+                    log.warning("Notion sync failed: %s", e)
             else:
-                print(f"[WARN] notion_sync.py not found at {sync_script}")
+                log.warning("notion_sync.py not found at %s", sync_script)
 
         sys.exit(0 if success else 1)
 
