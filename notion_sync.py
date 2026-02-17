@@ -235,6 +235,43 @@ def query_notion_row(db_id, date_str):
     return results[0]["id"] if results else None
 
 
+def verify_and_update_db_schema(db_id):
+    """Ensure the Notion database has all required properties."""
+    headers = get_notion_headers()
+    try:
+        r = requests.get(f"https://api.notion.com/v1/databases/{db_id}", headers=headers)
+        if r.status_code != 200:
+            log.error("Failed to fetch DB schema: %s", r.text)
+            return
+
+        current_props = r.json().get("properties", {})
+        required_props = {
+            "Irradiance (kWh/m\u00b2)": {"number": {"format": "number"}},
+            "PR (%)": {"number": {"format": "number"}},
+            "Specific Yield (kWh/kWp)": {"number": {"format": "number"}},
+        }
+
+        missing_props = {}
+        for name, spec in required_props.items():
+            if name not in current_props:
+                missing_props[name] = spec
+
+        if missing_props:
+            log.info("Adding missing properties to Notion DB: %s", list(missing_props.keys()))
+            payload = {"properties": missing_props}
+            r = requests.patch(
+                f"https://api.notion.com/v1/databases/{db_id}",
+                headers=headers,
+                json=payload
+            )
+            if r.status_code == 200:
+                log.info("Successfully updated DB schema.")
+            else:
+                log.error("Failed to update DB schema: %s %s", r.status_code, r.text)
+    except Exception as e:
+        log.error("Error verifying DB schema: %s", e)
+
+
 def upsert_notion_row(db_id, date_str, pv_kwh, inv_kwh, station_name,
                       alarms=None, irradiance_kwh_m2=None, capacity_kwp=None):
     """Insert or update a row in the Notion database."""
@@ -645,6 +682,9 @@ def main():
     # Find or create the Notion database
     db_id = find_or_create_notion_db(target_parent_id=cfg.get("notion_parent_page_id"))
     log.info("Notion DB ID: %s", db_id)
+
+    # Verify schema and add missing columns
+    verify_and_update_db_schema(db_id)
 
     if args.backfill:
         start = date.fromisoformat(args.start_date)
