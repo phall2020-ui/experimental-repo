@@ -1,6 +1,7 @@
 {
     "station_code": "NE=YOUR_STATION_CODE",
     "station_name": "Your Solar Farm Name",
+    "installed_capacity_kwp": 0,
     "domain": "eu5.fusionsolar.huawei.com",
     "portal_base": "https://uni001eu5.fusionsolar.huawei.com/uniportal/pvmswebsite/assets/build/cloud.html",
     "portal_params": "app-id=smartpvms&instance-id=smartpvms&zone-id=YOUR_ZONE_ID",

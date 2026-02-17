@@ -23,6 +23,8 @@ import time
 from datetime import datetime, date
 from pathlib import Path
 
+from calculations import inverter_availability
+
 # ---------------------------------------------------------------------------
 # Setup paths relative to this script
 # ---------------------------------------------------------------------------
@@ -289,6 +291,9 @@ def extract_overview_data(page):
                 data["total_yield_unit"] = card["unit"]
             elif "revenue" in label:
                 data["revenue"] = card["value"]
+            elif any(kw in label for kw in ["irradiance", "irradiation", "solar radiation", "global"]):
+                data["irradiance_value"] = card["value"]
+                data["irradiance_unit"] = card["unit"]
     except Exception as e:
         log.warning("Method 1 (card selectors) failed: %s", e)
 
@@ -311,6 +316,14 @@ def extract_overview_data(page):
             if total_match:
                 data["total_yield_value"] = total_match.group(1)
                 data["total_yield_unit"] = total_match.group(2)
+            # Also try to find irradiance in overview text
+            irr_match = re.search(
+                r'([\d.,]+)\s*(kWh/m|W/m|MJ/m)[\s\S]{0,30}(?:irradiance|irradiation|solar\s*radiation)',
+                page_text, re.IGNORECASE
+            )
+            if irr_match and "irradiance_value" not in data:
+                data["irradiance_value"] = irr_match.group(1)
+                data["irradiance_unit"] = irr_match.group(2)
         except Exception as e:
             log.warning("Method 2 (text regex) failed: %s", e)
 
@@ -414,6 +427,8 @@ def log_generation(data, dry_run=False):
     total_val = data.get("total_yield_value", "N/A")
     total_unit = data.get("total_yield_unit", "")
     alarms = data.get("alarms", {})
+    irr_val = data.get("irradiance_value", "N/A")
+    irr_unit = data.get("irradiance_unit", "")
 
     if dry_run:
         log.info("[DRY RUN] Would write generation record: %s %s", yield_val, yield_unit)
@@ -425,17 +440,20 @@ def log_generation(data, dry_run=False):
             writer.writerow([
                 "timestamp", "date", "yield_today", "yield_unit",
                 "total_yield", "total_unit",
+                "irradiance", "irradiance_unit",
                 "alarms_critical", "alarms_major", "alarms_minor", "alarms_warning"
             ])
         writer.writerow([
             ts, today, yield_val, yield_unit,
             total_val, total_unit,
+            irr_val, irr_unit,
             alarms.get("critical", ""),
             alarms.get("major", ""),
             alarms.get("minor", ""),
             alarms.get("warning", ""),
         ])
-    log.info("Wrote generation record: %s %s (date: %s)", yield_val, yield_unit, today)
+    log.info("Wrote generation record: %s %s, irradiance: %s %s (date: %s)",
+             yield_val, yield_unit, irr_val, irr_unit, today)
 
 
 # ---------------------------------------------------------------------------
@@ -522,6 +540,13 @@ def run_inverter_check(cfg, dry_run=False):
                             ", ".join(d["name"] for d in offline))
             else:
                 log.info("[OK] All %d devices online", len(devices))
+
+            # Calculate and log availability
+            online_count = len(devices) - len(offline)
+            avail = inverter_availability(online_count, len(devices))
+            if avail is not None:
+                log.info("Inverter availability: %.1f%% (%d/%d online)",
+                         avail, online_count, len(devices))
 
             return len(offline) == 0
 

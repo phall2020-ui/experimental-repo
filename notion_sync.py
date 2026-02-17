@@ -24,6 +24,8 @@ import requests
 from datetime import datetime, date, timedelta
 from pathlib import Path
 
+from calculations import performance_ratio, specific_yield
+
 # ---------------------------------------------------------------------------
 # Setup
 # ---------------------------------------------------------------------------
@@ -196,6 +198,9 @@ def find_or_create_notion_db(target_parent_id=None):
             "PV Yield (MWh)": {"number": {"format": "number"}},
             "Inverter Yield (kWh)": {"number": {"format": "number"}},
             "Inverter Yield (MWh)": {"number": {"format": "number"}},
+            "Irradiance (kWh/m²)": {"number": {"format": "number"}},
+            "PR (%)": {"number": {"format": "number"}},
+            "Specific Yield (kWh/kWp)": {"number": {"format": "number"}},
             "Alarms Critical": {"number": {"format": "number"}},
             "Alarms Major": {"number": {"format": "number"}},
             "Alarms Minor": {"number": {"format": "number"}},
@@ -230,12 +235,17 @@ def query_notion_row(db_id, date_str):
     return results[0]["id"] if results else None
 
 
-def upsert_notion_row(db_id, date_str, pv_kwh, inv_kwh, station_name, alarms=None):
+def upsert_notion_row(db_id, date_str, pv_kwh, inv_kwh, station_name,
+                      alarms=None, irradiance_kwh_m2=None, capacity_kwp=None):
     """Insert or update a row in the Notion database."""
     headers = get_notion_headers()
 
     pv_mwh = round(pv_kwh / 1000.0, 3) if pv_kwh else 0
     inv_mwh = round(inv_kwh / 1000.0, 3) if inv_kwh else 0
+
+    # Calculate PR and specific yield if we have the data
+    pr = performance_ratio(pv_kwh, irradiance_kwh_m2, capacity_kwp) if irradiance_kwh_m2 and capacity_kwp else None
+    sy = specific_yield(pv_kwh, capacity_kwp) if capacity_kwp else None
 
     props = {
         "Date": {"title": [{"text": {"content": date_str}}]},
@@ -245,6 +255,12 @@ def upsert_notion_row(db_id, date_str, pv_kwh, inv_kwh, station_name, alarms=Non
         "Inverter Yield (MWh)": {"number": inv_mwh},
         "Station": {"rich_text": [{"text": {"content": station_name}}]},
     }
+    if irradiance_kwh_m2 is not None:
+        props["Irradiance (kWh/m\u00b2)"] = {"number": round(irradiance_kwh_m2, 3)}
+    if pr is not None:
+        props["PR (%)"] = {"number": pr}
+    if sy is not None:
+        props["Specific Yield (kWh/kWp)"] = {"number": sy}
     if alarms:
         props["Alarms Critical"] = {"number": alarms.get("critical", 0) or 0}
         props["Alarms Major"] = {"number": alarms.get("major", 0) or 0}
@@ -268,8 +284,10 @@ def upsert_notion_row(db_id, date_str, pv_kwh, inv_kwh, station_name, alarms=Non
                 )
 
             if r.status_code in (200, 201):
-                log.info("  Synced %s: PV=%.1f kWh (%.3f MWh), Inv=%.1f kWh",
-                         date_str, pv_kwh or 0, pv_mwh, inv_kwh or 0)
+                irr_str = f", Irr={irradiance_kwh_m2:.3f} kWh/m²" if irradiance_kwh_m2 else ""
+                pr_str = f", PR={pr:.1f}%" if pr else ""
+                log.info("  Synced %s: PV=%.1f kWh (%.3f MWh), Inv=%.1f kWh%s%s",
+                         date_str, pv_kwh or 0, pv_mwh, inv_kwh or 0, irr_str, pr_str)
                 return True
             elif r.status_code == 429:
                 wait = 2.0 * (attempt + 1)
@@ -348,7 +366,34 @@ def scrape_monthly_report(page, year, month, is_first_month=True):
             log.warning("  Could not click Search: %s", e)
     time.sleep(5)  # Wait for data to load
 
-    # Step 4: Extract table data
+    # Step 4: Extract column headers to identify irradiance columns
+    column_headers = page.evaluate("""
+        (() => {
+            const headers = [];
+            const thead = document.querySelector('.dpdesign-table-thead') ||
+                          document.querySelector('.nco-site-table thead') ||
+                          document.querySelector('table thead');
+            if (!thead) return headers;
+            const ths = thead.querySelectorAll('th');
+            for (const th of ths) {
+                headers.push(th.textContent.trim().toLowerCase());
+            }
+            return headers;
+        })()
+    """)
+    log.info("  Table headers: %s", column_headers)
+
+    # Identify irradiance column index (match common FusionSolar header labels)
+    irr_col_idx = None
+    irr_keywords = ['irradiance', 'irradiation', 'global', 'ghi', 'poa', 'solar radiation',
+                    'total radiation', 'horizontal irrad']
+    for idx, hdr in enumerate(column_headers):
+        if any(kw in hdr for kw in irr_keywords):
+            irr_col_idx = idx
+            log.info("  Found irradiance column at index %d: '%s'", idx, hdr)
+            break
+
+    # Step 5: Extract table data (all columns)
     all_rows = []
     max_pages = 10
     for pg in range(max_pages):
@@ -367,6 +412,13 @@ def scrape_monthly_report(page, year, month, is_first_month=True):
                     const cells = tr.querySelectorAll('td');
                     if (cells.length >= 3) {
                         const dateText = cells[0]?.textContent?.trim() || '';
+
+                        // Collect ALL cell values for dynamic column mapping
+                        const allValues = [];
+                        for (let i = 0; i < cells.length; i++) {
+                            allValues.push(cells[i]?.textContent?.trim() || '');
+                        }
+
                         const pvText = cells[1]?.textContent?.trim() || '';
                         const invText = cells[2]?.textContent?.trim() || '';
 
@@ -375,12 +427,12 @@ def scrape_monthly_report(page, year, month, is_first_month=True):
 
                         // Accept YYYY-MM-DD (daily "By month" view)
                         if (dateText && /^\\d{4}-\\d{2}-\\d{2}/.test(dateText)) {
-                            // Extract just the date portion (strip any time component)
                             const justDate = dateText.substring(0, 10);
                             results.push({
                                 date: justDate,
                                 pv_kwh: pvVal,
-                                inv_kwh: invVal
+                                inv_kwh: invVal,
+                                all_values: allValues
                             });
                         }
                     }
@@ -389,6 +441,21 @@ def scrape_monthly_report(page, year, month, is_first_month=True):
             })()
         """)
         log.info("  Page %d: found %d rows", pg + 1, len(rows))
+
+        # Map irradiance from dynamic column index
+        for row in rows:
+            all_vals = row.pop("all_values", [])
+            if irr_col_idx is not None and irr_col_idx < len(all_vals):
+                try:
+                    irr_text = all_vals[irr_col_idx].replace(",", "")
+                    row["irradiance_kwh_m2"] = float(irr_text) if irr_text else 0
+                except (ValueError, TypeError):
+                    row["irradiance_kwh_m2"] = 0
+            else:
+                row["irradiance_kwh_m2"] = 0
+            # Stash any extra columns for debugging
+            row["extra_columns"] = all_vals[3:] if len(all_vals) > 3 else []
+
         all_rows.extend(rows)
 
         # Check for next page
@@ -409,7 +476,9 @@ def scrape_monthly_report(page, year, month, is_first_month=True):
             break
         time.sleep(2)
 
-    log.info("  Scraped %d daily records for %s", len(all_rows), month_str)
+    log.info("  Scraped %d daily records for %s (irradiance col: %s)",
+             len(all_rows), month_str,
+             f"idx {irr_col_idx}" if irr_col_idx is not None else "not found")
     return all_rows
 
 
@@ -594,6 +663,7 @@ def main():
 
         # Sync to Notion
         station_name = cfg.get("station_name", "Point Lane Solar Farm")
+        capacity_kwp = cfg.get("installed_capacity_kwp", 0)
         success = 0
         for row in historical:
             ok = upsert_notion_row(
@@ -602,6 +672,8 @@ def main():
                 pv_kwh=row.get("pv_kwh", 0),
                 inv_kwh=row.get("inv_kwh", 0),
                 station_name=station_name,
+                irradiance_kwh_m2=row.get("irradiance_kwh_m2"),
+                capacity_kwp=capacity_kwp if capacity_kwp > 0 else None,
             )
             if ok:
                 success += 1
