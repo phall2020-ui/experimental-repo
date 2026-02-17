@@ -41,7 +41,6 @@ def create_task(task_name, time_str, args, description):
         "/sc", "daily",
         "/st", time_str,
         "/f",  # Force overwrite if exists
-        "/rl", "HIGHEST",
     ]
 
     print(f"  Creating task: {full_name}")

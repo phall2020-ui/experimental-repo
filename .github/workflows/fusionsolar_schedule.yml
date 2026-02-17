@@ -1,0 +1,107 @@
+name: FusionSolar Monitoring
+
+on:
+  schedule:
+    # Inverter checks (UK time = UTC in winter, UTC+1 in summer)
+    - cron: '0 8 * * *'     # Check 1 — 08:00 UTC
+    - cron: '30 10 * * *'   # Check 2 — 10:30 UTC
+    - cron: '0 13 * * *'    # Check 3 — 13:00 UTC
+    - cron: '30 15 * * *'   # Check 4 — 15:30 UTC
+    # Daily generation report + Notion sync
+    - cron: '0 22 * * *'    # Report  — 22:00 UTC
+  workflow_dispatch:
+    inputs:
+      task:
+        description: 'Task to run'
+        required: true
+        default: '--report'
+        type: choice
+        options:
+          - '--check'
+          - '--report'
+          - '--report --no-sync'
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          playwright install --with-deps chromium
+
+      - name: Generate config.json
+        run: |
+          cat > config.json << 'TEMPLATE'
+          {
+            "station_code": "NE=199487890",
+            "station_name": "Point Lane Solar Farm",
+            "domain": "eu5.fusionsolar.huawei.com",
+            "portal_base": "https://uni001eu5.fusionsolar.huawei.com/uniportal/pvmswebsite/assets/build/cloud.html",
+            "portal_params": "app-id=smartpvms&instance-id=smartpvms&zone-id=region-1-43b6d703-7da9-49f0-8b84-048ff489273f",
+            "credentials": {
+              "username": "PLACEHOLDER_USER",
+              "password": "PLACEHOLDER_PASS"
+            },
+            "notion_token": "PLACEHOLDER_TOKEN",
+            "notion_parent_page_id": "2d21773a-96c0-8092-9070-d2128500f9dc",
+            "location": {
+              "latitude": 51.5,
+              "longitude": -0.1,
+              "timezone": "Europe/London"
+            },
+            "schedule": {
+              "check_times": ["08:00", "10:30", "13:00", "15:30"],
+              "report_time": "22:00"
+            },
+            "logging": {
+              "log_dir": "logs",
+              "inverter_csv": "logs/inverter_checks.csv",
+              "generation_csv": "logs/daily_generation.csv",
+              "log_file": "logs/monitor.log"
+            }
+          }
+          TEMPLATE
+
+          # Inject secrets via jq
+          jq --arg u "${{ secrets.FUSIONSOLAR_USERNAME }}" \
+             --arg p "${{ secrets.FUSIONSOLAR_PASSWORD }}" \
+             --arg t "${{ secrets.NOTION_TOKEN }}" \
+             '.credentials.username = $u | .credentials.password = $p | .notion_token = $t' \
+             config.json > config.tmp && mv config.tmp config.json
+
+      - name: Create logs directory
+        run: mkdir -p logs
+
+      - name: Determine task
+        id: task
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "command=${{ github.event.inputs.task }}" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event.schedule }}" = "0 22 * * *" ]; then
+            echo "command=--report" >> $GITHUB_OUTPUT
+          else
+            echo "command=--check" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run FusionSolar Monitor
+        run: python fusionsolar_monitor.py ${{ steps.task.outputs.command }}
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fusionsolar-logs-${{ github.run_id }}
+          path: logs/
+          retention-days: 30
