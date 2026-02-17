@@ -950,5 +950,107 @@ Examples:
         sys.exit(0 if success else 1)
 
 
+
+def fetch_daily_energy_balance_api(page, cfg, target_date):
+    """
+    Fetch 5-minute interval power data (kW) from the 'energy-balance' API.
+    Returns the raw JSON response containing 'productPower' array (288 items).
+    """
+    station_dn = cfg.get("station_code")
+    if not station_dn or not station_dn.startswith("NE="):
+        log.warning("Station code '%s' does not look like a DN (NE=...). API call might fail.", station_dn)
+
+    # Convert date to start-of-day timestamp (millis) and string
+    # target_date is a datetime.date object
+    dt_start = datetime.combine(target_date, datetime.min.time())
+    query_time_ms = int(dt_start.timestamp() * 1000)
+    date_str_param = dt_start.strftime("%Y-%m-%d 00:00:00")
+
+    # API Parameters
+    # endpoint: /rest/pvms/web/station/v3/overview/energy-balance
+    base_url = cfg.get("domain", "eu5.fusionsolar.huawei.com")
+    if not base_url.startswith("http"):
+        base_url = f"https://{base_url}"
+    
+    api_url = f"{base_url}/rest/pvms/web/station/v3/overview/energy-balance"
+    
+    # Construct query string manually to ensure correct encoding
+    # params: stationDn, timeDim=2 (day), timeZone=1.0 (approx), queryTime, dateStr
+    # We use a fixed timeZone=1.0 as observed in demo, but it might vary.
+    # The portal seems to rely on the server's handling of the station's timezone.
+    query_string = f"?stationDn={station_dn}&timeDim=2&timeZone=1.0&queryTime={query_time_ms}&dateStr={date_str_param}"
+    full_url = api_url + query_string
+
+    log.info("Fetching hourly data from API: %s...", api_url)
+    
+    try:
+        # Use page.evaluate to fetch in the context of the logged-in browser
+        # This automatically handles cookies and session headers
+        data = page.evaluate("""
+            async (url) => {
+                const response = await fetch(url);
+                if (!response.ok) {
+                    throw new Error("API call failed with status " + response.status);
+                }
+                return await response.json();
+            }
+        """, full_url)
+        
+        if data and "data" in data and "productPower" in data["data"]:
+            points = data["data"]["productPower"]
+            log.info("  Successfully fetched %d data points (5-min intervals)", len(points))
+            return points
+        else:
+            log.warning("  API response invalid or missing 'productPower': %s", str(data)[:100])
+            return None
+
+    except Exception as e:
+        log.warning("  Failed to fetch daily energy balance: %s", e)
+        return None
+
+
+def calculate_hourly_yield_from_power(power_array):
+    """
+    Convert 288 5-minute power samples (kW) into 24 hourly yield values (kWh).
+    Logic: Average Power (kW) * 1 Hour = Energy (kWh).
+    Since we have 12 samples per hour, the Average Power = Sum(samples) / 12.
+    """
+    if not power_array or len(power_array) != 288:
+        log.warning("Expected 288 power points, got %d. Cannot calculate hourly yield.", 
+                    len(power_array) if power_array else 0)
+        return {}
+
+    hourly_yield = {}
+    for hour in range(24):
+        start_idx = hour * 12
+        end_idx = start_idx + 12
+        samples = power_array[start_idx:end_idx]
+        
+        valid_samples = []
+        for s in samples:
+            try:
+                # API returns strings like "1.2", or null/empty
+                if s is not None and s != "" and s != "null":
+                    valid_samples.append(float(s))
+                else:
+                    valid_samples.append(0.0)
+            except ValueError:
+                valid_samples.append(0.0)
+        
+        if not valid_samples:
+            avg_kw = 0.0
+        else:
+            avg_kw = sum(valid_samples) / 12.0
+        
+        # Energy (kWh) = Avg Power (kW) * 1h
+        energy_kwh = avg_kw * 1.0
+        
+        # Store as "HH:00": value
+        hour_key = f"{hour:02d}:00"
+        hourly_yield[hour_key] = round(energy_kwh, 3)
+
+    return hourly_yield
+
+
 if __name__ == "__main__":
     main()
