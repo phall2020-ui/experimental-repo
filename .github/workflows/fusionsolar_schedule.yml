@@ -96,6 +96,7 @@ jobs:
           fi
 
       - name: Run FusionSolar Monitor
+        continue-on-error: true
         run: python fusionsolar_monitor.py ${{ steps.task.outputs.command }}
 
       - name: Upload logs
