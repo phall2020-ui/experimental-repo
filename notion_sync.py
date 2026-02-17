@@ -25,6 +25,16 @@ from datetime import datetime, date, timedelta
 from pathlib import Path
 
 from calculations import performance_ratio, specific_yield
+from fusionsolar_monitor import (
+    load_config,
+    login,
+    navigate_to_page,
+    scrape_monthly_report,
+    extract_station_irradiance,
+    extract_overview_data,
+    fetch_daily_energy_balance_api,
+    calculate_hourly_yield_from_power,
+)
 
 # ---------------------------------------------------------------------------
 # Setup
@@ -249,6 +259,7 @@ def verify_and_update_db_schema(db_id):
             "Irradiance (kWh/m\u00b2)": {"number": {"format": "number"}},
             "PR (%)": {"number": {"format": "number"}},
             "Specific Yield (kWh/kWp)": {"number": {"format": "number"}},
+            "Hourly Yield (kWh)": {"rich_text": {}},
         }
 
         missing_props = {}
@@ -272,8 +283,84 @@ def verify_and_update_db_schema(db_id):
         log.error("Error verifying DB schema: %s", e)
 
 
+    return None
+
+
+def append_hourly_table(page_id, hourly_yield):
+    """
+    Append a table block to the Notion page with the hourly yield data.
+    """
+    if not hourly_yield:
+        return
+
+    headers = get_notion_headers()
+    
+    # Create table rows: Header + Data
+    table_rows = []
+    
+    # Header row
+    table_rows.append({
+        "type": "table_row",
+        "table_row": {
+            "cells": [
+                [{"type": "text", "text": {"content": "Hour"}}],
+                [{"type": "text", "text": {"content": "Yield (kWh)"}}]
+            ]
+        }
+    })
+
+    # Data rows
+    sorted_hours = sorted(hourly_yield.keys())
+    for hour in sorted_hours:
+        val = hourly_yield[hour]
+        table_rows.append({
+            "type": "table_row",
+            "table_row": {
+                "cells": [
+                    [{"type": "text", "text": {"content": hour}}],
+                    [{"type": "text", "text": {"content": f"{val:.3f}"}}]
+                ]
+            }
+        })
+
+    # Construct the table block wrapped in a toggle
+    block_data = {
+        "children": [
+            {
+                "object": "block",
+                "type": "toggle", # Update: Append toggle block
+                "toggle": {
+                    "rich_text": [{"type": "text", "text": {"content": "Hourly Yield Breakdown"}}],
+                    "children": [
+                        {
+                            "object": "block",
+                            "type": "table",
+                            "table": {
+                                "table_width": 2,
+                                "has_column_header": True,
+                                "has_row_header": False,
+                                "children": table_rows
+                            }
+                        }
+                    ]
+                }
+            }
+        ]
+    }
+
+    try:
+        url = f"https://api.notion.com/v1/blocks/{page_id}/children"
+        r = requests.patch(url, headers=headers, json=block_data)
+        if r.status_code == 200:
+            log.info("  Appended hourly table to page %s", page_id)
+        else:
+            log.warning("  Failed to append table: %s", r.text)
+    except Exception as e:
+        log.warning("  Exception appending table: %s", e)
+
+
 def upsert_notion_row(db_id, date_str, pv_kwh, inv_kwh, station_name,
-                      alarms=None, irradiance_kwh_m2=None, capacity_kwp=None):
+                      alarms=None, irradiance_kwh_m2=None, capacity_kwp=None, hourly_yield_json=None):
     """Insert or update a row in the Notion database."""
     headers = get_notion_headers()
 
@@ -292,6 +379,9 @@ def upsert_notion_row(db_id, date_str, pv_kwh, inv_kwh, station_name,
         "Inverter Yield (MWh)": {"number": inv_mwh},
         "Station": {"rich_text": [{"text": {"content": station_name}}]},
     }
+    if hourly_yield_json:
+        props["Hourly Yield (kWh)"] = {"rich_text": [{"text": {"content": hourly_yield_json}}]}
+
     if irradiance_kwh_m2 is not None:
         props["Irradiance (kWh/m\u00b2)"] = {"number": round(irradiance_kwh_m2, 3)}
     if pr is not None:
@@ -325,7 +415,7 @@ def upsert_notion_row(db_id, date_str, pv_kwh, inv_kwh, station_name,
                 pr_str = f", PR={pr:.1f}%" if pr else ""
                 log.info("  Synced %s: PV=%.1f kWh (%.3f MWh), Inv=%.1f kWh%s%s",
                          date_str, pv_kwh or 0, pv_mwh, inv_kwh or 0, irr_str, pr_str)
-                return True
+                return r.json()["id"]
             elif r.status_code == 429:
                 wait = 2.0 * (attempt + 1)
                 log.warning("  Rate limited, waiting %.0fs...", wait)
@@ -607,13 +697,18 @@ def sync_today_from_report(cfg, db_id):
         page = context.new_page()
 
         try:
-            sys.path.insert(0, str(SCRIPT_DIR))
-            from fusionsolar_monitor import login, navigate_to_page, extract_overview_data, extract_station_irradiance
+            # Note: Global imports are used now
 
             if not login(page, cfg):
                 log.error("Login failed -- cannot sync today")
                 return False
 
+            # --- Fetch Hourly Data (API) ---
+            log.info("  Fetching hourly data via API...")
+            power_data = fetch_daily_energy_balance_api(page, cfg, today)
+            hourly_yield = calculate_hourly_yield_from_power(power_data)
+            hourly_yield_json = json.dumps(hourly_yield, sort_keys=True) if hourly_yield else None
+            
             # --- Primary: Report page (richer data) ---
             try:
                 navigate_to_page(page, cfg, "report")
@@ -646,7 +741,7 @@ def sync_today_from_report(cfg, db_id):
                     except Exception as e:
                         log.warning("  Could not fetch alarms from overview: %s", e)
 
-                    upsert_notion_row(
+                    page_id = upsert_notion_row(
                         db_id,
                         today_str,
                         pv_kwh=pv_kwh,
@@ -655,7 +750,12 @@ def sync_today_from_report(cfg, db_id):
                         alarms=alarms,
                         irradiance_kwh_m2=irradiance_kwh_m2,
                         capacity_kwp=capacity_kwp if capacity_kwp else None,
+                        hourly_yield_json=hourly_yield_json,
                     )
+                    
+                    if page_id and hourly_yield:
+                        append_hourly_table(page_id, hourly_yield)
+                        
                     return True
                 else:
                     log.warning("  Today's date (%s) not found in report data -- falling back to overview",
@@ -683,7 +783,7 @@ def sync_today_from_report(cfg, db_id):
 
             irradiance_kwh_m2 = extract_station_irradiance(page, cfg)
 
-            upsert_notion_row(
+            page_id = upsert_notion_row(
                 db_id,
                 today_str,
                 pv_kwh=kwh,
@@ -692,7 +792,12 @@ def sync_today_from_report(cfg, db_id):
                 alarms=alarms,
                 irradiance_kwh_m2=irradiance_kwh_m2,
                 capacity_kwp=capacity_kwp if capacity_kwp else None,
+                hourly_yield_json=hourly_yield_json,
             )
+            
+            if page_id and hourly_yield:
+                append_hourly_table(page_id, hourly_yield)
+            
             return True
 
         except Exception as e:
