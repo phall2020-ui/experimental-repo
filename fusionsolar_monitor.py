@@ -951,6 +951,7 @@ Examples:
 
 
 
+
 def fetch_daily_energy_balance_api(page, cfg, target_date):
     """
     Fetch 5-minute interval power data (kW) from the 'energy-balance' API.
@@ -967,25 +968,18 @@ def fetch_daily_energy_balance_api(page, cfg, target_date):
     date_str_param = dt_start.strftime("%Y-%m-%d 00:00:00")
 
     # API Parameters
-    # endpoint: /rest/pvms/web/station/v3/overview/energy-balance
-    base_url = cfg.get("domain", "eu5.fusionsolar.huawei.com")
-    if not base_url.startswith("http"):
-        base_url = f"https://{base_url}"
+    # Use relative path to avoid CORS/domain mismatch (e.g. uni001eu5 vs eu5)
+    api_path = "/rest/pvms/web/station/v3/overview/energy-balance"
     
-    api_url = f"{base_url}/rest/pvms/web/station/v3/overview/energy-balance"
-    
-    # Construct query string manually to ensure correct encoding
+    # Construct query string
     # params: stationDn, timeDim=2 (day), timeZone=1.0 (approx), queryTime, dateStr
-    # We use a fixed timeZone=1.0 as observed in demo, but it might vary.
-    # The portal seems to rely on the server's handling of the station's timezone.
     query_string = f"?stationDn={station_dn}&timeDim=2&timeZone=1.0&queryTime={query_time_ms}&dateStr={date_str_param}"
-    full_url = api_url + query_string
+    full_url = api_path + query_string
 
-    log.info("Fetching hourly data from API: %s...", api_url)
+    log.info("Fetching hourly data via API (relative): %s...", full_url)
     
     try:
         # Use page.evaluate to fetch in the context of the logged-in browser
-        # This automatically handles cookies and session headers
         data = page.evaluate("""
             async (url) => {
                 const response = await fetch(url);
