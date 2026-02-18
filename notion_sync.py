@@ -815,6 +815,91 @@ def sync_today_from_report(cfg, db_id):
             browser.close()
 
 
+def backfill_range(cfg, db_id, start_date, end_date):
+    """
+    Backfill data for a range of dates, including hourly yield.
+    Optimized to scrape monthly report once per month.
+    """
+    from playwright.sync_api import sync_playwright
+
+    log.info("Starting backfill from %s to %s", start_date, end_date)
+    
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        context = browser.new_context(
+            viewport={"width": 1920, "height": 1080},
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        )
+        page = context.new_page()
+
+        try:
+            if not login(page, cfg):
+                log.error("Login failed -- aborting backfill")
+                return
+
+            current_date = start_date
+            month_cache = {} # (year, month) -> list of rows
+            
+            station_name = cfg.get("station_name", "Point Lane Solar Farm")
+            capacity_kwp = cfg.get("installed_capacity_kwp", 0)
+
+            while current_date <= end_date:
+                log.info("Processing %s...", current_date)
+                
+                # 1. Get Daily Totals (PV, Inv, Irr) from Report
+                # We cache the monthly report to avoid navigating back and forth
+                ym = (current_date.year, current_date.month)
+                if ym not in month_cache:
+                    log.info("  Scraping monthly report for %s-%s...", ym[0], ym[1])
+                    navigate_to_page(page, cfg, "report")
+                    time.sleep(2)
+                    data = scrape_monthly_report(page, ym[0], ym[1])
+                    month_cache[ym] = data
+                
+                day_str = current_date.strftime("%Y-%m-%d")
+                daily_record = next((r for r in month_cache.get(ym, []) if r["date"] == day_str), None)
+                
+                if daily_record:
+                    pv_kwh = daily_record.get("pv_kwh", 0)
+                    inv_kwh = daily_record.get("inv_kwh", 0)
+                    irradiance_kwh_m2 = daily_record.get("irradiance_kwh_m2")
+                else:
+                    log.warning("  No report data for %s (might be future or missing)", day_str)
+                    pv_kwh = 0
+                    inv_kwh = 0
+                    irradiance_kwh_m2 = None
+
+                # 2. Get Hourly Data via API
+                power_data = fetch_daily_energy_balance_api(page, cfg, current_date)
+                hourly_yield = calculate_hourly_yield_from_power(power_data)
+                hourly_json = json.dumps(hourly_yield, sort_keys=True) if hourly_yield else None
+                
+                # 3. Upsert to Notion
+                page_id = upsert_notion_row(
+                    db_id,
+                    day_str,
+                    pv_kwh=pv_kwh,
+                    inv_kwh=inv_kwh,
+                    station_name=station_name,
+                    alarms={}, # No historical alarms scraping implemented
+                    irradiance_kwh_m2=irradiance_kwh_m2,
+                    capacity_kwp=capacity_kwp if capacity_kwp else None,
+                    hourly_yield_json=hourly_json
+                )
+
+                # 4. Append Hourly Table
+                if page_id and hourly_yield:
+                    append_hourly_table(page_id, hourly_yield)
+
+                current_date += timedelta(days=1)
+                time.sleep(1) # Gentle pace
+
+        except Exception as e:
+            log.exception("Backfill failed: %s", e)
+        finally:
+            browser.close()
+
+
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
@@ -858,6 +943,7 @@ def main():
     # Verify schema and add missing columns
     verify_and_update_db_schema(db_id)
 
+
     if args.backfill:
         start = date.fromisoformat(args.start_date)
         end = date.fromisoformat(args.end_date) if args.end_date else date.today()
@@ -866,32 +952,8 @@ def main():
         log.info("BACKFILL: %s to %s", start, end)
         log.info("=" * 60)
 
-        # Scrape historical data from FusionSolar
-        historical = scrape_historical_data(cfg, start, end)
-
-        if not historical:
-            log.warning("No historical data scraped!")
-            return
-
-        # Sync to Notion
-        station_name = cfg.get("station_name", "Point Lane Solar Farm")
-        capacity_kwp = cfg.get("installed_capacity_kwp", 0)
-        success = 0
-        for row in historical:
-            ok = upsert_notion_row(
-                db_id,
-                row["date"],
-                pv_kwh=row.get("pv_kwh", 0),
-                inv_kwh=row.get("inv_kwh", 0),
-                station_name=station_name,
-                irradiance_kwh_m2=row.get("irradiance_kwh_m2"),
-                capacity_kwp=capacity_kwp if capacity_kwp > 0 else None,
-            )
-            if ok:
-                success += 1
-            time.sleep(0.35)  # Respect Notion rate limits
-
-        log.info("Backfill complete: %d/%d rows synced", success, len(historical))
+        backfill_range(cfg, db_id, start, end)
+        log.info("Backfill complete")
 
     if args.sync_today:
         log.info("=" * 60)
