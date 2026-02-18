@@ -410,12 +410,20 @@ def upsert_notion_row(db_id, date_str, pv_kwh, inv_kwh, station_name,
                     json={"parent": {"database_id": db_id}, "properties": props},
                 )
 
+
             if r.status_code in (200, 201):
+                res_json = r.json()
+                page_id = res_json["id"]
+                page_url = f"https://notion.so/{page_id.replace('-', '')}"
+                
                 irr_str = f", Irr={irradiance_kwh_m2:.3f} kWh/m²" if irradiance_kwh_m2 else ""
                 pr_str = f", PR={pr:.1f}%" if pr else ""
+                
                 log.info("  Synced %s: PV=%.1f kWh (%.3f MWh), Inv=%.1f kWh%s%s",
                          date_str, pv_kwh or 0, pv_mwh, inv_kwh or 0, irr_str, pr_str)
-                return r.json()["id"]
+                log.info("  Page URL: %s", page_url)
+                
+                return page_id
             elif r.status_code == 429:
                 wait = 2.0 * (attempt + 1)
                 log.warning("  Rate limited, waiting %.0fs...", wait)
