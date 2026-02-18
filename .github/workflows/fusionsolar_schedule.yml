@@ -77,6 +77,12 @@ jobs:
             },
             "notion_token": "PLACEHOLDER_TOKEN",
             "notion_parent_page_id": "2d21773a-96c0-8092-9070-d2128500f9dc",
+            "stark": {
+              "username": "PLACEHOLDER_STARK_USER",
+              "password": "PLACEHOLDER_STARK_PASS",
+              "site_name": "Point Lane",
+              "search_text": "2100042103940"
+            },
             "location": {
               "latitude": 51.5,
               "longitude": -0.1,
@@ -99,7 +105,17 @@ jobs:
           jq --arg u "${{ secrets.FUSIONSOLAR_USERNAME }}" \
              --arg p "${{ secrets.FUSIONSOLAR_PASSWORD }}" \
              --arg t "${{ secrets.NOTION_TOKEN }}" \
-             '.credentials.username = $u | .credentials.password = $p | .notion_token = $t' \
+             --arg su "${{ secrets.STARK_USERNAME }}" \
+             --arg sp "${{ secrets.STARK_PASSWORD }}" \
+             --arg ss "${{ secrets.STARK_SITE_NAME }}" \
+             --arg sx "${{ secrets.STARK_SEARCH_TEXT }}" \
+             '.credentials.username = $u
+              | .credentials.password = $p
+              | .notion_token = $t
+              | .stark.username = ($su // "")
+              | .stark.password = ($sp // "")
+              | .stark.site_name = (if ($ss // "") == "" then "Point Lane" else $ss end)
+              | .stark.search_text = (if ($sx // "") == "" then "2100042103940" else $sx end)' \
              config.json > config.tmp && mv config.tmp config.json
 
       - name: Create logs directory

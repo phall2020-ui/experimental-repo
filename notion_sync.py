@@ -14,10 +14,13 @@ Usage:
 """
 
 import argparse
+import csv
+import importlib.util
 import json
 import logging
 import os
 import re
+import subprocess
 import sys
 import time
 import requests
@@ -42,7 +45,13 @@ from fusionsolar_monitor import (
 SCRIPT_DIR = Path(__file__).resolve().parent
 CONFIG_PATH = SCRIPT_DIR / "config.json"
 LOGS_DIR = SCRIPT_DIR / "logs"
+ELEXON_DIR = SCRIPT_DIR / "Elexon_Data"
+ELEXON_DAILY_DIR = ELEXON_DIR / "bmrs_data"
+ELEXON_FETCH_SCRIPT = ELEXON_DIR / "fetch_elexon_data.py"
+STARK_SCRAPER_SCRIPT = SCRIPT_DIR / "stark_scraper.py"
+STARK_DATA_DIR = SCRIPT_DIR / "stark_data"
 LOGS_DIR.mkdir(exist_ok=True)
+STARK_DATA_DIR.mkdir(exist_ok=True)
 
 # Safe stream handler for Windows cp1252 consoles
 class SafeStreamHandler(logging.StreamHandler):
@@ -70,7 +79,9 @@ log = logging.getLogger("notion_sync")
 # ---------------------------------------------------------------------------
 NOTION_TOKEN = None
 NOTION_DB_ID_FILE = SCRIPT_DIR / ".notion_db_id"
+NOTION_HH_DB_ID_FILE = SCRIPT_DIR / ".notion_hh_db_id"
 DB_NAME = "FusionSolar Daily Generation"
+HH_DB_NAME = "FusionSolar HH Site Data"
 
 def load_config():
     with open(CONFIG_PATH, "r") as f:
@@ -92,6 +103,17 @@ def load_db_id():
     """Load cached Notion DB ID."""
     if NOTION_DB_ID_FILE.exists():
         return NOTION_DB_ID_FILE.read_text().strip()
+    return None
+
+
+def save_hh_db_id(db_id):
+    with open(NOTION_HH_DB_ID_FILE, "w") as f:
+        f.write(db_id)
+
+
+def load_hh_db_id():
+    if NOTION_HH_DB_ID_FILE.exists():
+        return NOTION_HH_DB_ID_FILE.read_text().strip()
     return None
 
 # ---------------------------------------------------------------------------
@@ -228,6 +250,81 @@ def find_or_create_notion_db(target_parent_id=None):
     return db_id
 
 
+def find_or_create_hh_notion_db(target_parent_id, daily_db_id):
+    """
+    Find or create HH database linked to the main daily database.
+    """
+    headers = get_notion_headers()
+
+    cached_id = load_hh_db_id()
+    if cached_id:
+        try:
+            r = requests.get(f"https://api.notion.com/v1/databases/{cached_id}", headers=headers)
+            if r.status_code == 200:
+                log.info("Using cached HH Notion DB: %s", cached_id)
+                return cached_id
+        except Exception as e:
+            log.warning("Failed to verify cached HH DB: %s", e)
+
+    r = requests.post(
+        "https://api.notion.com/v1/search",
+        headers=headers,
+        json={"query": HH_DB_NAME, "filter": {"value": "database", "property": "object"}},
+    )
+    for db in r.json().get("results", []):
+        title_arr = db.get("title", [])
+        if title_arr and title_arr[0].get("plain_text") == HH_DB_NAME:
+            db_id = db["id"]
+            parent = db.get("parent", {})
+            if not target_parent_id or (parent.get("type") == "page_id" and parent.get("page_id") == target_parent_id):
+                save_hh_db_id(db_id)
+                log.info("Found existing HH Notion DB: %s", db_id)
+                return db_id
+
+    if not target_parent_id:
+        log.error("No notion_parent_page_id configured; cannot create linked HH DB")
+        return None
+
+    payload = {
+        "parent": {"type": "page_id", "page_id": target_parent_id},
+        "title": [{"type": "text", "text": {"content": HH_DB_NAME}}],
+        "properties": {
+            "HH Key": {"title": {}},
+            "Date": {"rich_text": {}},
+            "Settlement Period": {"number": {"format": "number"}},
+            "Interval End": {"rich_text": {}},
+            "Consumption (kWh)": {"number": {"format": "number"}},
+            "Site": {"rich_text": {}},
+            "Daily Record": {"relation": {"database_id": daily_db_id, "single_property": {}}},
+        },
+    }
+    r = requests.post("https://api.notion.com/v1/databases", headers=headers, json=payload)
+    if r.status_code != 200:
+        log.error("Error creating HH DB: %s %s", r.status_code, r.text)
+        return None
+
+    db_id = r.json()["id"]
+    save_hh_db_id(db_id)
+    log.info("Created HH Notion DB: %s", db_id)
+    return db_id
+
+
+def query_hh_row(hh_db_id, hh_key):
+    headers = get_notion_headers()
+    r = requests.post(
+        f"https://api.notion.com/v1/databases/{hh_db_id}/query",
+        headers=headers,
+        json={
+            "filter": {
+                "property": "HH Key",
+                "title": {"equals": hh_key},
+            }
+        },
+    )
+    results = r.json().get("results", [])
+    return results[0]["id"] if results else None
+
+
 def query_notion_row(db_id, date_str):
     """Check if a row already exists for a given date."""
     headers = get_notion_headers()
@@ -260,6 +357,8 @@ def verify_and_update_db_schema(db_id):
             "PR (%)": {"number": {"format": "number"}},
             "Specific Yield (kWh/kWp)": {"number": {"format": "number"}},
             "Hourly Yield (kWh)": {"rich_text": {}},
+            "Hourly SSP (\u00a3/MWh)": {"rich_text": {}},
+            "Daily Revenue (\u00a3)": {"number": {"format": "pound"}},
         }
 
         missing_props = {}
@@ -286,7 +385,76 @@ def verify_and_update_db_schema(db_id):
     return None
 
 
-def append_hourly_table(page_id, hourly_yield):
+def verify_and_update_hh_db_schema(hh_db_id, daily_db_id):
+    headers = get_notion_headers()
+    try:
+        r = requests.get(f"https://api.notion.com/v1/databases/{hh_db_id}", headers=headers)
+        if r.status_code != 200:
+            log.error("Failed to fetch HH DB schema: %s", r.text)
+            return
+        current_props = r.json().get("properties", {})
+        required_props = {
+            "Date": {"rich_text": {}},
+            "Settlement Period": {"number": {"format": "number"}},
+            "Interval End": {"rich_text": {}},
+            "Consumption (kWh)": {"number": {"format": "number"}},
+            "SSP (£/MWh)": {"number": {"format": "pound"}},
+            "Site": {"rich_text": {}},
+            "Daily Record": {"relation": {"database_id": daily_db_id, "single_property": {}}},
+        }
+        missing = {k: v for k, v in required_props.items() if k not in current_props}
+        if missing:
+            log.info("Adding missing properties to HH DB: %s", list(missing.keys()))
+            r = requests.patch(
+                f"https://api.notion.com/v1/databases/{hh_db_id}",
+                headers=headers,
+                json={"properties": missing},
+            )
+            if r.status_code == 200:
+                log.info("Successfully updated HH DB schema.")
+            else:
+                log.error("Failed updating HH DB schema: %s %s", r.status_code, r.text)
+    except Exception as e:
+        log.error("Error verifying HH DB schema: %s", e)
+
+
+def upsert_hh_notion_row(hh_db_id, hh_key, date_str, settlement_period, interval_end, consumption_kwh,
+                         site_name, daily_page_id=None, ssp_gbp_mwh=None):
+    headers = get_notion_headers()
+    props = {
+        "HH Key": {"title": [{"text": {"content": hh_key}}]},
+        "Date": {"rich_text": [{"text": {"content": date_str}}]},
+        "Settlement Period": {"number": settlement_period},
+        "Interval End": {"rich_text": [{"text": {"content": interval_end}}]},
+        "Consumption (kWh)": {"number": round(consumption_kwh, 5)},
+        "Site": {"rich_text": [{"text": {"content": site_name}}]},
+    }
+    if ssp_gbp_mwh is not None:
+        props["SSP (£/MWh)"] = {"number": round(ssp_gbp_mwh, 4)}
+    if daily_page_id:
+        props["Daily Record"] = {"relation": [{"id": daily_page_id}]}
+
+    try:
+        page_id = query_hh_row(hh_db_id, hh_key)
+        if page_id:
+            r = requests.patch(
+                f"https://api.notion.com/v1/pages/{page_id}",
+                headers=headers,
+                json={"properties": props},
+            )
+        else:
+            r = requests.post(
+                "https://api.notion.com/v1/pages",
+                headers=headers,
+                json={"parent": {"database_id": hh_db_id}, "properties": props},
+            )
+        return r.status_code in (200, 201)
+    except Exception as e:
+        log.warning("  Failed upserting HH row %s: %s", hh_key, e)
+        return False
+
+
+def append_hourly_table(page_id, hourly_yield, hourly_ssp=None):
     """
     Append a table block to the Notion page with the hourly yield data.
     """
@@ -298,13 +466,16 @@ def append_hourly_table(page_id, hourly_yield):
     # Create table rows: Header + Data
     table_rows = []
     
+    hourly_ssp = hourly_ssp or {}
+
     # Header row
     table_rows.append({
         "type": "table_row",
         "table_row": {
             "cells": [
                 [{"type": "text", "text": {"content": "Hour"}}],
-                [{"type": "text", "text": {"content": "Yield (kWh)"}}]
+                [{"type": "text", "text": {"content": "Yield (kWh)"}}],
+                [{"type": "text", "text": {"content": "SSP (\u00a3/MWh)"}}],
             ]
         }
     })
@@ -318,7 +489,8 @@ def append_hourly_table(page_id, hourly_yield):
             "table_row": {
                 "cells": [
                     [{"type": "text", "text": {"content": hour}}],
-                    [{"type": "text", "text": {"content": f"{val:.3f}"}}]
+                    [{"type": "text", "text": {"content": f"{val:.3f}"}}],
+                    [{"type": "text", "text": {"content": f"{hourly_ssp[hour]:.3f}" if hour in hourly_ssp else ""}}],
                 ]
             }
         })
@@ -336,7 +508,7 @@ def append_hourly_table(page_id, hourly_yield):
                             "object": "block",
                             "type": "table",
                             "table": {
-                                "table_width": 2,
+                                "table_width": 3,
                                 "has_column_header": True,
                                 "has_row_header": False,
                                 "children": table_rows
@@ -360,7 +532,8 @@ def append_hourly_table(page_id, hourly_yield):
 
 
 def upsert_notion_row(db_id, date_str, pv_kwh, inv_kwh, station_name,
-                      alarms=None, irradiance_kwh_m2=None, capacity_kwp=None, hourly_yield_json=None):
+                      alarms=None, irradiance_kwh_m2=None, capacity_kwp=None,
+                      hourly_yield_json=None, hourly_ssp_json=None, daily_revenue_gbp=None):
     """Insert or update a row in the Notion database."""
     headers = get_notion_headers()
 
@@ -381,6 +554,10 @@ def upsert_notion_row(db_id, date_str, pv_kwh, inv_kwh, station_name,
     }
     if hourly_yield_json:
         props["Hourly Yield (kWh)"] = {"rich_text": [{"text": {"content": hourly_yield_json}}]}
+    if hourly_ssp_json:
+        props["Hourly SSP (\u00a3/MWh)"] = {"rich_text": [{"text": {"content": hourly_ssp_json}}]}
+    if daily_revenue_gbp is not None:
+        props["Daily Revenue (\u00a3)"] = {"number": round(daily_revenue_gbp, 2)}
 
     if irradiance_kwh_m2 is not None:
         props["Irradiance (kWh/m\u00b2)"] = {"number": round(irradiance_kwh_m2, 3)}
@@ -435,6 +612,270 @@ def upsert_notion_row(db_id, date_str, pv_kwh, inv_kwh, station_name,
             log.error("  Exception syncing %s: %s", date_str, e)
             time.sleep(1)
     return False
+
+
+def _load_elexon_fetch_module():
+    if not ELEXON_FETCH_SCRIPT.exists():
+        return None
+    spec = importlib.util.spec_from_file_location("elexon_fetch", str(ELEXON_FETCH_SCRIPT))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def ensure_daily_ssp_csv(target_date):
+    """
+    Ensure Elexon SSP CSV exists for target_date by reusing Elexon_Data/fetch_elexon_data.py.
+    Returns the CSV path if available.
+    """
+    date_str = target_date.strftime("%Y-%m-%d")
+    csv_path = ELEXON_DAILY_DIR / f"system_prices_{date_str}.csv"
+    if csv_path.exists():
+        return csv_path
+
+    module = _load_elexon_fetch_module()
+    if not module or not hasattr(module, "fetch_data"):
+        log.warning("Elexon fetch script unavailable; SSP for %s will be skipped", date_str)
+        return None
+
+    ELEXON_DAILY_DIR.mkdir(parents=True, exist_ok=True)
+    old_cwd = os.getcwd()
+    try:
+        os.chdir(ELEXON_DIR)
+        module.fetch_data(target_date, target_date)
+    except Exception as e:
+        log.warning("Failed fetching Elexon SSP for %s: %s", date_str, e)
+    finally:
+        os.chdir(old_cwd)
+
+    return csv_path if csv_path.exists() else None
+
+
+def load_hourly_ssp(target_date):
+    """
+    Convert Elexon settlement-period SSP (48 half-hours) into 24 hourly SSP values.
+    Returns dict like {'00:00': 75.2, ...} where available.
+    """
+    csv_path = ensure_daily_ssp_csv(target_date)
+    if not csv_path:
+        return {}
+
+    by_hour = {}
+    with open(csv_path, "r", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            sp_raw = row.get("SettlementPeriod")
+            ssp_raw = row.get("SystemSellPrice")
+            if not sp_raw or ssp_raw in (None, ""):
+                continue
+            try:
+                sp = int(sp_raw)
+                ssp = float(ssp_raw)
+            except (ValueError, TypeError):
+                continue
+            hour = (sp - 1) // 2
+            if hour < 0 or hour > 23:
+                continue
+            by_hour.setdefault(hour, []).append(ssp)
+
+    hourly = {}
+    for hour, values in by_hour.items():
+        if not values:
+            continue
+        hour_key = f"{hour:02d}:00"
+        hourly[hour_key] = round(sum(values) / len(values), 3)
+    return hourly
+
+
+def load_settlement_period_ssp(target_date):
+    """
+    Return SSP by settlement period for a date: {1: 75.65, ..., 48: 80.12}
+    """
+    csv_path = ensure_daily_ssp_csv(target_date)
+    if not csv_path:
+        return {}
+    result = {}
+    with open(csv_path, "r", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            sp_raw = row.get("SettlementPeriod")
+            ssp_raw = row.get("SystemSellPrice")
+            if not sp_raw or ssp_raw in (None, ""):
+                continue
+            try:
+                sp = int(sp_raw)
+                ssp = float(ssp_raw)
+            except (ValueError, TypeError):
+                continue
+            if 1 <= sp <= 48:
+                result[sp] = ssp
+    return result
+
+
+def _load_stark_module():
+    if not STARK_SCRAPER_SCRIPT.exists():
+        return None
+    spec = importlib.util.spec_from_file_location("stark_scraper_module", str(STARK_SCRAPER_SCRIPT))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def ensure_stark_hh_csv(cfg, target_date, allow_scrape=True):
+    """
+    Ensure Stark HH CSV exists for target_date.
+    Returns Path or None.
+    """
+    date_str = target_date.strftime("%Y-%m-%d")
+    csv_path = STARK_DATA_DIR / f"stark_hh_data_{date_str}.csv"
+    legacy_path = SCRIPT_DIR / f"stark_hh_data_{date_str}.csv"
+    if csv_path.exists():
+        return csv_path
+    if legacy_path.exists():
+        return legacy_path
+    if not allow_scrape:
+        return None
+
+    if not STARK_SCRAPER_SCRIPT.exists():
+        log.warning("Stark scraper script unavailable; HH data for %s skipped", date_str)
+        return None
+
+    stark_cfg = cfg.get("stark", {}) if isinstance(cfg.get("stark"), dict) else {}
+    username = stark_cfg.get("username") or os.environ.get("STARK_USERNAME")
+    password = stark_cfg.get("password") or os.environ.get("STARK_PASSWORD")
+    site_name = stark_cfg.get("site_name") or os.environ.get("STARK_SITE_NAME") or "Point Lane"
+    search_text = (
+        stark_cfg.get("search_text")
+        or os.environ.get("STARK_SEARCH_TEXT")
+        or os.environ.get("STARK_EXPORT_MPAN")
+        or "2100042103940"
+    )
+
+    cmd = [sys.executable, str(STARK_SCRAPER_SCRIPT), "--date", date_str, "--output-dir", str(STARK_DATA_DIR)]
+    if username:
+        cmd.extend(["--username", username])
+    if password:
+        cmd.extend(["--password", password])
+    if site_name:
+        cmd.extend(["--site-name", site_name])
+    if search_text:
+        cmd.extend(["--search-text", str(search_text)])
+
+    try:
+        proc = subprocess.run(cmd, check=False, capture_output=True, text=True, timeout=180)
+        if proc.returncode != 0:
+            out = (proc.stdout or "") + "\n" + (proc.stderr or "")
+            log.warning("Failed scraping Stark HH for %s (exit %s): %s", date_str, proc.returncode, out[:400])
+    except Exception as e:
+        log.warning("Failed scraping Stark HH for %s: %s", date_str, e)
+
+    if csv_path.exists():
+        return csv_path
+    return None
+
+
+def parse_stark_hh_csv(csv_path):
+    """
+    Parse Stark CSV rows into 48 settlement periods.
+    Returns list of dicts: {settlement_period, interval_end, consumption_kwh}
+    """
+    rows = []
+    with open(csv_path, "r", encoding="utf-8-sig", newline="") as f:
+        reader = csv.reader(f)
+        data = list(reader)
+
+    header_idx = None
+    for i, row in enumerate(data):
+        if row and row[0].strip() == "Period":
+            header_idx = i
+            break
+    if header_idx is None:
+        return rows
+
+    value_header = data[header_idx][1].strip().lower() if len(data[header_idx]) > 1 else ""
+    is_power_kw = "power" in value_header and "kw" in value_header
+
+    for row in data[header_idx + 1:]:
+        if not row or not row[0].strip():
+            continue
+        period_text = row[0].strip()
+        kwh_text = row[1].strip() if len(row) > 1 else ""
+        try:
+            interval_end_dt = datetime.strptime(period_text, "%a %d/%m/%Y %H:%M")
+            raw_value = float(kwh_text.replace(",", "")) if kwh_text else 0.0
+            # If Stark export is Active Power (kW) at HH granularity, convert to energy.
+            consumption_kwh = (raw_value * 0.5) if is_power_kw else raw_value
+        except Exception:
+            continue
+
+        settlement_period = len(rows) + 1
+        rows.append({
+            "settlement_period": settlement_period,
+            "interval_end": interval_end_dt.strftime("%Y-%m-%d %H:%M"),
+            "consumption_kwh": consumption_kwh,
+        })
+        if len(rows) >= 48:
+            break
+    return rows
+
+
+def sync_stark_hh_day(cfg, hh_db_id, daily_page_id, target_date, allow_scrape=True):
+    """
+    Sync Stark half-hour data for one day into the linked HH database.
+    """
+    if not hh_db_id:
+        return 0
+    csv_path = ensure_stark_hh_csv(cfg, target_date, allow_scrape=allow_scrape)
+    if not csv_path:
+        log.warning("  No Stark HH CSV for %s", target_date)
+        return 0
+
+    entries = parse_stark_hh_csv(csv_path)
+    if not entries:
+        log.warning("  Stark CSV parsed 0 HH rows for %s (%s)", target_date, csv_path)
+        return 0
+
+    date_str = target_date.strftime("%Y-%m-%d")
+    site_name = (cfg.get("stark", {}) or {}).get("site_name") or cfg.get("station_name", "Point Lane")
+    ssp_by_sp = load_settlement_period_ssp(target_date)
+    upserts = 0
+    for row in entries:
+        hh_key = f"{date_str}-SP{row['settlement_period']:02d}"
+        ok = upsert_hh_notion_row(
+            hh_db_id=hh_db_id,
+            hh_key=hh_key,
+            date_str=date_str,
+            settlement_period=row["settlement_period"],
+            interval_end=row["interval_end"],
+            consumption_kwh=row["consumption_kwh"],
+            site_name=site_name,
+            daily_page_id=daily_page_id,
+            ssp_gbp_mwh=ssp_by_sp.get(row["settlement_period"]),
+        )
+        if ok:
+            upserts += 1
+    log.info("  Synced Stark HH rows for %s: %d", date_str, upserts)
+    return upserts
+
+
+def calculate_daily_revenue_gbp(hourly_yield, hourly_ssp):
+    """
+    Daily revenue in GBP from matching hourly pairs:
+      revenue_h = (kWh / 1000) * (GBP per MWh)
+    """
+    if not hourly_yield or not hourly_ssp:
+        return None
+    total = 0.0
+    matched = 0
+    for hour, kwh in hourly_yield.items():
+        if hour not in hourly_ssp:
+            continue
+        try:
+            total += (float(kwh) / 1000.0) * float(hourly_ssp[hour])
+            matched += 1
+        except (ValueError, TypeError):
+            continue
+    return round(total, 4) if matched else None
 
 
 # ---------------------------------------------------------------------------
@@ -681,7 +1122,7 @@ def scrape_historical_data(cfg, start_date, end_date):
     return all_data
 
 
-def sync_today_from_report(cfg, db_id):
+def sync_today_from_report(cfg, db_id, hh_db_id=None):
     """
     Sync today's data using the Report page for the richest data:
     separate PV yield, inverter yield, and irradiance.
@@ -716,6 +1157,9 @@ def sync_today_from_report(cfg, db_id):
             power_data = fetch_daily_energy_balance_api(page, cfg, today)
             hourly_yield = calculate_hourly_yield_from_power(power_data)
             hourly_yield_json = json.dumps(hourly_yield, sort_keys=True) if hourly_yield else None
+            hourly_ssp = load_hourly_ssp(today)
+            hourly_ssp_json = json.dumps(hourly_ssp, sort_keys=True) if hourly_ssp else None
+            daily_revenue_gbp = calculate_daily_revenue_gbp(hourly_yield, hourly_ssp)
             
             # --- Primary: Report page (richer data) ---
             try:
@@ -759,10 +1203,14 @@ def sync_today_from_report(cfg, db_id):
                         irradiance_kwh_m2=irradiance_kwh_m2,
                         capacity_kwp=capacity_kwp if capacity_kwp else None,
                         hourly_yield_json=hourly_yield_json,
+                        hourly_ssp_json=hourly_ssp_json,
+                        daily_revenue_gbp=daily_revenue_gbp,
                     )
                     
                     if page_id and hourly_yield:
-                        append_hourly_table(page_id, hourly_yield)
+                        append_hourly_table(page_id, hourly_yield, hourly_ssp)
+                    if page_id:
+                        sync_stark_hh_day(cfg, hh_db_id, page_id, today, allow_scrape=True)
                         
                     return True
                 else:
@@ -801,10 +1249,14 @@ def sync_today_from_report(cfg, db_id):
                 irradiance_kwh_m2=irradiance_kwh_m2,
                 capacity_kwp=capacity_kwp if capacity_kwp else None,
                 hourly_yield_json=hourly_yield_json,
+                hourly_ssp_json=hourly_ssp_json,
+                daily_revenue_gbp=daily_revenue_gbp,
             )
             
             if page_id and hourly_yield:
-                append_hourly_table(page_id, hourly_yield)
+                append_hourly_table(page_id, hourly_yield, hourly_ssp)
+            if page_id:
+                sync_stark_hh_day(cfg, hh_db_id, page_id, today, allow_scrape=True)
             
             return True
 
@@ -815,7 +1267,7 @@ def sync_today_from_report(cfg, db_id):
             browser.close()
 
 
-def backfill_range(cfg, db_id, start_date, end_date):
+def backfill_range(cfg, db_id, hh_db_id, start_date, end_date):
     """
     Backfill data for a range of dates, including hourly yield.
     Optimized to scrape monthly report once per month.
@@ -873,6 +1325,9 @@ def backfill_range(cfg, db_id, start_date, end_date):
                 power_data = fetch_daily_energy_balance_api(page, cfg, current_date)
                 hourly_yield = calculate_hourly_yield_from_power(power_data)
                 hourly_json = json.dumps(hourly_yield, sort_keys=True) if hourly_yield else None
+                hourly_ssp = load_hourly_ssp(current_date)
+                hourly_ssp_json = json.dumps(hourly_ssp, sort_keys=True) if hourly_ssp else None
+                daily_revenue_gbp = calculate_daily_revenue_gbp(hourly_yield, hourly_ssp)
                 
                 # 3. Upsert to Notion
                 page_id = upsert_notion_row(
@@ -884,12 +1339,16 @@ def backfill_range(cfg, db_id, start_date, end_date):
                     alarms={}, # No historical alarms scraping implemented
                     irradiance_kwh_m2=irradiance_kwh_m2,
                     capacity_kwp=capacity_kwp if capacity_kwp else None,
-                    hourly_yield_json=hourly_json
+                    hourly_yield_json=hourly_json,
+                    hourly_ssp_json=hourly_ssp_json,
+                    daily_revenue_gbp=daily_revenue_gbp,
                 )
 
                 # 4. Append Hourly Table
                 if page_id and hourly_yield:
-                    append_hourly_table(page_id, hourly_yield)
+                    append_hourly_table(page_id, hourly_yield, hourly_ssp)
+                if page_id:
+                    sync_stark_hh_day(cfg, hh_db_id, page_id, current_date, allow_scrape=True)
 
                 current_date += timedelta(days=1)
                 time.sleep(1) # Gentle pace
@@ -942,6 +1401,12 @@ def main():
 
     # Verify schema and add missing columns
     verify_and_update_db_schema(db_id)
+    hh_db_id = find_or_create_hh_notion_db(
+        target_parent_id=cfg.get("notion_parent_page_id"),
+        daily_db_id=db_id,
+    )
+    if hh_db_id:
+        verify_and_update_hh_db_schema(hh_db_id, db_id)
 
 
     if args.backfill:
@@ -952,17 +1417,16 @@ def main():
         log.info("BACKFILL: %s to %s", start, end)
         log.info("=" * 60)
 
-        backfill_range(cfg, db_id, start, end)
+        backfill_range(cfg, db_id, hh_db_id, start, end)
         log.info("Backfill complete")
 
     if args.sync_today:
         log.info("=" * 60)
         log.info("SYNC TODAY: %s", date.today())
         log.info("=" * 60)
-        sync_today_from_report(cfg, db_id)
+        sync_today_from_report(cfg, db_id, hh_db_id=hh_db_id)
         log.info("Today sync complete")
 
 
 if __name__ == "__main__":
     main()
-

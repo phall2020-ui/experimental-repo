@@ -9,6 +9,12 @@
         "username": "YOUR_USERNAME",
         "password": "YOUR_PASSWORD"
     },
+    "stark": {
+        "username": "YOUR_STARK_USERNAME",
+        "password": "YOUR_STARK_PASSWORD",
+        "site_name": "Point Lane",
+        "search_text": "2100042103940"
+    },
     "location": {
         "latitude": 51.5,
         "longitude": -0.1,

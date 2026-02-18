@@ -1,0 +1,183 @@
+import argparse
+import os
+import time
+from datetime import datetime
+from pathlib import Path
+from playwright.sync_api import sync_playwright
+def _first_visible(locator, timeout_ms=5000):
+    end = time.time() + (timeout_ms / 1000.0)
+    while time.time() < end:
+        try:
+            if locator.count() > 0 and locator.first.is_visible():
+                return locator.first
+        except Exception:
+            pass
+        time.sleep(0.2)
+    return None
+def run(
+    date_str,
+    username=None,
+    password=None,
+    site_name=None,
+    search_text=None,
+    output_dir=None,
+    headless=True,
+):
+    username = username or os.environ.get("STARK_USERNAME")
+    password = password or os.environ.get("STARK_PASSWORD")
+    site_name = site_name or os.environ.get("STARK_SITE_NAME") or "Point Lane"
+    search_text = (
+        search_text
+        or os.environ.get("STARK_SEARCH_TEXT")
+        or os.environ.get("STARK_EXPORT_MPAN")
+        or "2100042103940"
+    )
+    meter_id = os.environ.get("STARK_METER_ID") or "K21W001099"
+    if not username or not password:
+        print("Missing Stark credentials. Set STARK_USERNAME and STARK_PASSWORD.")
+        return None
+    try:
+        target_date = datetime.strptime(date_str, "%Y-%m-%d")
+        formatted_date = target_date.strftime("%d/%m/%Y")
+        file_date = target_date.strftime("%Y-%m-%d")
+    except ValueError:
+        print("Invalid date format. Please use YYYY-MM-DD")
+        return None
+    out_dir = Path(output_dir) if output_dir else Path.cwd()
+    out_dir.mkdir(parents=True, exist_ok=True)
+    output_path = out_dir / f"stark_hh_data_{file_date}.csv"
+    print(f"Goal: Scrape HH data for {site_name} (Search: {search_text}) on {formatted_date}")
+    print(f"Output: {output_path}")
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=headless)
+        context = browser.new_context(viewport={"width": 1920, "height": 1080})
+        page = context.new_page()
+        try:
+            print("Navigating to login page...")
+            page.goto("https://id.stark.co.uk/StarkID/SignIn")
+            try:
+                if page.is_visible("#onetrust-accept-btn-handler", timeout=3000):
+                    page.click("#onetrust-accept-btn-handler")
+                    print("Accepted cookies.")
+            except Exception:
+                pass
+            print("Logging in...")
+            page.fill("#inputUsernameOrEmail", username)
+            page.fill("#inputPassword", password)
+            page.click("button[type='submit']")
+            try:
+                page.wait_for_url("**/Dashboard*", timeout=30000)
+            except Exception:
+                print("Checking for login errors...")
+                if page.is_visible(".validation-summary-errors"):
+                    print("Login error detected.")
+                    return None
+            print("Login successful.")
+            page.wait_for_load_state("networkidle")
+            print("Navigating to Dynamic Reports > Timeline...")
+            page.get_by_text("Dynamic Reports").click()
+            page.get_by_text("Timeline").click()
+            page.wait_for_load_state("networkidle")
+
+            print(f"Selecting meter using search term: {search_text}...")
+            page.click("#btnOpenGroupTreeSearch")
+            page.wait_for_selector("#groupSearchInput", state="visible")
+            page.fill("#groupSearchInput", search_text)
+            page.press("#groupSearchInput", "Enter")
+            search_result = _first_visible(
+                page.locator(".searchItemName").filter(has_text=search_text).filter(has_text=meter_id),
+                timeout_ms=10000
+            )
+            if not search_result:
+                search_result = _first_visible(
+                    page.locator(".searchItemName").filter(has_text=search_text),
+                    timeout_ms=5000
+                )
+            if search_result:
+                print("Clicking MPAN search result...")
+                search_result.click()
+            else:
+                # Do NOT fall back to site name — that hits the import/consumption meter.
+                # Only the explicit MPAN search returns the generation (export) meter.
+                print(f"MPAN search result not found for '{search_text}'. Aborting to avoid selecting wrong meter.")
+                return None
+            tree_item = _first_visible(
+                page.locator(".treeItemName").filter(has_text=search_text).filter(has_text=meter_id),
+                timeout_ms=10000
+            )
+            if not tree_item:
+                tree_item = _first_visible(
+                    page.locator(".treeItemName").filter(has_text=search_text),
+                    timeout_ms=5000
+                )
+            if not tree_item:
+                # Do NOT fall back to site name tree item.
+                print(f"Could not locate generation meter tree item for MPAN '{search_text}'. Aborting.")
+                return None
+            print("Double-clicking tree item...")
+            time.sleep(1)
+            tree_item.dblclick()
+            time.sleep(1)
+            try:
+                modal = page.locator(".modalCurtain")
+                if modal.count() > 0 and modal.first.is_visible():
+                    page.keyboard.press("Escape")
+                page.locator(".modalCurtain").first.wait_for(state="hidden", timeout=5000)
+            except Exception:
+                pass
+            print(f"Setting date to {formatted_date}...")
+            page.wait_for_selector("#StartDate", state="attached", timeout=30000)
+            page.evaluate(f"document.getElementById('StartDate').value = '{formatted_date}'")
+            page.evaluate(f"document.getElementById('EndDate').value = '{formatted_date}'")
+            page.evaluate("document.getElementById('StartDate').dispatchEvent(new Event('change'))")
+            page.evaluate("document.getElementById('EndDate').dispatchEvent(new Event('change'))")
+            # Meter selection can reset type; enforce Power right before report run.
+            try:
+                page.select_option("#energyType", label="Power")
+                page.select_option("#powerType", label="Active Power (kW)")
+                page.select_option("#Interval", label="Half Hourly")
+            except Exception:
+                pass
+            print("Running report...")
+            time.sleep(2)
+            page.click("#buttonRunReport")
+            print("Waiting for report generation...")
+            download_menu_btn = page.locator("#btnOpenGraphicDownloadMenu")
+            download_menu_btn.wait_for(state="visible", timeout=60000)
+            print("Initiating download...")
+            download_menu_btn.click()
+            with page.expect_download(timeout=60000) as download_info:
+                page.wait_for_selector("text=CSV", state="visible")
+                page.click("text=CSV")
+            download = download_info.value
+            download.save_as(str(output_path))
+            print(f"Success! Data saved to: {output_path.name}")
+            return str(output_path)
+        except Exception as e:
+            print(f"Error occurred: {e}")
+            debug_shot = f"error_debug_{int(time.time())}.png"
+            page.screenshot(path=debug_shot)
+            print(f"Saved debug screenshot to {debug_shot}")
+            return None
+        finally:
+            browser.close()
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Scrape Stark HH Data")
+    parser.add_argument("--date", type=str, required=True, help="Date in YYYY-MM-DD format")
+    parser.add_argument("--username", type=str, help="Stark username/email")
+    parser.add_argument("--password", type=str, help="Stark password")
+    parser.add_argument("--site-name", type=str, help="Site label used as fallback selector")
+    parser.add_argument("--search-text", type=str, help="Primary search term (MPAN recommended)")
+    parser.add_argument("--output-dir", type=str, help="Directory to save downloaded CSV")
+    parser.add_argument("--show-browser", action="store_true", help="Show browser window")
+    args = parser.parse_args()
+    saved = run(
+        date_str=args.date,
+        username=args.username,
+        password=args.password,
+        site_name=args.site_name,
+        search_text=args.search_text,
+        output_dir=args.output_dir,
+        headless=not args.show_browser,
+    )
+    raise SystemExit(0 if saved else 1)
