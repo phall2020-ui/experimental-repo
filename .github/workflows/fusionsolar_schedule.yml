@@ -14,6 +14,11 @@ on:
     - cron: '0 22 * * *'    # Report
     # Nightly sync: Elexon SSP + Stark HH -> Notion (22:30 UTC, after report)
     - cron: '30 22 * * *'   # Nightly Sync
+  # Cross-repo trigger: solar-platform's daily_notion_pull.yml dispatches this
+  # after completing the Juggle inverter/meter sync, so the Point Lane nightly
+  # pipeline (Elexon + Stark HH) runs in coordination with the portfolio sync.
+  repository_dispatch:
+    types: [nightly-sync]
   workflow_dispatch:
     inputs:
       task:
@@ -137,7 +142,10 @@ jobs:
       - name: Determine task
         id: task
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            echo "command=--nightly-sync" >> $GITHUB_OUTPUT
+            echo "Triggered via repository_dispatch (solar-platform cross-repo)"
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "command=${{ github.event.inputs.task }}" >> $GITHUB_OUTPUT
           elif [ "${{ github.event.schedule }}" = "0 22 * * *" ]; then
             echo "command=--report" >> $GITHUB_OUTPUT
