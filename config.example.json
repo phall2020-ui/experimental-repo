@@ -37,5 +37,6 @@
         "log_file": "logs/monitor.log"
     },
     "notion_parent_page_id": "YOUR_NOTION_PARENT_PAGE_ID",
-    "notion_fusionsolar_parent_page_id": "YOUR_FUSIONSOLAR_PARENT_PAGE_ID"
+    "notion_fusionsolar_parent_page_id": "YOUR_FUSIONSOLAR_PARENT_PAGE_ID",
+    "notion_fusionsolar_db_id": "YOUR_FUSIONSOLAR_HOURLY_GENERATION_DB_ID"
 }

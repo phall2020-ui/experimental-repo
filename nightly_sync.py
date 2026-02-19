@@ -3,15 +3,20 @@
 nightly_sync.py
 ================
 Consolidated nightly pipeline that runs sequentially:
-  1. Fetch Elexon SSP data for recent dates
-  2. Scrape Stark HH generation data & sync to Notion
+  1. FusionSolar daily data -> Notion (notion_sync.py --sync-today)
+  2. Fetch Elexon SSP data for recent dates
+  3. Scrape Stark HH generation data & sync to Notion
 
-Designed to run after the FusionSolar daily report (22:00 UTC).
+Designed to run after/alongside the FusionSolar daily report (22:00 UTC).
 Scheduled at 22:30 UTC via GitHub Actions and/or local launchd.
+
+Even if fusionsolar_monitor.py --report already triggers notion_sync on success,
+this pipeline guarantees FusionSolar data is synced regardless of monitor outcome.
 
 Usage:
     python nightly_sync.py                   # yesterday + today (default)
     python nightly_sync.py --days 3          # last 3 days + today
+    python nightly_sync.py --no-fusion       # skip FusionSolar sync (Elexon + Stark only)
 """
 
 import argparse
@@ -58,11 +63,15 @@ def run_step(label, cmd, cwd=None, timeout=300):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Nightly sync: Elexon SSP + Stark HH generation -> Notion"
+        description="Nightly sync: FusionSolar + Elexon SSP + Stark HH generation -> Notion"
     )
     parser.add_argument(
         "--days", type=int, default=2,
         help="Number of days to sync (default: 2 = yesterday + today)"
+    )
+    parser.add_argument(
+        "--no-fusion", action="store_true",
+        help="Skip FusionSolar notion sync (run Elexon + Stark only)"
     )
     args = parser.parse_args()
 
@@ -78,12 +87,33 @@ def main():
     sys.stdout.flush()
 
     results = []
+    total_steps = 2 if args.no_fusion else 3
+    step = 0
 
     # ------------------------------------------------------------------
-    # Step 1: Fetch Elexon SSP data
+    # Step 1: FusionSolar daily data -> Notion  (notion_sync --sync-today)
     # ------------------------------------------------------------------
+    if not args.no_fusion:
+        step += 1
+        notion_sync = SCRIPT_DIR / "notion_sync.py"
+        if notion_sync.exists():
+            ok, elapsed = run_step(
+                f"Step {step}/{total_steps}: FusionSolar -> Notion",
+                [sys.executable, str(notion_sync), "--sync-today"],
+                cwd=SCRIPT_DIR,
+                timeout=300,
+            )
+        else:
+            print(f"  [SKIP] notion_sync.py not found at {notion_sync}")
+            ok, elapsed = True, 0.0  # non-fatal
+        results.append(("FusionSolar notion sync", ok, elapsed))
+
+    # ------------------------------------------------------------------
+    # Step 2: Fetch Elexon SSP data
+    # ------------------------------------------------------------------
+    step += 1
     ok, elapsed = run_step(
-        "Step 1/2: Fetch Elexon SSP data",
+        f"Step {step}/{total_steps}: Fetch Elexon SSP data",
         [sys.executable, str(SCRIPT_DIR / "Elexon_Data" / "fetch_elexon_data.py"),
          "--start", start_str, "--end", end_str],
         cwd=SCRIPT_DIR / "Elexon_Data",
@@ -92,10 +122,11 @@ def main():
     results.append(("Elexon SSP fetch", ok, elapsed))
 
     # ------------------------------------------------------------------
-    # Step 2: Stark HH generation sync to Notion
+    # Step 3: Stark HH generation sync to Notion
     # ------------------------------------------------------------------
+    step += 1
     ok, elapsed = run_step(
-        "Step 2/2: Stark HH generation -> Notion",
+        f"Step {step}/{total_steps}: Stark HH generation -> Notion",
         [sys.executable, str(SCRIPT_DIR / "stark_daily_sync.py"),
          "--start", start_str, "--end", end_str],
         cwd=SCRIPT_DIR,

@@ -124,15 +124,39 @@ def load_hh_db_id():
 # Notion database operations
 # ---------------------------------------------------------------------------
 
-def find_or_create_notion_db(target_parent_id=None):
+def find_or_create_notion_db(target_parent_id=None, known_db_id=None):
     """
     Find existing database by name OR create a new one.
+    If known_db_id is supplied (from config), it is verified and used directly
+    (bypassing the name search).  This is essential in CI where no cache file exists
+    and the actual DB name may differ from DB_NAME.
     If target_parent_id is provided, only return a DB if it resides under that parent.
-    Otherwise create a new one under that parent.
     """
     headers = get_notion_headers()
 
-    # Check cache first
+    # If a known/configured DB ID is provided, prefer it over cache + search
+    if known_db_id:
+        try:
+            r = requests.get(f"https://api.notion.com/v1/databases/{known_db_id}", headers=headers)
+            if r.status_code == 200:
+                data = r.json()
+                if target_parent_id:
+                    parent = data.get("parent", {})
+                    if parent.get("type") == "page_id" and parent.get("page_id") == target_parent_id:
+                        log.info("Using configured Notion DB (parent matches): %s", known_db_id)
+                        save_db_id(known_db_id)
+                        return known_db_id
+                    else:
+                        log.warning("Configured DB %s parent mismatch (expected %s). Falling back to search.",
+                                    known_db_id, target_parent_id)
+                else:
+                    log.info("Using configured Notion DB: %s", known_db_id)
+                    save_db_id(known_db_id)
+                    return known_db_id
+        except Exception as e:
+            log.warning("Failed to verify configured DB %s: %s", known_db_id, e)
+
+    # Check cache
     cached_id = load_db_id()
     if cached_id:
         # Verify it still exists and check parent if needed
@@ -1471,7 +1495,9 @@ def main():
         cfg.get("notion_fusionsolar_parent_page_id")
         or cfg.get("notion_parent_page_id")
     )
-    db_id = find_or_create_notion_db(target_parent_id=fusionsolar_parent)
+    # notion_fusionsolar_db_id in config pins CI to the correct DB without a cache file
+    known_db_id = cfg.get("notion_fusionsolar_db_id")
+    db_id = find_or_create_notion_db(target_parent_id=fusionsolar_parent, known_db_id=known_db_id)
     log.info("Notion DB ID: %s", db_id)
 
     # Verify schema and add missing columns

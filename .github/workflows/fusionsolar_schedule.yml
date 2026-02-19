@@ -27,6 +27,7 @@ on:
           - '--report --no-sync'
           - '--test-login'
           - '--nightly-sync'
+          - '--nightly-sync --no-fusion'
           - '--backfill'
           - '--backfill --start-date 2025-12-01'
 
@@ -86,6 +87,8 @@ jobs:
             },
             "notion_token": "PLACEHOLDER_TOKEN",
             "notion_parent_page_id": "2d21773a-96c0-8092-9070-d2128500f9dc",
+            "notion_fusionsolar_parent_page_id": "478905a9-7e96-42b6-84b6-aaa51a8b6cc6",
+            "notion_fusionsolar_db_id": "d4806bf5-10e9-413c-83a1-e185da605361",
             "stark": {
               "username": "PLACEHOLDER_STARK_USER",
               "password": "PLACEHOLDER_STARK_PASS",
