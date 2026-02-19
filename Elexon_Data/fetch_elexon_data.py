@@ -1,3 +1,4 @@
+import argparse
 import requests
 import os
 from datetime import date, timedelta, datetime
@@ -5,7 +6,7 @@ import time
 
 # Configuration
 START_DATE = date(2025, 12, 1)
-END_DATE = date(2026, 2, 18) # Today
+END_DATE = date.today()
 OUTPUT_DIR = "bmrs_data"
 COMBINED_FILE = "combined_system_prices.csv"
 
@@ -53,27 +54,45 @@ def fetch_data(start_date, end_date):
     return all_files
 
 def combine_files(file_list):
-    import pandas as pd
+    import csv as csv_mod
     print("Combining files...")
-    dfs = []
-    for file in file_list:
+    header = None
+    rows = []
+    for file_path in file_list:
         try:
-             # Skip header logic might be needed if files have headers, usually they do.
-             # Elexon CSVs usually have a header.
-            df = pd.read_csv(file)
-            dfs.append(df)
-        except pd.errors.EmptyDataError:
-             print(f"Skipping empty file: {file}")
+            with open(file_path, newline='') as f:
+                reader = csv_mod.reader(f)
+                file_header = next(reader, None)
+                if file_header is None:
+                    print(f"Skipping empty file: {file_path}")
+                    continue
+                if header is None:
+                    header = file_header
+                for row in reader:
+                    if row:
+                        rows.append(row)
         except Exception as e:
-            print(f"Error reading {file}: {e}")
+            print(f"Error reading {file_path}: {e}")
 
-    if dfs:
-        combined_df = pd.concat(dfs, ignore_index=True)
-        combined_df.to_csv(COMBINED_FILE, index=False)
-        print(f"Successfully created {COMBINED_FILE} with {len(combined_df)} rows.")
+    if header and rows:
+        with open(COMBINED_FILE, "w", newline='') as f:
+            writer = csv_mod.writer(f)
+            writer.writerow(header)
+            writer.writerows(rows)
+        print(f"Successfully created {COMBINED_FILE} with {len(rows)} rows.")
     else:
         print("No data to combine.")
 
 if __name__ == "__main__":
-    files = fetch_data(START_DATE, END_DATE)
+    parser = argparse.ArgumentParser(description="Fetch Elexon BMRS system prices")
+    parser.add_argument("--start", default=START_DATE.isoformat(),
+                        help=f"Start date YYYY-MM-DD (default: {START_DATE})")
+    parser.add_argument("--end", default=None,
+                        help="End date YYYY-MM-DD (default: today)")
+    args = parser.parse_args()
+
+    start = date.fromisoformat(args.start)
+    end = date.fromisoformat(args.end) if args.end else date.today()
+
+    files = fetch_data(start, end)
     combine_files(files)

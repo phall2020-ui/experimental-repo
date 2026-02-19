@@ -10,8 +10,10 @@ on:
     - cron: '30 10 * * *'   # Check 2
     - cron: '0 13 * * *'    # Check 3
     - cron: '30 15 * * *'   # Check 4
-    # Daily data sync runs at 04:00 UTC to capture the previous day's complete data
-    - cron: '0 4 * * *'     # Daily sync (previous day)
+    # Daily generation report + Notion sync (22:00 UTC = 22:00 GMT / 23:00 BST)
+    - cron: '0 22 * * *'    # Report
+    # Nightly sync: Elexon SSP + Stark HH -> Notion (22:30 UTC, after report)
+    - cron: '30 22 * * *'   # Nightly Sync
   workflow_dispatch:
     inputs:
       task:
@@ -24,7 +26,7 @@ on:
           - '--report'
           - '--report --no-sync'
           - '--test-login'
-          - '--sync-yesterday'
+          - '--nightly-sync'
           - '--backfill'
           - '--backfill --start-date 2025-12-01'
 
@@ -34,7 +36,7 @@ env:
 jobs:
   monitor:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
 
     steps:
       - name: Checkout repository
@@ -56,6 +58,12 @@ jobs:
         with:
           python-version: '3.12'
           cache: 'pip'
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('requirements.txt') }}
 
       - name: Install dependencies
         run: |
@@ -91,7 +99,8 @@ jobs:
             },
             "schedule": {
               "check_times": ["08:00", "10:30", "13:00", "15:30"],
-              "report_time": "22:00"
+              "report_time": "22:00",
+              "nightly_sync_time": "22:30"
             },
             "logging": {
               "log_dir": "logs",
@@ -125,12 +134,12 @@ jobs:
       - name: Determine task
         id: task
         run: |
-          YESTERDAY=$(date -u -d "yesterday" +%Y-%m-%d)
-          echo "yesterday=$YESTERDAY" >> $GITHUB_OUTPUT
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "command=${{ github.event.inputs.task }}" >> $GITHUB_OUTPUT
-          elif [ "${{ github.event.schedule }}" = "0 4 * * *" ]; then
-            echo "command=--backfill --start-date $YESTERDAY --end-date $YESTERDAY" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event.schedule }}" = "0 22 * * *" ]; then
+            echo "command=--report" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event.schedule }}" = "30 22 * * *" ]; then
+            echo "command=--nightly-sync" >> $GITHUB_OUTPUT
           else
             echo "command=--check" >> $GITHUB_OUTPUT
           fi
@@ -141,12 +150,10 @@ jobs:
         shell: bash
         run: |
           CMD="${{ steps.task.outputs.command }}"
-          YESTERDAY="${{ steps.task.outputs.yesterday }}"
           EXIT_CODE=0
-          if [[ "$CMD" == "--sync-yesterday" ]]; then
-            echo "::group::Running FusionSolar sync for yesterday ($YESTERDAY)"
-            echo "Command: python notion_sync.py --backfill --start-date $YESTERDAY --end-date $YESTERDAY"
-            python notion_sync.py --backfill --start-date $YESTERDAY --end-date $YESTERDAY || EXIT_CODE=$?
+          if [[ "$CMD" == "--nightly-sync" ]]; then
+            echo "::group::Running Nightly Sync (Elexon + Stark)"
+            python nightly_sync.py || EXIT_CODE=$?
             echo "::endgroup::"
           elif [[ "$CMD" == *"--backfill"* ]]; then
             echo "::group::Running Backfill"
@@ -169,27 +176,6 @@ jobs:
             echo "::warning::Task exited with code $EXIT_CODE"
           fi
 
-      - name: Run Stark Sync
-        id: run_stark
-        if: >
-          github.event.schedule == '0 4 * * *' ||
-          github.event.inputs.task == '--sync-yesterday'
-        shell: bash
-        run: |
-          DATE="${{ steps.task.outputs.yesterday }}"
-          if [ -z "$DATE" ]; then
-            echo "::error::Yesterday date is empty -- cannot run Stark sync"
-            exit 1
-          fi
-          EXIT_CODE=0
-          echo "::group::Running Stark sync for $DATE"
-          python stark_daily_sync.py --start $DATE --end $DATE || EXIT_CODE=$?
-          echo "::endgroup::"
-          echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
-          if [ $EXIT_CODE -ne 0 ]; then
-            echo "::warning::Stark sync exited with code $EXIT_CODE"
-          fi
-
       - name: Upload logs
         if: always()
         uses: actions/upload-artifact@v4
@@ -202,19 +188,46 @@ jobs:
         if: always()
         run: |
           EXIT_CODE="${{ steps.run_task.outputs.exit_code }}"
-          STARK_EXIT="${{ steps.run_stark.outputs.exit_code }}"
           CMD="${{ steps.task.outputs.command }}"
-          FAILED=0
           if [ "$EXIT_CODE" != "0" ] && [ -n "$EXIT_CODE" ]; then
             echo "::error::FusionSolar task '$CMD' failed (exit code: $EXIT_CODE). Check logs artifact for details."
-            FAILED=1
+            exit 1
           else
             echo "FusionSolar task '$CMD' completed successfully."
           fi
-          if [ "$STARK_EXIT" != "0" ] && [ -n "$STARK_EXIT" ]; then
-            echo "::error::Stark sync failed (exit code: $STARK_EXIT). Check logs artifact for details."
-            FAILED=1
-          elif [ "$STARK_EXIT" = "0" ]; then
-            echo "Stark sync completed successfully."
+
+      - name: Notify on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WEBHOOK_URL: ${{ secrets.NOTIFICATION_WEBHOOK_URL }}
+        run: |
+          CMD="${{ steps.task.outputs.command }}"
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          TITLE="FusionSolar task failed: ${CMD}"
+
+          # Check for existing open failure issue to avoid duplicates
+          EXISTING=$(gh issue list --state open --search "FusionSolar task failed" --json number --jq '.[0].number' 2>/dev/null || echo "")
+
+          if [ -n "$EXISTING" ]; then
+            BODY="Another failure at $(date -u '+%Y-%m-%d %H:%M') UTC.
+          **Task:** \`${CMD}\`
+          [View run](${RUN_URL})"
+            gh issue comment "$EXISTING" --body "$BODY"
+            echo "Commented on existing issue #${EXISTING}"
+          else
+            BODY="**Task:** \`${CMD}\`
+          **Time:** $(date -u '+%Y-%m-%d %H:%M') UTC
+
+          [View workflow run](${RUN_URL})"
+            gh issue create --title "$TITLE" --body "$BODY" \
+              || echo "::warning::Could not create failure issue"
           fi
-          [ $FAILED -eq 0 ] || exit 1
+
+          # Webhook (Slack/Discord/etc.) if NOTIFICATION_WEBHOOK_URL secret is set
+          if [ -n "$WEBHOOK_URL" ]; then
+            curl -sf -X POST "$WEBHOOK_URL" \
+              -H "Content-Type: application/json" \
+              -d "{\"text\":\"FusionSolar task '${CMD}' failed. ${RUN_URL}\"}" \
+              || echo "::warning::Webhook notification failed"
+          fi

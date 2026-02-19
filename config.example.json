@@ -27,7 +27,8 @@
             "13:00",
             "15:30"
         ],
-        "report_time": "22:00"
+        "report_time": "22:00",
+        "nightly_sync_time": "23:00"
     },
     "logging": {
         "log_dir": "logs",

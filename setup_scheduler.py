@@ -25,6 +25,7 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).resolve().parent
 CONFIG_PATH = SCRIPT_DIR / "config.json"
 MONITOR_SCRIPT = SCRIPT_DIR / "fusionsolar_monitor.py"
+NIGHTLY_SCRIPT = SCRIPT_DIR / "nightly_sync.py"
 
 TASK_PREFIX = "FusionSolar_PointLane"
 LAUNCHD_PREFIX = "com.fusionsolar.pointlane"
@@ -41,15 +42,20 @@ def load_config():
 
 
 def get_task_names(cfg):
-    """Derive task names dynamically from config schedule."""
+    """Derive task names dynamically from config schedule.
+
+    Returns list of 5-tuples: (name, time, script_path, args, description)
+    """
     schedule = cfg.get("schedule", {})
     check_times = schedule.get("check_times", ["08:00", "10:30", "13:00", "15:30"])
     report_time = schedule.get("report_time", "22:00")
+    nightly_time = schedule.get("nightly_sync_time", "23:00")
 
     tasks = []
     for i, t in enumerate(check_times, 1):
-        tasks.append((f"Check_{i}", t, "--check", f"Inverter status check #{i}"))
-    tasks.append(("Report", report_time, "--report", "Daily generation report + Notion sync"))
+        tasks.append((f"Check_{i}", t, str(MONITOR_SCRIPT), "--check", f"Inverter status check #{i}"))
+    tasks.append(("Report", report_time, str(MONITOR_SCRIPT), "--report", "Daily generation report + Notion sync"))
+    tasks.append(("Nightly_Sync", nightly_time, str(NIGHTLY_SCRIPT), "", "Nightly Elexon + Stark sync"))
     return tasks
 
 
@@ -64,12 +70,15 @@ def _plist_path(task_name):
     return LAUNCH_AGENTS_DIR / f"{LAUNCHD_PREFIX}.{task_name.lower()}.plist"
 
 
-def _build_plist(task_name, hour, minute, args, description):
+def _build_plist(task_name, hour, minute, script, args, description):
     """Generate a launchd plist XML string."""
     label = f"{LAUNCHD_PREFIX}.{task_name.lower()}"
     log_path = SCRIPT_DIR / "logs" / f"launchd_{task_name.lower()}.log"
 
-    arg_elements = "\n".join(f"        <string>{a}</string>" for a in args.split())
+    cmd_parts = [str(PYTHON_EXE), str(script)]
+    if args:
+        cmd_parts.extend(args.split())
+    arg_elements = "\n".join(f"        <string>{p}</string>" for p in cmd_parts)
     return f"""<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -80,8 +89,6 @@ def _build_plist(task_name, hour, minute, args, description):
     <string>FusionSolar: {description}</string>
     <key>ProgramArguments</key>
     <array>
-        <string>{PYTHON_EXE}</string>
-        <string>{MONITOR_SCRIPT}</string>
 {arg_elements}
     </array>
     <key>WorkingDirectory</key>
@@ -104,18 +111,18 @@ def _build_plist(task_name, hour, minute, args, description):
 """
 
 
-def create_task_macos(task_name, time_str, args, description):
+def create_task_macos(task_name, time_str, script, args, description):
     """Create a macOS launchd plist and load it."""
     LAUNCH_AGENTS_DIR.mkdir(parents=True, exist_ok=True)
     hour, minute = map(int, time_str.split(":"))
     plist = _plist_path(task_name)
 
-    content = _build_plist(task_name, hour, minute, args, description)
+    content = _build_plist(task_name, hour, minute, script, args, description)
     plist.write_text(content)
 
     print(f"  Creating: {plist.name}")
     print(f"    Time:    {time_str}")
-    print(f"    Command: {PYTHON_EXE} {MONITOR_SCRIPT} {args}")
+    print(f"    Command: {PYTHON_EXE} {script} {args}")
 
     # Unload first if already loaded (ignore errors)
     subprocess.run(["launchctl", "unload", str(plist)],
@@ -152,7 +159,7 @@ def query_tasks_macos(cfg):
                             capture_output=True, text=True)
     loaded_labels = result.stdout if result.returncode == 0 else ""
 
-    for task_name, time_str, args, desc in tasks:
+    for task_name, time_str, script, args, desc in tasks:
         label = f"{LAUNCHD_PREFIX}.{task_name.lower()}"
         plist = _plist_path(task_name)
         installed = plist.exists()
@@ -180,10 +187,10 @@ def query_tasks_macos(cfg):
 CRON_TAG = "# FusionSolar_PointLane"
 
 
-def create_task_linux(task_name, time_str, args, description):
+def create_task_linux(task_name, time_str, script, args, description):
     """Add a crontab entry."""
     hour, minute = map(int, time_str.split(":"))
-    command = f"{PYTHON_EXE} {MONITOR_SCRIPT} {args}"
+    command = f"{PYTHON_EXE} {script} {args}".rstrip()
     log_path = SCRIPT_DIR / "logs" / f"cron_{task_name.lower()}.log"
     cron_line = f"{minute} {hour} * * * cd {SCRIPT_DIR} && {command} >> {log_path} 2>&1 {CRON_TAG}_{task_name}"
 
@@ -242,7 +249,7 @@ def query_tasks_linux(cfg):
         return
 
     tasks = get_task_names(cfg)
-    for task_name, time_str, args, desc in tasks:
+    for task_name, time_str, script, args, desc in tasks:
         tag = f"{CRON_TAG}_{task_name}"
         found = any(tag in line for line in result.stdout.splitlines())
         status = "Installed" if found else "Not found"
@@ -262,10 +269,10 @@ def query_tasks_linux(cfg):
 # Windows — Task Scheduler
 # ---------------------------------------------------------------------------
 
-def create_task_windows(task_name, time_str, args, description):
+def create_task_windows(task_name, time_str, script, args, description):
     """Create a Windows scheduled task using schtasks."""
     full_name = f"{TASK_PREFIX}_{task_name}"
-    command = f'"{PYTHON_EXE}" "{MONITOR_SCRIPT}" {args}'
+    command = f'"{ PYTHON_EXE}" "{script}" {args}'.rstrip()
 
     cmd = [
         "schtasks", "/create",
@@ -306,7 +313,7 @@ def remove_task_windows(task_name):
 def query_tasks_windows(cfg):
     """Query the status of FusionSolar scheduled tasks on Windows."""
     tasks = get_task_names(cfg)
-    for task_name, time_str, args, desc in tasks:
+    for task_name, time_str, script, args, desc in tasks:
         full_name = f"{TASK_PREFIX}_{task_name}"
         cmd = ["schtasks", "/query", "/tn", full_name, "/fo", "LIST"]
         result = subprocess.run(cmd, capture_output=True, text=True)
@@ -364,8 +371,8 @@ def install_tasks(cfg):
     }[plat]
 
     success_count = 0
-    for task_name, time_str, args, desc in tasks:
-        if create_fn(task_name, time_str, args, desc):
+    for task_name, time_str, script, args, desc in tasks:
+        if create_fn(task_name, time_str, script, args, desc):
             success_count += 1
         print()
 
@@ -395,7 +402,7 @@ def remove_all_tasks(cfg):
         "windows": remove_task_windows,
     }[plat]
 
-    for task_name, _, _, _ in tasks:
+    for task_name, _, _, _, _ in tasks:
         remove_fn(task_name)
     print()
 
