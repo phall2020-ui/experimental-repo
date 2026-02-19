@@ -10,8 +10,8 @@ on:
     - cron: '30 10 * * *'   # Check 2
     - cron: '0 13 * * *'    # Check 3
     - cron: '30 15 * * *'   # Check 4
-    # Daily generation report + Notion sync (22:00 UTC = 22:00 GMT / 23:00 BST)
-    - cron: '0 22 * * *'    # Report
+    # Daily data sync runs at 04:00 UTC to capture the previous day's complete data
+    - cron: '0 4 * * *'     # Daily sync (previous day)
   workflow_dispatch:
     inputs:
       task:
@@ -24,6 +24,7 @@ on:
           - '--report'
           - '--report --no-sync'
           - '--test-login'
+          - '--sync-yesterday'
           - '--backfill'
           - '--backfill --start-date 2025-12-01'
 
@@ -33,7 +34,7 @@ env:
 jobs:
   monitor:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
 
     steps:
       - name: Checkout repository
@@ -124,10 +125,12 @@ jobs:
       - name: Determine task
         id: task
         run: |
+          YESTERDAY=$(date -u -d "yesterday" +%Y-%m-%d)
+          echo "yesterday=$YESTERDAY" >> $GITHUB_OUTPUT
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "command=${{ github.event.inputs.task }}" >> $GITHUB_OUTPUT
-          elif [ "${{ github.event.schedule }}" = "0 22 * * *" ]; then
-            echo "command=--report" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event.schedule }}" = "0 4 * * *" ]; then
+            echo "command=--backfill --start-date $YESTERDAY --end-date $YESTERDAY" >> $GITHUB_OUTPUT
           else
             echo "command=--check" >> $GITHUB_OUTPUT
           fi
@@ -138,8 +141,14 @@ jobs:
         shell: bash
         run: |
           CMD="${{ steps.task.outputs.command }}"
+          YESTERDAY="${{ steps.task.outputs.yesterday }}"
           EXIT_CODE=0
-          if [[ "$CMD" == *"--backfill"* ]]; then
+          if [[ "$CMD" == "--sync-yesterday" ]]; then
+            echo "::group::Running FusionSolar sync for yesterday ($YESTERDAY)"
+            echo "Command: python notion_sync.py --backfill --start-date $YESTERDAY --end-date $YESTERDAY"
+            python notion_sync.py --backfill --start-date $YESTERDAY --end-date $YESTERDAY || EXIT_CODE=$?
+            echo "::endgroup::"
+          elif [[ "$CMD" == *"--backfill"* ]]; then
             echo "::group::Running Backfill"
             echo "Command: python notion_sync.py $CMD"
             python notion_sync.py $CMD || EXIT_CODE=$?
@@ -160,6 +169,27 @@ jobs:
             echo "::warning::Task exited with code $EXIT_CODE"
           fi
 
+      - name: Run Stark Sync
+        id: run_stark
+        if: >
+          github.event.schedule == '0 4 * * *' ||
+          github.event.inputs.task == '--sync-yesterday'
+        shell: bash
+        run: |
+          DATE="${{ steps.task.outputs.yesterday }}"
+          if [ -z "$DATE" ]; then
+            echo "::error::Yesterday date is empty -- cannot run Stark sync"
+            exit 1
+          fi
+          EXIT_CODE=0
+          echo "::group::Running Stark sync for $DATE"
+          python stark_daily_sync.py --start $DATE --end $DATE || EXIT_CODE=$?
+          echo "::endgroup::"
+          echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
+          if [ $EXIT_CODE -ne 0 ]; then
+            echo "::warning::Stark sync exited with code $EXIT_CODE"
+          fi
+
       - name: Upload logs
         if: always()
         uses: actions/upload-artifact@v4
@@ -172,10 +202,19 @@ jobs:
         if: always()
         run: |
           EXIT_CODE="${{ steps.run_task.outputs.exit_code }}"
+          STARK_EXIT="${{ steps.run_stark.outputs.exit_code }}"
           CMD="${{ steps.task.outputs.command }}"
+          FAILED=0
           if [ "$EXIT_CODE" != "0" ] && [ -n "$EXIT_CODE" ]; then
             echo "::error::FusionSolar task '$CMD' failed (exit code: $EXIT_CODE). Check logs artifact for details."
-            exit 1
+            FAILED=1
           else
             echo "FusionSolar task '$CMD' completed successfully."
           fi
+          if [ "$STARK_EXIT" != "0" ] && [ -n "$STARK_EXIT" ]; then
+            echo "::error::Stark sync failed (exit code: $STARK_EXIT). Check logs artifact for details."
+            FAILED=1
+          elif [ "$STARK_EXIT" = "0" ]; then
+            echo "Stark sync completed successfully."
+          fi
+          [ $FAILED -eq 0 ] || exit 1
