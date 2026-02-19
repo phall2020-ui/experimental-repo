@@ -35,5 +35,7 @@
         "inverter_csv": "logs/inverter_checks.csv",
         "generation_csv": "logs/daily_generation.csv",
         "log_file": "logs/monitor.log"
-    }
+    },
+    "notion_parent_page_id": "YOUR_NOTION_PARENT_PAGE_ID",
+    "notion_fusionsolar_parent_page_id": "YOUR_FUSIONSOLAR_PARENT_PAGE_ID"
 }

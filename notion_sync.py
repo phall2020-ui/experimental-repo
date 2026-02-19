@@ -82,6 +82,10 @@ NOTION_DB_ID_FILE = SCRIPT_DIR / ".notion_db_id"
 NOTION_HH_DB_ID_FILE = SCRIPT_DIR / ".notion_hh_db_id"
 DB_NAME = "FusionSolar Daily Generation"
 HH_DB_NAME = "FusionSolar HH Site Data"
+# Cache: db_id -> {prop_name: prop_type} (populated on first upsert per DB)
+_DB_PROP_CACHE: dict = {}
+# Cache: db_id -> {prop_name: prop_type} (populated on first upsert per DB)
+_DB_PROP_CACHE: dict = {}
 
 def load_config():
     with open(CONFIG_PATH, "r") as f:
@@ -531,11 +535,48 @@ def append_hourly_table(page_id, hourly_yield, hourly_ssp=None):
         log.warning("  Exception appending table: %s", e)
 
 
+def _get_db_prop_types(db_id):
+    """Return {prop_name: prop_type} for the given DB, using a module-level cache."""
+    if db_id not in _DB_PROP_CACHE:
+        headers = get_notion_headers()
+        try:
+            r = requests.get(f"https://api.notion.com/v1/databases/{db_id}", headers=headers)
+            if r.status_code == 200:
+                _DB_PROP_CACHE[db_id] = {
+                    name: prop.get("type", "unknown")
+                    for name, prop in r.json().get("properties", {}).items()
+                }
+                log.info("  Cached DB schema for %s: %d properties", db_id, len(_DB_PROP_CACHE[db_id]))
+            else:
+                log.warning("  Could not fetch DB schema for %s: %s", db_id, r.status_code)
+                _DB_PROP_CACHE[db_id] = None  # unknown — allow all writes
+        except Exception as e:
+            log.warning("  Error fetching DB schema for %s: %s", db_id, e)
+            _DB_PROP_CACHE[db_id] = None
+    return _DB_PROP_CACHE.get(db_id)
+
+
 def upsert_notion_row(db_id, date_str, pv_kwh, inv_kwh, station_name,
                       alarms=None, irradiance_kwh_m2=None, capacity_kwp=None,
                       hourly_yield_json=None, hourly_ssp_json=None, daily_revenue_gbp=None):
-    """Insert or update a row in the Notion database."""
+    """Insert or update a row in the Notion database.
+
+    Dynamically adapts to the target DB schema: only writes properties that
+    exist in the DB and are not formula columns.  Hourly yield / SSP values
+    are expanded into individual column entries (e.g. '07:00', 'SSP 07:00 (£/MWh)')
+    when those columns are present in the DB.
+    """
     headers = get_notion_headers()
+
+    # --- Schema introspection ---
+    db_prop_types = _get_db_prop_types(db_id)  # {name: type} or None
+
+    def can_write(name):
+        """True if the property exists in this DB and is not a formula."""
+        if db_prop_types is None:
+            return True  # unknown schema — optimistically try all
+        typ = db_prop_types.get(name)
+        return typ is not None and typ != "formula"
 
     pv_mwh = round(pv_kwh / 1000.0, 3) if pv_kwh else 0
     inv_mwh = round(inv_kwh / 1000.0, 3) if inv_kwh else 0
@@ -544,33 +585,62 @@ def upsert_notion_row(db_id, date_str, pv_kwh, inv_kwh, station_name,
     pr = performance_ratio(pv_kwh, irradiance_kwh_m2, capacity_kwp) if irradiance_kwh_m2 and capacity_kwp else None
     sy = specific_yield(pv_kwh, capacity_kwp) if capacity_kwp else None
 
+    # --- Build props dict, guarding every field against missing/formula columns ---
     props = {
         "Date": {"title": [{"text": {"content": date_str}}]},
-        "PV Yield (kWh)": {"number": round(pv_kwh, 2) if pv_kwh else 0},
-        "PV Yield (MWh)": {"number": pv_mwh},
-        "Inverter Yield (kWh)": {"number": round(inv_kwh, 2) if inv_kwh else 0},
-        "Inverter Yield (MWh)": {"number": inv_mwh},
-        "Station": {"rich_text": [{"text": {"content": station_name}}]},
     }
-    if hourly_yield_json:
+    if can_write("PV Yield (kWh)"):
+        props["PV Yield (kWh)"] = {"number": round(pv_kwh, 2) if pv_kwh else 0}
+    if can_write("PV Yield (MWh)"):
+        props["PV Yield (MWh)"] = {"number": pv_mwh}
+    if can_write("Inverter Yield (kWh)"):
+        props["Inverter Yield (kWh)"] = {"number": round(inv_kwh, 2) if inv_kwh else 0}
+    if can_write("Inverter Yield (MWh)"):
+        props["Inverter Yield (MWh)"] = {"number": inv_mwh}
+    if can_write("Station"):
+        props["Station"] = {"rich_text": [{"text": {"content": station_name}}]}
+    if can_write("Record Date"):
+        props["Record Date"] = {"date": {"start": date_str}}
+    if hourly_yield_json and can_write("Hourly Yield (kWh)"):
         props["Hourly Yield (kWh)"] = {"rich_text": [{"text": {"content": hourly_yield_json}}]}
-    if hourly_ssp_json:
+    if hourly_ssp_json and can_write("Hourly SSP (\u00a3/MWh)"):
         props["Hourly SSP (\u00a3/MWh)"] = {"rich_text": [{"text": {"content": hourly_ssp_json}}]}
-    if daily_revenue_gbp is not None:
+    if daily_revenue_gbp is not None and can_write("Daily Revenue (\u00a3)"):
         props["Daily Revenue (\u00a3)"] = {"number": round(daily_revenue_gbp, 2)}
-
-    if irradiance_kwh_m2 is not None:
+    if irradiance_kwh_m2 is not None and can_write("Irradiance (kWh/m\u00b2)"):
         props["Irradiance (kWh/m\u00b2)"] = {"number": round(irradiance_kwh_m2, 3)}
-    if pr is not None:
+    if pr is not None and can_write("PR (%)"):
         props["PR (%)"] = {"number": pr}
-    if sy is not None:
+    if sy is not None and can_write("Specific Yield (kWh/kWp)"):
         props["Specific Yield (kWh/kWp)"] = {"number": sy}
     if alarms:
-        props["Alarms Critical"] = {"number": alarms.get("critical", 0) or 0}
-        props["Alarms Major"] = {"number": alarms.get("major", 0) or 0}
-        props["Alarms Minor"] = {"number": alarms.get("minor", 0) or 0}
+        if can_write("Alarms Critical"):
+            props["Alarms Critical"] = {"number": alarms.get("critical", 0) or 0}
+        if can_write("Alarms Major"):
+            props["Alarms Major"] = {"number": alarms.get("major", 0) or 0}
+        if can_write("Alarms Minor"):
+            props["Alarms Minor"] = {"number": alarms.get("minor", 0) or 0}
 
-    # Check if row exists
+    # Expand hourly yield JSON into individual time-slot columns (e.g. '07:00' ... '18:00')
+    if hourly_yield_json:
+        try:
+            for hour, val in json.loads(hourly_yield_json).items():
+                if can_write(hour):
+                    props[hour] = {"number": round(float(val), 3)}
+        except Exception as exc:
+            log.warning("  Could not expand hourly yield columns: %s", exc)
+
+    # Expand SSP JSON into individual SSP columns (e.g. 'SSP 07:00 (\u00a3/MWh)')
+    if hourly_ssp_json:
+        try:
+            for hour, val in json.loads(hourly_ssp_json).items():
+                col = f"SSP {hour} (\u00a3/MWh)"
+                if can_write(col):
+                    props[col] = {"number": round(float(val), 4)}
+        except Exception as exc:
+            log.warning("  Could not expand hourly SSP columns: %s", exc)
+
+    # --- Upsert with retry ---
     for attempt in range(3):
         try:
             page_id = query_notion_row(db_id, date_str)
@@ -587,19 +657,18 @@ def upsert_notion_row(db_id, date_str, pv_kwh, inv_kwh, station_name,
                     json={"parent": {"database_id": db_id}, "properties": props},
                 )
 
-
             if r.status_code in (200, 201):
                 res_json = r.json()
                 page_id = res_json["id"]
                 page_url = f"https://notion.so/{page_id.replace('-', '')}"
-                
-                irr_str = f", Irr={irradiance_kwh_m2:.3f} kWh/m²" if irradiance_kwh_m2 else ""
+
+                irr_str = f", Irr={irradiance_kwh_m2:.3f} kWh/m\u00b2" if irradiance_kwh_m2 else ""
                 pr_str = f", PR={pr:.1f}%" if pr else ""
-                
+
                 log.info("  Synced %s: PV=%.1f kWh (%.3f MWh), Inv=%.1f kWh%s%s",
                          date_str, pv_kwh or 0, pv_mwh, inv_kwh or 0, irr_str, pr_str)
                 log.info("  Page URL: %s", page_url)
-                
+
                 return page_id
             elif r.status_code == 429:
                 wait = 2.0 * (attempt + 1)
@@ -1396,7 +1465,13 @@ def main():
         sys.exit(1)
 
     # Find or create the Notion database
-    db_id = find_or_create_notion_db(target_parent_id=cfg.get("notion_parent_page_id"))
+    # notion_fusionsolar_parent_page_id pins the FusionSolar DB to a specific
+    # parent page (separate from the Stark HH parent page)
+    fusionsolar_parent = (
+        cfg.get("notion_fusionsolar_parent_page_id")
+        or cfg.get("notion_parent_page_id")
+    )
+    db_id = find_or_create_notion_db(target_parent_id=fusionsolar_parent)
     log.info("Notion DB ID: %s", db_id)
 
     # Verify schema and add missing columns
