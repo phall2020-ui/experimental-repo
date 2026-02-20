@@ -53,6 +53,17 @@ npm run build
 npx wrangler pages deploy dist --project-name solar-dashboard
 ```
 
+### Deploy frontend to GitHub Pages (free, fully automated)
+This repo includes a workflow at `.github/workflows/solar-dashboard-pages.yml` that deploys the app from `apps/solar-dashboard/frontend`.
+
+1. In GitHub repo settings, enable **Pages** and set source to **GitHub Actions**.
+2. In repo **Settings -> Secrets and variables -> Actions -> Variables**, add:
+   - `SOLAR_DASHBOARD_API_URL=https://<your-backend-domain>`
+3. Push to `main` (or run the workflow manually from Actions).
+
+Published URL:
+`https://<github-user>.github.io/experimental-repo/`
+
 ### Serve with Caddy (recommended)
 ```caddy
 solar.example.com {
