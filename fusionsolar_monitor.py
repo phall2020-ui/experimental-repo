@@ -682,7 +682,13 @@ def log_generation(data, dry_run=False):
 # ---------------------------------------------------------------------------
 
 def run_inverter_check(cfg, dry_run=False):
-    """Run a daylight inverter status check."""
+    """Run a daylight inverter status check.
+
+    Returns:
+        True  – check completed, all devices online
+        False – check completed, some devices offline (warning)
+        None  – check execution failed (login error, browser error, etc.)
+    """
     from playwright.sync_api import sync_playwright
 
     log.info("=" * 60)
@@ -701,7 +707,7 @@ def run_inverter_check(cfg, dry_run=False):
             # Login
             if not login(page, cfg):
                 log.error("Login failed -- aborting inverter check")
-                return False
+                return None
 
             # Navigate to device management
             navigate_to_page(page, cfg, "device-manage")
@@ -773,7 +779,7 @@ def run_inverter_check(cfg, dry_run=False):
 
         except Exception as e:
             log.exception("Error during inverter check: %s", e)
-            return False
+            return None
         finally:
             browser.close()
 
@@ -920,8 +926,10 @@ Examples:
         sys.exit(0 if success else 1)
 
     if args.check:
-        success = run_inverter_check(cfg, dry_run=args.dry_run)
-        sys.exit(0 if success else 1)
+        result = run_inverter_check(cfg, dry_run=args.dry_run)
+        # None = execution failed (login error, exception); True/False = check completed
+        # Offline devices are a monitoring warning, not a workflow failure
+        sys.exit(1 if result is None else 0)
 
     if args.report:
         success = run_generation_report(cfg, dry_run=args.dry_run)
