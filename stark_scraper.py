@@ -127,7 +127,22 @@ def _login(page, username, password, attempts=2):
                 return True
             page.wait_for_timeout(500)
 
-        print("Checking for login errors...")
+        # Capture diagnostics on every failure to proceed
+        print(f"Checking for login errors (Attempt {attempt})...")
+        log_dir = Path.cwd() / "logs"
+        log_dir.mkdir(exist_ok=True)
+        ts = int(time.time())
+        debug_html = log_dir / f"login_fail_att{attempt}_{ts}.html"
+        debug_png = log_dir / f"login_fail_att{attempt}_{ts}.png"
+        
+        try:
+            with open(debug_html, "w", encoding="utf-8") as f:
+                f.write(page.content())
+            page.screenshot(path=str(debug_png), full_page=True)
+            print(f"Saved attempt {attempt} diagnostics: {debug_html.name}")
+        except Exception as e:
+            print(f"Failed to save diagnostics: {e}")
+
         try:
             err = page.locator(".validation-summary-errors").first
             if err.count() > 0 and err.is_visible():
@@ -232,13 +247,7 @@ def run(
         try:
             print("Navigating to login page...")
             if not _login(page, username, password):
-                print(f"Login appears incomplete (still on sign-in page): {page.url}")
-                debug_html = f"login_failure_debug_{int(time.time())}.html"
-                debug_png = f"login_failure_debug_{int(time.time())}.png"
-                with open(debug_html, "w", encoding="utf-8") as f:
-                    f.write(page.content())
-                page.screenshot(path=debug_png, full_page=True)
-                print(f"Saved navigation debug HTML to {debug_html} and PNG to {debug_png}")
+                print(f"Login failed after multiple attempts (Final URL: {page.url})")
                 return None
             print("Login successful.")
             page.wait_for_load_state("networkidle")
