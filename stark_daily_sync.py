@@ -142,6 +142,15 @@ def ensure_schema(token, db_id):
         )
 
 
+def get_db_property_types(token, db_id):
+    """Return {property_name: notion_type} for the target DB."""
+    h = headers(token)
+    r = requests.get(f"https://api.notion.com/v1/databases/{db_id}", headers=h)
+    r.raise_for_status()
+    props = r.json().get("properties", {})
+    return {name: meta.get("type") for name, meta in props.items()}
+
+
 # ---------------------------------------------------------------------------
 # Notion row upsert
 # ---------------------------------------------------------------------------
@@ -155,7 +164,7 @@ def query_page_id(token, db_id, date_str):
     return results[0]["id"] if results else None
 
 
-def upsert_day(token, db_id, date_str, sp_kwh, sp_ssp):
+def upsert_day(token, db_id, date_str, sp_kwh, sp_ssp, set_total_kwh=True, set_settlement_date=False):
     """
     sp_kwh: dict {1: 0.0, …, 48: 1.23}
     sp_ssp: dict {1: 75.66, …, 48: 80.1}  (partial OK)
@@ -163,10 +172,11 @@ def upsert_day(token, db_id, date_str, sp_kwh, sp_ssp):
     h = headers(token)
     total = round(sum(sp_kwh.values()), 4)
 
-    props = {
-        "Date": {"title": [{"text": {"content": date_str}}]},
-        "Total kWh": {"number": total},
-    }
+    props = {"Date": {"title": [{"text": {"content": date_str}}]}}
+    if set_total_kwh:
+        props["Total kWh"] = {"number": total}
+    if set_settlement_date:
+        props["Settlement Date"] = {"date": {"start": date_str}}
     for i in range(1, 49):
         sp_key = f"SP{i:02d}"
         kwh = sp_kwh.get(i)
@@ -366,6 +376,11 @@ def main():
     # ---- DB setup ----------------------------------------------------------
     db_id = find_or_create_db(token, parent_page_id)
     ensure_schema(token, db_id)
+    prop_types = get_db_property_types(token, db_id)
+    set_total_kwh = prop_types.get("Total kWh") == "number"
+    set_settlement_date = prop_types.get("Settlement Date") == "date"
+    if set_settlement_date:
+        print("[DB] Settlement Date property detected; rows will be grouped by date correctly.")
     print(f"[DB] DB ID  : {db_id}")
     print(f"[DB] Range  : {start} → {end}")
     print(f"[DB] GenDir : {GEN_DIR}")
@@ -405,7 +420,11 @@ def main():
         has_ssp  = bool(sp_ssp)
 
         # 4. Upsert to Notion
-        ok, total = upsert_day(token, db_id, date_str, sp_kwh, sp_ssp)
+        ok, total = upsert_day(
+            token, db_id, date_str, sp_kwh, sp_ssp,
+            set_total_kwh=set_total_kwh,
+            set_settlement_date=set_settlement_date,
+        )
 
         status   = "OK  " if ok else "FAIL"
         ssp_note = f"SSP={len(sp_ssp)}/48SPs" if has_ssp else "SSP=none"
