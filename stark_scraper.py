@@ -112,11 +112,6 @@ def _login(page, username, password, attempts=2):
         while time.time() < deadline:
             if not _on_signin_page(page):
                 return True
-            try:
-                if page.locator("#inputUsernameOrEmail").count() == 0:
-                    return True
-            except Exception:
-                pass
             page.wait_for_timeout(500)
 
         print("Checking for login errors...")
