@@ -327,10 +327,30 @@ def all_dates(start, end):
     return dates
 
 
+def compute_exit_code(ok_count, fail_count, scrape_fail, fail_on_scrape_fail=True):
+    """
+    Return 0 on success, non-zero when sync health should fail the workflow.
+
+    We fail if any row failed to sync, and optionally fail if any scrape failed.
+    """
+    if fail_count > 0:
+        return 1
+    if fail_on_scrape_fail and scrape_fail > 0:
+        return 1
+    if ok_count == 0:
+        return 1
+    return 0
+
+
 def main():
     parser = argparse.ArgumentParser(description="Sync Stark HH generation → Notion (one row per day)")
     parser.add_argument("--start", default="2025-12-01", help="Start date YYYY-MM-DD")
     parser.add_argument("--end",   default=None,          help="End date  YYYY-MM-DD (default: today)")
+    parser.add_argument(
+        "--allow-scrape-fail",
+        action="store_true",
+        help="Do not return non-zero exit when scraping fails (not recommended for CI).",
+    )
     args = parser.parse_args()
 
     start = date.fromisoformat(args.start)
@@ -407,6 +427,15 @@ def main():
     print(f"DB ID  : {db_id}")
     print(f"DB URL : https://notion.so/{db_id.replace('-', '')}")
     print("=" * 60)
+    exit_code = compute_exit_code(
+        ok_count=ok_count,
+        fail_count=fail_count,
+        scrape_fail=scrape_fail,
+        fail_on_scrape_fail=not args.allow_scrape_fail,
+    )
+    if exit_code != 0:
+        print("[EXIT] Failing run due to sync errors.")
+    raise SystemExit(exit_code)
 
 
 if __name__ == "__main__":

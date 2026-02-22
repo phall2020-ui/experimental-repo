@@ -1,9 +1,13 @@
 import argparse
 import os
+import re
 import time
 from datetime import datetime
 from pathlib import Path
+
 from playwright.sync_api import sync_playwright
+
+
 def _first_visible(locator, timeout_ms=5000):
     end = time.time() + (timeout_ms / 1000.0)
     while time.time() < end:
@@ -14,6 +18,62 @@ def _first_visible(locator, timeout_ms=5000):
             pass
         time.sleep(0.2)
     return None
+
+
+def _click_first_visible(candidates, timeout_ms=8000):
+    end = time.time() + (timeout_ms / 1000.0)
+    while time.time() < end:
+        for locator in candidates:
+            try:
+                if locator.count() > 0 and locator.first.is_visible():
+                    locator.first.click(timeout=3000)
+                    return True
+            except Exception:
+                pass
+        time.sleep(0.2)
+    return False
+
+
+def _timeline_ready(page, timeout_ms=8000):
+    end = time.time() + (timeout_ms / 1000.0)
+    while time.time() < end:
+        try:
+            if page.locator("#btnOpenGroupTreeSearch").count() > 0:
+                return True
+            if page.locator("#groupSearchInput").count() > 0:
+                return True
+            if page.locator("#StartDate").count() > 0:
+                return True
+        except Exception:
+            pass
+        time.sleep(0.2)
+    return False
+
+
+def _open_timeline(page):
+    if _timeline_ready(page, timeout_ms=3000):
+        return True
+
+    dynamic_reports_candidates = [
+        page.get_by_role("link", name=re.compile(r"Dynamic Reports", re.I)),
+        page.get_by_role("button", name=re.compile(r"Dynamic Reports", re.I)),
+        page.get_by_text(re.compile(r"Dynamic Reports", re.I)),
+    ]
+    if not _click_first_visible(dynamic_reports_candidates, timeout_ms=12000):
+        return False
+
+    timeline_candidates = [
+        page.get_by_role("link", name=re.compile(r"Timeline", re.I)),
+        page.get_by_role("button", name=re.compile(r"Timeline", re.I)),
+        page.get_by_text(re.compile(r"Timeline", re.I)),
+    ]
+    if not _click_first_visible(timeline_candidates, timeout_ms=12000):
+        return False
+
+    page.wait_for_load_state("networkidle")
+    return _timeline_ready(page, timeout_ms=12000)
+
+
 def run(
     date_str,
     username=None,
@@ -66,18 +126,23 @@ def run(
             page.fill("#inputPassword", password)
             page.click("button[type='submit']")
             try:
-                page.wait_for_url("**/Dashboard*", timeout=30000)
+                page.wait_for_url(re.compile(r".*/Dashboard.*"), timeout=30000)
             except Exception:
                 print("Checking for login errors...")
                 if page.is_visible(".validation-summary-errors"):
                     print("Login error detected.")
                     return None
+                # Sometimes Stark keeps a non-dashboard post-login route.
+                # If login form still exists, treat as failure.
+                if page.locator("#inputUsernameOrEmail").count() > 0:
+                    print("Login appears incomplete (still on sign-in form).")
+                    return None
             print("Login successful.")
             page.wait_for_load_state("networkidle")
             print("Navigating to Dynamic Reports > Timeline...")
-            page.get_by_text("Dynamic Reports").click()
-            page.get_by_text("Timeline").click()
-            page.wait_for_load_state("networkidle")
+            if not _open_timeline(page):
+                print("Could not open Timeline report view after login.")
+                return None
 
             print(f"Selecting meter using search term: {search_text}...")
             page.click("#btnOpenGroupTreeSearch")
