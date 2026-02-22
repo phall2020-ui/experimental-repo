@@ -106,6 +106,8 @@ def _login(page, username, password, attempts=2):
         page.type("#inputUsernameOrEmail", username, delay=35)
         page.fill("#inputPassword", "")
         page.type("#inputPassword", password, delay=35)
+        page.keyboard.press("Enter")
+        # Fallback to click if enter isn't intercepted
         page.click("button[type='submit']")
 
         deadline = time.time() + 30
@@ -211,12 +213,21 @@ def run(
     print(f"Output: {output_path}")
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=headless)
-        context = browser.new_context(viewport={"width": 1920, "height": 1080})
+        context = browser.new_context(
+            viewport={"width": 1920, "height": 1080},
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        )
         page = context.new_page()
         try:
             print("Navigating to login page...")
             if not _login(page, username, password):
                 print(f"Login appears incomplete (still on sign-in page): {page.url}")
+                debug_html = f"login_failure_debug_{int(time.time())}.html"
+                debug_png = f"login_failure_debug_{int(time.time())}.png"
+                with open(debug_html, "w", encoding="utf-8") as f:
+                    f.write(page.content())
+                page.screenshot(path=debug_png, full_page=True)
+                print(f"Saved navigation debug HTML to {debug_html} and PNG to {debug_png}")
                 return None
             print("Login successful.")
             page.wait_for_load_state("networkidle")
