@@ -34,6 +34,58 @@ def _click_first_visible(candidates, timeout_ms=8000):
     return False
 
 
+def _click_text_via_js(page, pattern):
+    try:
+        return bool(page.evaluate(
+            """([rawPattern]) => {
+                const regex = new RegExp(rawPattern, "i");
+                const nodes = Array.from(document.querySelectorAll("a,button,span,div"));
+                for (const node of nodes) {
+                    const txt = (node.textContent || "").trim();
+                    if (!txt || !regex.test(txt)) continue;
+                    try { node.click(); return true; } catch (e) {}
+                }
+                return false;
+            }""",
+            [pattern],
+        ))
+    except Exception:
+        return False
+
+
+def _open_timeline_from_links(page):
+    try:
+        links = page.eval_on_selector_all(
+            "a[href]",
+            """els => els.map(e => ({
+                text: (e.textContent || "").trim(),
+                href: e.href || ""
+            }))""",
+        )
+    except Exception:
+        return False
+
+    timeline_href = ""
+    for link in links:
+        href = link.get("href", "")
+        text = link.get("text", "")
+        haystack = f"{text} {href}"
+        if re.search(r"timeline|dynamic\\s*report|report", haystack, re.I):
+            timeline_href = href
+            if re.search(r"timeline", haystack, re.I):
+                break
+
+    if not timeline_href:
+        return False
+
+    try:
+        page.goto(timeline_href, wait_until="domcontentloaded")
+        page.wait_for_load_state("networkidle")
+    except Exception:
+        return False
+    return _timeline_ready(page, timeout_ms=12000)
+
+
 def _timeline_ready(page, timeout_ms=8000):
     end = time.time() + (timeout_ms / 1000.0)
     while time.time() < end:
@@ -60,7 +112,10 @@ def _open_timeline(page):
         page.get_by_text(re.compile(r"Dynamic Reports", re.I)),
     ]
     if not _click_first_visible(dynamic_reports_candidates, timeout_ms=12000):
-        return False
+        # Last-resort fallback for dynamic menus that render text in non-standard nodes.
+        if not _click_text_via_js(page, r"Dynamic\s*Reports"):
+            return _open_timeline_from_links(page)
+        time.sleep(1)
 
     timeline_candidates = [
         page.get_by_role("link", name=re.compile(r"Timeline", re.I)),
@@ -68,10 +123,14 @@ def _open_timeline(page):
         page.get_by_text(re.compile(r"Timeline", re.I)),
     ]
     if not _click_first_visible(timeline_candidates, timeout_ms=12000):
-        return False
+        if not _click_text_via_js(page, r"Timeline"):
+            return _open_timeline_from_links(page)
+        time.sleep(1)
 
     page.wait_for_load_state("networkidle")
-    return _timeline_ready(page, timeout_ms=12000)
+    if _timeline_ready(page, timeout_ms=12000):
+        return True
+    return _open_timeline_from_links(page)
 
 
 def run(
@@ -141,7 +200,11 @@ def run(
             page.wait_for_load_state("networkidle")
             print("Navigating to Dynamic Reports > Timeline...")
             if not _open_timeline(page):
+                print(f"Current URL after login: {page.url}")
                 print("Could not open Timeline report view after login.")
+                debug_shot = f"timeline_nav_debug_{int(time.time())}.png"
+                page.screenshot(path=debug_shot, full_page=True)
+                print(f"Saved navigation debug screenshot to {debug_shot}")
                 return None
 
             print(f"Selecting meter using search term: {search_text}...")
