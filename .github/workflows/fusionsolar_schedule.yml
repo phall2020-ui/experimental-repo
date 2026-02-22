@@ -201,19 +201,27 @@ jobs:
           CMD="${{ steps.task.outputs.command }}"
           EXIT_CODE=0
           PYTHON_CMD=(python)
+          CMD_PARTS=()
+          read -r -a CMD_PARTS <<< "$CMD"
           if [ "${STARK_HEADLESS}" = "false" ] && command -v xvfb-run >/dev/null 2>&1; then
             PYTHON_CMD=(xvfb-run -a python)
           fi
           echo "Python runner: ${PYTHON_CMD[*]}"
 
-          if [[ "$CMD" == "--nightly-sync" ]]; then
+          if [[ "$CMD" == *"--nightly-sync"* ]]; then
+            NIGHTLY_ARGS=()
+            for arg in "${CMD_PARTS[@]}"; do
+              if [[ "$arg" != "--nightly-sync" ]]; then
+                NIGHTLY_ARGS+=("$arg")
+              fi
+            done
             echo "::group::Running Nightly Sync (Elexon + Stark)"
-            "${PYTHON_CMD[@]}" nightly_sync.py || EXIT_CODE=$?
+            "${PYTHON_CMD[@]}" nightly_sync.py "${NIGHTLY_ARGS[@]}" || EXIT_CODE=$?
             echo "::endgroup::"
           elif [[ "$CMD" == *"--backfill"* ]]; then
             echo "::group::Running Backfill"
-            echo "Command: ${PYTHON_CMD[*]} notion_sync.py $CMD"
-            "${PYTHON_CMD[@]}" notion_sync.py $CMD || EXIT_CODE=$?
+            echo "Command: ${PYTHON_CMD[*]} notion_sync.py ${CMD_PARTS[*]}"
+            "${PYTHON_CMD[@]}" notion_sync.py "${CMD_PARTS[@]}" || EXIT_CODE=$?
             echo "::endgroup::"
           elif [[ "$CMD" == *"--test-login"* ]]; then
             echo "::group::Testing Login"
@@ -221,8 +229,8 @@ jobs:
             echo "::endgroup::"
           else
             echo "::group::Running Monitor"
-            echo "Command: ${PYTHON_CMD[*]} fusionsolar_monitor.py $CMD"
-            "${PYTHON_CMD[@]}" fusionsolar_monitor.py $CMD || EXIT_CODE=$?
+            echo "Command: ${PYTHON_CMD[*]} fusionsolar_monitor.py ${CMD_PARTS[*]}"
+            "${PYTHON_CMD[@]}" fusionsolar_monitor.py "${CMD_PARTS[@]}" || EXIT_CODE=$?
             echo "::endgroup::"
           fi
 

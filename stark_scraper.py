@@ -53,6 +53,85 @@ def _click_text_via_js(page, pattern):
         return False
 
 
+def _save_debug_artifacts(page, prefix):
+    log_dir = Path.cwd() / "logs"
+    log_dir.mkdir(exist_ok=True)
+    ts = int(time.time())
+    debug_html = log_dir / f"{prefix}_{ts}.html"
+    debug_png = log_dir / f"{prefix}_{ts}.png"
+    try:
+        with open(debug_html, "w", encoding="utf-8") as f:
+            f.write(page.content())
+        page.screenshot(path=str(debug_png), full_page=True)
+        print(f"Saved diagnostics: {debug_html.name}, {debug_png.name}")
+    except Exception as e:
+        print(f"Failed to save diagnostics for {prefix}: {e}")
+
+
+def _digits_only(value):
+    return re.sub(r"\D", "", value or "")
+
+
+def _sample_locator_text(locator, limit=12):
+    samples = []
+    try:
+        count = min(locator.count(), limit)
+    except Exception:
+        return samples
+    for idx in range(count):
+        try:
+            text = (locator.nth(idx).inner_text(timeout=1000) or "").strip()
+        except Exception:
+            text = ""
+        if text:
+            samples.append(" ".join(text.split()))
+    return samples
+
+
+def _pick_best_candidate(locator, search_text, meter_id="", timeout_ms=10000):
+    search_text = (search_text or "").strip()
+    search_lower = search_text.lower()
+    search_digits = _digits_only(search_text)
+    meter_lower = (meter_id or "").lower()
+    end = time.time() + (timeout_ms / 1000.0)
+
+    while time.time() < end:
+        best = None
+        try:
+            count = locator.count()
+        except Exception:
+            count = 0
+        for idx in range(min(count, 50)):
+            item = locator.nth(idx)
+            try:
+                text = (item.inner_text(timeout=1000) or "").strip()
+            except Exception:
+                continue
+            if not text:
+                continue
+            text_norm = " ".join(text.split())
+            text_lower = text_norm.lower()
+            text_digits = _digits_only(text_norm)
+
+            score = 0
+            if search_digits and search_digits in text_digits:
+                score += 100
+            if search_lower and search_lower in text_lower:
+                score += 40
+            if meter_lower and meter_lower in text_lower:
+                score += 20
+            if re.search(r"\b(export|generation)\b", text_lower):
+                score += 10
+
+            if score > 0 and (best is None or score > best["score"]):
+                best = {"idx": idx, "score": score, "text": text_norm}
+
+        if best:
+            return locator.nth(best["idx"]), best["text"], best["score"]
+        time.sleep(0.3)
+    return None, "", 0
+
+
 def _open_timeline_from_links(page):
     try:
         links = page.eval_on_selector_all(
@@ -211,19 +290,7 @@ def _login(page, username, password, attempts=2):
 
         # Capture diagnostics on every failure to proceed
         print(f"Checking for login errors (Attempt {attempt})...")
-        log_dir = Path.cwd() / "logs"
-        log_dir.mkdir(exist_ok=True)
-        ts = int(time.time())
-        debug_html = log_dir / f"login_fail_att{attempt}_{ts}.html"
-        debug_png = log_dir / f"login_fail_att{attempt}_{ts}.png"
-        
-        try:
-            with open(debug_html, "w", encoding="utf-8") as f:
-                f.write(page.content())
-            page.screenshot(path=str(debug_png), full_page=True)
-            print(f"Saved attempt {attempt} diagnostics: {debug_html.name}")
-        except Exception as e:
-            print(f"Failed to save diagnostics: {e}")
+        _save_debug_artifacts(page, f"login_fail_att{attempt}")
 
         try:
             err = page.locator(".validation-summary-errors").first
@@ -239,14 +306,17 @@ def _login(page, username, password, attempts=2):
 
 
 def _timeline_ready(page, timeout_ms=8000):
+    timeline_selectors = ["#StartDate", "#EndDate", "#buttonRunReport"]
     end = time.time() + (timeout_ms / 1000.0)
     while time.time() < end:
+        for selector in timeline_selectors:
+            try:
+                if page.locator(selector).count() > 0:
+                    return True
+            except Exception:
+                pass
         try:
-            if page.locator("#btnOpenGroupTreeSearch").count() > 0:
-                return True
-            if page.locator("#groupSearchInput").count() > 0:
-                return True
-            if page.locator("#StartDate").count() > 0:
+            if page.get_by_text(re.compile(r"\bTimeline\b", re.I)).count() > 0 and page.locator("#buttonRunReport").count() > 0:
                 return True
         except Exception:
             pass
@@ -355,37 +425,46 @@ def run(
             page.wait_for_selector("#groupSearchInput", state="visible")
             page.fill("#groupSearchInput", search_text)
             page.press("#groupSearchInput", "Enter")
-            search_result = _first_visible(
-                page.locator(".searchItemName").filter(has_text=search_text).filter(has_text=meter_id),
-                timeout_ms=10000
+            search_result, search_label, search_score = _pick_best_candidate(
+                page.locator("#groupSearchResults button, .groupSearchResult button, .searchItemName"),
+                search_text=search_text,
+                meter_id=meter_id,
+                timeout_ms=12000,
             )
-            if not search_result:
-                search_result = _first_visible(
-                    page.locator(".searchItemName").filter(has_text=search_text),
-                    timeout_ms=5000
-                )
             if search_result:
-                print("Clicking MPAN search result...")
+                print(f"Clicking MPAN search result (score={search_score}): {search_label}")
                 search_result.click()
+                page.wait_for_timeout(1000)
             else:
                 # Do NOT fall back to site name — that hits the import/consumption meter.
                 # Only the explicit MPAN search returns the generation (export) meter.
+                samples = _sample_locator_text(
+                    page.locator("#groupSearchResults button, .groupSearchResult button, .searchItemName")
+                )
+                if samples:
+                    print("Available search results:")
+                    for sample in samples:
+                        print(f"  - {sample}")
                 print(f"MPAN search result not found for '{search_text}'. Aborting to avoid selecting wrong meter.")
+                _save_debug_artifacts(page, "mpan_search_missing")
                 return None
-            tree_item = _first_visible(
-                page.locator(".treeItemName").filter(has_text=search_text).filter(has_text=meter_id),
-                timeout_ms=10000
+            tree_item, tree_label, tree_score = _pick_best_candidate(
+                page.locator(".treeItemName"),
+                search_text=search_text,
+                meter_id=meter_id,
+                timeout_ms=12000,
             )
             if not tree_item:
-                tree_item = _first_visible(
-                    page.locator(".treeItemName").filter(has_text=search_text),
-                    timeout_ms=5000
-                )
-            if not tree_item:
                 # Do NOT fall back to site name tree item.
+                samples = _sample_locator_text(page.locator(".treeItemName"))
+                if samples:
+                    print("Available tree items:")
+                    for sample in samples:
+                        print(f"  - {sample}")
                 print(f"Could not locate generation meter tree item for MPAN '{search_text}'. Aborting.")
+                _save_debug_artifacts(page, "tree_item_missing")
                 return None
-            print("Double-clicking tree item...")
+            print(f"Double-clicking tree item (score={tree_score}): {tree_label}")
             time.sleep(1)
             tree_item.dblclick()
             time.sleep(1)
@@ -396,6 +475,14 @@ def run(
                 page.locator(".modalCurtain").first.wait_for(state="hidden", timeout=5000)
             except Exception:
                 pass
+
+            if not _timeline_ready(page, timeout_ms=3000):
+                print("Timeline controls not visible after meter selection; reopening Timeline view...")
+                if not _open_timeline(page):
+                    print("Could not reopen Timeline view after meter selection.")
+                    _save_debug_artifacts(page, "timeline_missing_after_meter")
+                    return None
+
             print(f"Setting date to {formatted_date}...")
             page.wait_for_selector("#StartDate", state="attached", timeout=30000)
             page.evaluate(f"document.getElementById('StartDate').value = '{formatted_date}'")
