@@ -164,6 +164,25 @@ def query_page_id(token, db_id, date_str):
     return results[0]["id"] if results else None
 
 
+def find_missing_dates(token, db_id, start, end):
+    """
+    Check which dates in [start, end] are missing from Notion DB.
+    Returns tuple: (missing_dates:list[date], existing_count:int, checked_count:int)
+    """
+    missing = []
+    existing = 0
+    checked = 0
+    for d in all_dates(start, end):
+        checked += 1
+        if query_page_id(token, db_id, d.isoformat()):
+            existing += 1
+        else:
+            missing.append(d)
+        # Keep API pressure low while scanning many dates.
+        time.sleep(0.05)
+    return missing, existing, checked
+
+
 def upsert_day(token, db_id, date_str, sp_kwh, sp_ssp, set_total_kwh=True, set_settlement_date=False):
     """
     sp_kwh: dict {1: 0.0, …, 48: 1.23}
@@ -357,6 +376,15 @@ def main():
     parser.add_argument("--start", default="2025-12-01", help="Start date YYYY-MM-DD")
     parser.add_argument("--end",   default=None,          help="End date  YYYY-MM-DD (default: today)")
     parser.add_argument(
+        "--backfill-window-days",
+        type=int,
+        default=30,
+        help=(
+            "Before normal sync, check this recent window for missing dates in Notion "
+            "and auto-backfill them (default: 30, set 0 to disable)."
+        ),
+    )
+    parser.add_argument(
         "--allow-scrape-fail",
         action="store_true",
         help="Do not return non-zero exit when scraping fails (not recommended for CI).",
@@ -386,7 +414,41 @@ def main():
     print(f"[DB] GenDir : {GEN_DIR}")
     print()
 
-    dates = all_dates(start, end)
+    requested_dates = all_dates(start, end)
+    dates = list(requested_dates)
+
+    if args.backfill_window_days > 0:
+        backfill_start = end - timedelta(days=args.backfill_window_days - 1)
+        if backfill_start < date(2000, 1, 1):
+            backfill_start = date(2000, 1, 1)
+        print(
+            f"[BACKFILL] Checking Notion for missing dates in recent window: "
+            f"{backfill_start} → {end}"
+        )
+        missing_recent, existing_recent, checked_recent = find_missing_dates(
+            token=token,
+            db_id=db_id,
+            start=backfill_start,
+            end=end,
+        )
+        requested_set = set(requested_dates)
+        extra_backfill = [d for d in missing_recent if d not in requested_set]
+        print(
+            f"[BACKFILL] Checked={checked_recent} Existing={existing_recent} Missing={len(missing_recent)}"
+        )
+        if extra_backfill:
+            print(
+                f"[BACKFILL] Adding {len(extra_backfill)} missing date(s) to this run: "
+                f"{extra_backfill[0]} → {extra_backfill[-1]}"
+            )
+            dates = sorted(set(dates + extra_backfill))
+        elif missing_recent:
+            print("[BACKFILL] Missing dates are already inside requested sync range.")
+        else:
+            print("[BACKFILL] No missing dates found in recent window.")
+    else:
+        print("[BACKFILL] Missing-date check disabled (--backfill-window-days 0).")
+
     print(f"[SYNC] {len(dates)} dates to process\n")
 
     ok_count = 0
