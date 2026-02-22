@@ -56,6 +56,8 @@ jobs:
           if [ -z "${{ secrets.FUSIONSOLAR_USERNAME }}" ]; then missing="$missing FUSIONSOLAR_USERNAME"; fi
           if [ -z "${{ secrets.FUSIONSOLAR_PASSWORD }}" ]; then missing="$missing FUSIONSOLAR_PASSWORD"; fi
           if [ -z "${{ secrets.NOTION_TOKEN }}" ]; then missing="$missing NOTION_TOKEN"; fi
+          if [ -z "${{ secrets.STARK_USERNAME }}" ]; then missing="$missing STARK_USERNAME"; fi
+          if [ -z "${{ secrets.STARK_PASSWORD }}" ]; then missing="$missing STARK_PASSWORD"; fi
           if [ -n "$missing" ]; then
             echo "::error::Missing required secrets:$missing"
             exit 1
