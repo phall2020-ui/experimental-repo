@@ -106,7 +106,20 @@ def _login(page, username, password, attempts=2):
         page.type("#inputUsernameOrEmail", username, delay=35)
         page.fill("#inputPassword", "")
         page.type("#inputPassword", password, delay=35)
-        page.click("button[type='submit']")
+        page.keyboard.press("Enter")
+
+        # Wait a moment to see if "Enter" triggered navigation
+        time.sleep(1)
+        if not _on_signin_page(page):
+             return True
+
+        # Fallback to click if enter isn't intercepted and we're still on the signin page
+        try:
+            submit_btn = page.locator("button[type='submit']").first
+            if submit_btn.count() > 0 and submit_btn.is_visible():
+                submit_btn.click(timeout=5000)
+        except Exception:
+            pass
 
         deadline = time.time() + 30
         while time.time() < deadline:
@@ -211,12 +224,21 @@ def run(
     print(f"Output: {output_path}")
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=headless)
-        context = browser.new_context(viewport={"width": 1920, "height": 1080})
+        context = browser.new_context(
+            viewport={"width": 1920, "height": 1080},
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        )
         page = context.new_page()
         try:
             print("Navigating to login page...")
             if not _login(page, username, password):
                 print(f"Login appears incomplete (still on sign-in page): {page.url}")
+                debug_html = f"login_failure_debug_{int(time.time())}.html"
+                debug_png = f"login_failure_debug_{int(time.time())}.png"
+                with open(debug_html, "w", encoding="utf-8") as f:
+                    f.write(page.content())
+                page.screenshot(path=debug_png, full_page=True)
+                print(f"Saved navigation debug HTML to {debug_html} and PNG to {debug_png}")
                 return None
             print("Login successful.")
             page.wait_for_load_state("networkidle")
