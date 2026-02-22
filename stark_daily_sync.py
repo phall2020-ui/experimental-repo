@@ -164,6 +164,101 @@ def query_page_id(token, db_id, date_str):
     return results[0]["id"] if results else None
 
 
+def _safe_float(value):
+    try:
+        if value is None:
+            return None
+        if isinstance(value, (int, float)):
+            return float(value)
+        s = str(value).replace(",", "").strip()
+        if not s:
+            return None
+        return float(s)
+    except (ValueError, TypeError):
+        return None
+
+
+def _extract_text(prop):
+    if not isinstance(prop, dict):
+        return ""
+    typ = prop.get("type")
+    parts = prop.get(typ, []) if typ in {"title", "rich_text"} else []
+    out = []
+    for part in parts:
+        txt = part.get("plain_text") or part.get("text", {}).get("content")
+        if txt:
+            out.append(txt)
+    return "".join(out).strip()
+
+
+def _extract_number(prop):
+    if not isinstance(prop, dict):
+        return None
+    typ = prop.get("type")
+    if typ == "number":
+        return _safe_float(prop.get("number"))
+    if typ == "formula":
+        formula = prop.get("formula", {})
+        ftyp = formula.get("type")
+        if ftyp == "number":
+            return _safe_float(formula.get("number"))
+        if ftyp == "string":
+            return _safe_float(formula.get("string"))
+        return None
+    if typ in {"title", "rich_text"}:
+        return _safe_float(_extract_text(prop))
+    return None
+
+
+def _extract_date_title(props):
+    date_title = _extract_text(props.get("Date", {}))
+    if date_title:
+        return date_title
+    rec = props.get("Record Date", {})
+    if isinstance(rec, dict) and rec.get("type") == "date":
+        date_obj = rec.get("date", {}) or {}
+        rec_start = date_obj.get("start")
+        if rec_start:
+            return str(rec_start)[:10]
+    return ""
+
+
+def _stark_total_from_props(props):
+    direct_total = _extract_number(props.get("Total kWh", {}))
+    if direct_total is not None:
+        return direct_total
+    total = 0.0
+    found = False
+    for i in range(1, 49):
+        kwh = _extract_number(props.get(f"SP{i:02d}_kWh", {}))
+        if kwh is not None:
+            total += kwh
+            found = True
+    return round(total, 5) if found else None
+
+
+def _fusion_total_from_props(props):
+    for name in ("Daily Total (kWh)", "PV Yield (kWh)", "Inverter Yield (kWh)"):
+        value = _extract_number(props.get(name, {}))
+        if value is not None:
+            return value
+    for name in ("PV Yield (MWh)", "Inverter Yield (MWh)"):
+        value = _extract_number(props.get(name, {}))
+        if value is not None:
+            return value * 1000.0
+
+    # Fallback for hourly-only rows.
+    total = 0.0
+    found = False
+    for hour in range(7, 19):
+        key = f"{hour:02d}:00"
+        value = _extract_number(props.get(key, {}))
+        if value is not None:
+            total += value
+            found = True
+    return round(total, 5) if found else None
+
+
 def load_existing_date_titles(token, db_id):
     """
     Return set of existing Date title values already present in the Notion DB.
@@ -171,6 +266,7 @@ def load_existing_date_titles(token, db_id):
     """
     h = headers(token)
     existing = set()
+    stark_totals = {}
     pages = 0
     cursor = None
     while True:
@@ -186,19 +282,73 @@ def load_existing_date_titles(token, db_id):
         data = r.json()
         pages += 1
         for row in data.get("results", []):
-            title_parts = (
-                row.get("properties", {})
-                .get("Date", {})
-                .get("title", [])
-            )
-            date_str = "".join(part.get("plain_text", "") for part in title_parts).strip()
+            props = row.get("properties", {})
+            date_str = _extract_date_title(props)
             if date_str:
                 existing.add(date_str)
+                total = _stark_total_from_props(props)
+                if total is not None:
+                    stark_totals[date_str] = total
         if not data.get("has_more"):
             break
         cursor = data.get("next_cursor")
     print(f"[BACKFILL] Loaded {len(existing)} existing date row(s) from Notion across {pages} page(s).")
-    return existing
+    return existing, stark_totals
+
+
+def load_fusion_totals_by_date(token, fusion_db_id):
+    """Return {YYYY-MM-DD: daily_kwh} from the FusionSolar Notion DB."""
+    h = headers(token)
+    totals = {}
+    pages = 0
+    cursor = None
+    while True:
+        payload = {"page_size": 100}
+        if cursor:
+            payload["start_cursor"] = cursor
+        r = requests.post(f"https://api.notion.com/v1/databases/{fusion_db_id}/query", headers=h, json=payload)
+        if r.status_code == 429:
+            retry = float(r.headers.get("Retry-After", "1"))
+            time.sleep(max(1.0, retry))
+            continue
+        if r.status_code != 200:
+            print(f"[COMPARE] Could not query FusionSolar DB {fusion_db_id}: {r.status_code}")
+            return {}
+        data = r.json()
+        pages += 1
+        for row in data.get("results", []):
+            props = row.get("properties", {})
+            date_str = _extract_date_title(props)
+            if not date_str:
+                continue
+            total = _fusion_total_from_props(props)
+            if total is not None:
+                totals[date_str] = total
+        if not data.get("has_more"):
+            break
+        cursor = data.get("next_cursor")
+    print(f"[COMPARE] Loaded {len(totals)} FusionSolar daily total row(s) across {pages} page(s).")
+    return totals
+
+
+def find_mismatch_dates(fusion_totals, stark_totals, start, end, threshold_pct=8.0):
+    """
+    Return dates where Stark/Fusion totals differ by more than threshold percentage.
+    """
+    mismatches = []
+    for d in all_dates(start, end):
+        date_str = d.isoformat()
+        fusion = fusion_totals.get(date_str)
+        if fusion is None:
+            continue
+        stark = stark_totals.get(date_str, 0.0)
+        if fusion <= 0:
+            diff_pct = 0.0 if abs(stark) <= 0.001 else 100.0
+        else:
+            diff_pct = abs(stark - fusion) / fusion * 100.0
+        if diff_pct > threshold_pct:
+            mismatches.append((d, stark, fusion, diff_pct))
+    return mismatches
 
 
 def find_missing_dates(existing_date_titles, start, end):
@@ -426,6 +576,15 @@ def main():
         ),
     )
     parser.add_argument(
+        "--fusion-diff-threshold-pct",
+        type=float,
+        default=8.0,
+        help=(
+            "If Stark total differs from FusionSolar daily total by more than this percent, "
+            "auto-backfill that date by scraping and overwriting Stark row (default: 8.0)."
+        ),
+    )
+    parser.add_argument(
         "--allow-scrape-fail",
         action="store_true",
         help="Do not return non-zero exit when scraping fails (not recommended for CI).",
@@ -439,6 +598,7 @@ def main():
     token = cfg.get("notion_token") or os.environ.get("NOTION_TOKEN")
     if not token:
         sys.exit("ERROR: No notion_token in config.json or NOTION_TOKEN env var")
+    fusion_db_id = cfg.get("notion_fusionsolar_db_id") or os.environ.get("NOTION_FUSIONSOLAR_DB_ID")
 
     parent_page_id = cfg.get("notion_parent_page_id")
 
@@ -457,6 +617,7 @@ def main():
 
     requested_dates = all_dates(start, end)
     dates = list(requested_dates)
+    stark_totals = {}
 
     if args.backfill_check_start:
         backfill_start = date.fromisoformat(args.backfill_check_start)
@@ -466,7 +627,7 @@ def main():
             f"[BACKFILL] Checking Notion for missing dates from absolute start: "
             f"{backfill_start} → {end}"
         )
-        existing_titles = load_existing_date_titles(token, db_id)
+        existing_titles, stark_totals = load_existing_date_titles(token, db_id)
         missing_recent, existing_recent, checked_recent = find_missing_dates(
             existing_date_titles=existing_titles,
             start=backfill_start,
@@ -487,6 +648,42 @@ def main():
             print("[BACKFILL] Missing dates are already inside requested sync range.")
         else:
             print("[BACKFILL] No missing dates found in checked range.")
+
+        if fusion_db_id:
+            fusion_totals = load_fusion_totals_by_date(token, fusion_db_id)
+            mismatches = find_mismatch_dates(
+                fusion_totals=fusion_totals,
+                stark_totals=stark_totals,
+                start=backfill_start,
+                end=end,
+                threshold_pct=args.fusion_diff_threshold_pct,
+            )
+            if mismatches:
+                print(
+                    f"[COMPARE] Found {len(mismatches)} date(s) above "
+                    f"{args.fusion_diff_threshold_pct:.1f}% Stark/Fusion variance."
+                )
+                for d, stark_val, fusion_val, pct in mismatches[:10]:
+                    print(
+                        f"[COMPARE] {d.isoformat()}: Stark={stark_val:.2f} kWh, "
+                        f"Fusion={fusion_val:.2f} kWh, diff={pct:.1f}%"
+                    )
+                mismatch_dates = [d for d, _, _, _ in mismatches]
+                extra_mismatch = [d for d in mismatch_dates if d not in requested_set]
+                if extra_mismatch:
+                    print(
+                        f"[COMPARE] Adding {len(extra_mismatch)} mismatch date(s) to run: "
+                        f"{extra_mismatch[0]} → {extra_mismatch[-1]}"
+                    )
+                    dates = sorted(set(dates + extra_mismatch))
+                else:
+                    print("[COMPARE] Mismatch dates already in requested sync range.")
+            else:
+                print(
+                    f"[COMPARE] No Stark/Fusion mismatches above {args.fusion_diff_threshold_pct:.1f}%."
+                )
+        else:
+            print("[COMPARE] notion_fusionsolar_db_id not configured; skipping Stark/Fusion variance audit.")
     elif args.backfill_window_days > 0:
         backfill_start = end - timedelta(days=args.backfill_window_days - 1)
         if backfill_start < date(2000, 1, 1):
@@ -495,7 +692,7 @@ def main():
             f"[BACKFILL] Checking Notion for missing dates in recent window: "
             f"{backfill_start} → {end}"
         )
-        existing_titles = load_existing_date_titles(token, db_id)
+        existing_titles, stark_totals = load_existing_date_titles(token, db_id)
         missing_recent, existing_recent, checked_recent = find_missing_dates(
             existing_date_titles=existing_titles,
             start=backfill_start,
@@ -516,6 +713,42 @@ def main():
             print("[BACKFILL] Missing dates are already inside requested sync range.")
         else:
             print("[BACKFILL] No missing dates found in recent window.")
+
+        if fusion_db_id:
+            fusion_totals = load_fusion_totals_by_date(token, fusion_db_id)
+            mismatches = find_mismatch_dates(
+                fusion_totals=fusion_totals,
+                stark_totals=stark_totals,
+                start=backfill_start,
+                end=end,
+                threshold_pct=args.fusion_diff_threshold_pct,
+            )
+            if mismatches:
+                print(
+                    f"[COMPARE] Found {len(mismatches)} date(s) above "
+                    f"{args.fusion_diff_threshold_pct:.1f}% Stark/Fusion variance."
+                )
+                for d, stark_val, fusion_val, pct in mismatches[:10]:
+                    print(
+                        f"[COMPARE] {d.isoformat()}: Stark={stark_val:.2f} kWh, "
+                        f"Fusion={fusion_val:.2f} kWh, diff={pct:.1f}%"
+                    )
+                mismatch_dates = [d for d, _, _, _ in mismatches]
+                extra_mismatch = [d for d in mismatch_dates if d not in requested_set]
+                if extra_mismatch:
+                    print(
+                        f"[COMPARE] Adding {len(extra_mismatch)} mismatch date(s) to run: "
+                        f"{extra_mismatch[0]} → {extra_mismatch[-1]}"
+                    )
+                    dates = sorted(set(dates + extra_mismatch))
+                else:
+                    print("[COMPARE] Mismatch dates already in requested sync range.")
+            else:
+                print(
+                    f"[COMPARE] No Stark/Fusion mismatches above {args.fusion_diff_threshold_pct:.1f}%."
+                )
+        else:
+            print("[COMPARE] notion_fusionsolar_db_id not configured; skipping Stark/Fusion variance audit.")
     else:
         print("[BACKFILL] Missing-date check disabled (--backfill-window-days 0).")
 
@@ -529,6 +762,7 @@ def main():
     for i, d in enumerate(dates, 1):
         date_str = d.isoformat()
         prefix   = f"  [{i:>3}/{len(dates)}] {date_str}"
+        existing_stark_total = stark_totals.get(date_str)
 
         # 1. Scrape fresh generation data from Stark (always — never use old CSVs)
         csv_path = scrape_generation(cfg, d)
@@ -546,6 +780,15 @@ def main():
             sys.stdout.flush()
             fail_count += 1
             continue
+        new_stark_total = round(sum(sp_kwh.values()), 4)
+        if existing_stark_total is not None:
+            if abs(new_stark_total - existing_stark_total) > 0.01:
+                print(
+                    f"{prefix}  OVERWRITE  old={existing_stark_total:.2f} kWh -> "
+                    f"new={new_stark_total:.2f} kWh"
+                )
+            else:
+                print(f"{prefix}  NO-CHANGE  Stark total still {new_stark_total:.2f} kWh")
 
         # 3. Load SSP
         sp_ssp   = load_ssp(date_str)
@@ -566,6 +809,7 @@ def main():
         if ok:
             ok_count      += 1
             total_kwh_all += total
+            stark_totals[date_str] = total
         else:
             fail_count += 1
 
