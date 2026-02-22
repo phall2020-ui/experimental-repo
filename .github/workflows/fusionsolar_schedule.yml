@@ -43,6 +43,14 @@ jobs:
   monitor:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+      FUSIONSOLAR_USERNAME: ${{ secrets.FUSIONSOLAR_USERNAME }}
+      FUSIONSOLAR_PASSWORD: ${{ secrets.FUSIONSOLAR_PASSWORD }}
+      STARK_USERNAME: ${{ secrets.STARK_USERNAME }}
+      STARK_PASSWORD: ${{ secrets.STARK_PASSWORD }}
+      STARK_SITE_NAME: ${{ secrets.STARK_SITE_NAME }}
+      STARK_SEARCH_TEXT: ${{ secrets.STARK_SEARCH_TEXT }}
 
     steps:
       - name: Checkout repository
@@ -53,11 +61,11 @@ jobs:
       - name: Validate secrets
         run: |
           missing=""
-          if [ -z "${{ secrets.FUSIONSOLAR_USERNAME }}" ]; then missing="$missing FUSIONSOLAR_USERNAME"; fi
-          if [ -z "${{ secrets.FUSIONSOLAR_PASSWORD }}" ]; then missing="$missing FUSIONSOLAR_PASSWORD"; fi
-          if [ -z "${{ secrets.NOTION_TOKEN }}" ]; then missing="$missing NOTION_TOKEN"; fi
-          if [ -z "${{ secrets.STARK_USERNAME }}" ]; then missing="$missing STARK_USERNAME"; fi
-          if [ -z "${{ secrets.STARK_PASSWORD }}" ]; then missing="$missing STARK_PASSWORD"; fi
+          if [ -z "${FUSIONSOLAR_USERNAME}" ]; then missing="$missing FUSIONSOLAR_USERNAME"; fi
+          if [ -z "${FUSIONSOLAR_PASSWORD}" ]; then missing="$missing FUSIONSOLAR_PASSWORD"; fi
+          if [ -z "${NOTION_TOKEN}" ]; then missing="$missing NOTION_TOKEN"; fi
+          if [ -z "${STARK_USERNAME}" ]; then missing="$missing STARK_USERNAME"; fi
+          if [ -z "${STARK_PASSWORD}" ]; then missing="$missing STARK_PASSWORD"; fi
           if [ -n "$missing" ]; then
             echo "::error::Missing required secrets:$missing"
             exit 1
@@ -124,13 +132,13 @@ jobs:
           TEMPLATE
 
           # Inject secrets via jq
-          jq --arg u "${{ secrets.FUSIONSOLAR_USERNAME }}" \
-             --arg p "${{ secrets.FUSIONSOLAR_PASSWORD }}" \
-             --arg t "${{ secrets.NOTION_TOKEN }}" \
-             --arg su "${{ secrets.STARK_USERNAME }}" \
-             --arg sp "${{ secrets.STARK_PASSWORD }}" \
-             --arg ss "${{ secrets.STARK_SITE_NAME }}" \
-             --arg sx "${{ secrets.STARK_SEARCH_TEXT }}" \
+          jq --arg u "$FUSIONSOLAR_USERNAME" \
+             --arg p "$FUSIONSOLAR_PASSWORD" \
+             --arg t "$NOTION_TOKEN" \
+             --arg su "$STARK_USERNAME" \
+             --arg sp "$STARK_PASSWORD" \
+             --arg ss "$STARK_SITE_NAME" \
+             --arg sx "$STARK_SEARCH_TEXT" \
              '.credentials.username = $u
               | .credentials.password = $p
               | .notion_token = $t
@@ -139,6 +147,10 @@ jobs:
               | .stark.site_name = (if ($ss // "") == "" then "Point Lane" else $ss end)
               | .stark.search_text = (if ($sx // "") == "" then "2100042103940" else $sx end)' \
              config.json > config.tmp && mv config.tmp config.json
+
+          # Sanity check post-injection (fail fast if any value unexpectedly blank).
+          jq -e '.stark.username != "" and .stark.password != "" and .credentials.username != "" and .credentials.password != "" and .notion_token != ""' config.json >/dev/null \
+            || { echo "::error::Injected config contains blank required credentials"; exit 1; }
 
       - name: Create logs directory
         run: mkdir -p logs
