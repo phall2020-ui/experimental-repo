@@ -107,8 +107,19 @@ def _login(page, username, password, attempts=2):
         page.fill("#inputPassword", "")
         page.type("#inputPassword", password, delay=35)
         page.keyboard.press("Enter")
-        # Fallback to click if enter isn't intercepted
-        page.click("button[type='submit']")
+
+        # Wait a moment to see if "Enter" triggered navigation
+        time.sleep(1)
+        if not _on_signin_page(page):
+             return True
+
+        # Fallback to click if enter isn't intercepted and we're still on the signin page
+        try:
+            submit_btn = page.locator("button[type='submit']").first
+            if submit_btn.count() > 0 and submit_btn.is_visible():
+                submit_btn.click(timeout=5000)
+        except Exception:
+            pass
 
         deadline = time.time() + 30
         while time.time() < deadline:
