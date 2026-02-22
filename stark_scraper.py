@@ -108,13 +108,16 @@ def _login(page, username, password, attempts=2):
         page.type("#inputPassword", password, delay=35)
         page.click("button[type='submit']")
 
-        try:
-            page.wait_for_url(lambda url: "starkid/signin" not in url.lower(), timeout=30000)
-        except Exception:
-            pass
-
-        if not _on_signin_page(page):
-            return True
+        deadline = time.time() + 30
+        while time.time() < deadline:
+            if not _on_signin_page(page):
+                return True
+            try:
+                if page.locator("#inputUsernameOrEmail").count() == 0:
+                    return True
+            except Exception:
+                pass
+            page.wait_for_timeout(500)
 
         print("Checking for login errors...")
         try:
