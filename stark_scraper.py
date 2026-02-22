@@ -86,6 +86,50 @@ def _open_timeline_from_links(page):
     return _timeline_ready(page, timeout_ms=12000)
 
 
+def _on_signin_page(page):
+    return "starkid/signin" in page.url.lower()
+
+
+def _login(page, username, password, attempts=2):
+    for attempt in range(1, attempts + 1):
+        print(f"Logging in... (attempt {attempt}/{attempts})")
+        page.goto("https://id.stark.co.uk/StarkID/SignIn", wait_until="domcontentloaded")
+        try:
+            if page.is_visible("#onetrust-accept-btn-handler", timeout=3000):
+                page.click("#onetrust-accept-btn-handler")
+                print("Accepted cookies.")
+        except Exception:
+            pass
+
+        page.wait_for_selector("#inputUsernameOrEmail", state="visible", timeout=15000)
+        page.fill("#inputUsernameOrEmail", "")
+        page.type("#inputUsernameOrEmail", username, delay=35)
+        page.fill("#inputPassword", "")
+        page.type("#inputPassword", password, delay=35)
+        page.click("button[type='submit']")
+
+        try:
+            page.wait_for_url(lambda url: "starkid/signin" not in url.lower(), timeout=30000)
+        except Exception:
+            pass
+
+        if not _on_signin_page(page):
+            return True
+
+        print("Checking for login errors...")
+        try:
+            err = page.locator(".validation-summary-errors").first
+            if err.count() > 0 and err.is_visible():
+                print(f"Login error detected: {err.inner_text().strip()}")
+        except Exception:
+            pass
+
+        # Give the page a short pause before retry to avoid anti-bot race conditions.
+        time.sleep(2)
+
+    return False
+
+
 def _timeline_ready(page, timeout_ms=8000):
     end = time.time() + (timeout_ms / 1000.0)
     while time.time() < end:
@@ -173,29 +217,9 @@ def run(
         page = context.new_page()
         try:
             print("Navigating to login page...")
-            page.goto("https://id.stark.co.uk/StarkID/SignIn")
-            try:
-                if page.is_visible("#onetrust-accept-btn-handler", timeout=3000):
-                    page.click("#onetrust-accept-btn-handler")
-                    print("Accepted cookies.")
-            except Exception:
-                pass
-            print("Logging in...")
-            page.fill("#inputUsernameOrEmail", username)
-            page.fill("#inputPassword", password)
-            page.click("button[type='submit']")
-            try:
-                page.wait_for_url(re.compile(r".*/Dashboard.*"), timeout=30000)
-            except Exception:
-                print("Checking for login errors...")
-                if page.is_visible(".validation-summary-errors"):
-                    print("Login error detected.")
-                    return None
-                # Sometimes Stark keeps a non-dashboard post-login route.
-                # If login form still exists, treat as failure.
-                if page.locator("#inputUsernameOrEmail").count() > 0:
-                    print("Login appears incomplete (still on sign-in form).")
-                    return None
+            if not _login(page, username, password):
+                print(f"Login appears incomplete (still on sign-in page): {page.url}")
+                return None
             print("Login successful.")
             page.wait_for_load_state("networkidle")
             print("Navigating to Dynamic Reports > Timeline...")
