@@ -164,22 +164,55 @@ def query_page_id(token, db_id, date_str):
     return results[0]["id"] if results else None
 
 
-def find_missing_dates(token, db_id, start, end):
+def load_existing_date_titles(token, db_id):
+    """
+    Return set of existing Date title values already present in the Notion DB.
+    Uses paginated database query to avoid one API request per date.
+    """
+    h = headers(token)
+    existing = set()
+    pages = 0
+    cursor = None
+    while True:
+        payload = {"page_size": 100}
+        if cursor:
+            payload["start_cursor"] = cursor
+        r = requests.post(f"https://api.notion.com/v1/databases/{db_id}/query", headers=h, json=payload)
+        if r.status_code == 429:
+            retry = float(r.headers.get("Retry-After", "1"))
+            time.sleep(max(1.0, retry))
+            continue
+        r.raise_for_status()
+        data = r.json()
+        pages += 1
+        for row in data.get("results", []):
+            title_parts = (
+                row.get("properties", {})
+                .get("Date", {})
+                .get("title", [])
+            )
+            date_str = "".join(part.get("plain_text", "") for part in title_parts).strip()
+            if date_str:
+                existing.add(date_str)
+        if not data.get("has_more"):
+            break
+        cursor = data.get("next_cursor")
+    print(f"[BACKFILL] Loaded {len(existing)} existing date row(s) from Notion across {pages} page(s).")
+    return existing
+
+
+def find_missing_dates(existing_date_titles, start, end):
     """
     Check which dates in [start, end] are missing from Notion DB.
     Returns tuple: (missing_dates:list[date], existing_count:int, checked_count:int)
     """
     missing = []
-    existing = 0
     checked = 0
     for d in all_dates(start, end):
         checked += 1
-        if query_page_id(token, db_id, d.isoformat()):
-            existing += 1
-        else:
+        if d.isoformat() not in existing_date_titles:
             missing.append(d)
-        # Keep API pressure low while scanning many dates.
-        time.sleep(0.05)
+    existing = checked - len(missing)
     return missing, existing, checked
 
 
@@ -385,6 +418,14 @@ def main():
         ),
     )
     parser.add_argument(
+        "--backfill-check-start",
+        default=None,
+        help=(
+            "Optional absolute start date (YYYY-MM-DD) for missing-date check. "
+            "When set, overrides --backfill-window-days."
+        ),
+    )
+    parser.add_argument(
         "--allow-scrape-fail",
         action="store_true",
         help="Do not return non-zero exit when scraping fails (not recommended for CI).",
@@ -417,7 +458,36 @@ def main():
     requested_dates = all_dates(start, end)
     dates = list(requested_dates)
 
-    if args.backfill_window_days > 0:
+    if args.backfill_check_start:
+        backfill_start = date.fromisoformat(args.backfill_check_start)
+        if backfill_start < date(2000, 1, 1):
+            backfill_start = date(2000, 1, 1)
+        print(
+            f"[BACKFILL] Checking Notion for missing dates from absolute start: "
+            f"{backfill_start} → {end}"
+        )
+        existing_titles = load_existing_date_titles(token, db_id)
+        missing_recent, existing_recent, checked_recent = find_missing_dates(
+            existing_date_titles=existing_titles,
+            start=backfill_start,
+            end=end,
+        )
+        requested_set = set(requested_dates)
+        extra_backfill = [d for d in missing_recent if d not in requested_set]
+        print(
+            f"[BACKFILL] Checked={checked_recent} Existing={existing_recent} Missing={len(missing_recent)}"
+        )
+        if extra_backfill:
+            print(
+                f"[BACKFILL] Adding {len(extra_backfill)} missing date(s) to this run: "
+                f"{extra_backfill[0]} → {extra_backfill[-1]}"
+            )
+            dates = sorted(set(dates + extra_backfill))
+        elif missing_recent:
+            print("[BACKFILL] Missing dates are already inside requested sync range.")
+        else:
+            print("[BACKFILL] No missing dates found in checked range.")
+    elif args.backfill_window_days > 0:
         backfill_start = end - timedelta(days=args.backfill_window_days - 1)
         if backfill_start < date(2000, 1, 1):
             backfill_start = date(2000, 1, 1)
@@ -425,9 +495,9 @@ def main():
             f"[BACKFILL] Checking Notion for missing dates in recent window: "
             f"{backfill_start} → {end}"
         )
+        existing_titles = load_existing_date_titles(token, db_id)
         missing_recent, existing_recent, checked_recent = find_missing_dates(
-            token=token,
-            db_id=db_id,
+            existing_date_titles=existing_titles,
             start=backfill_start,
             end=end,
         )

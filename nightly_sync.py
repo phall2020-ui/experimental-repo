@@ -20,6 +20,7 @@ Usage:
 """
 
 import argparse
+import os
 import subprocess
 import sys
 import time
@@ -125,10 +126,18 @@ def main():
     # Step 3: Stark HH generation sync to Notion
     # ------------------------------------------------------------------
     step += 1
+    backfill_check_start = os.environ.get("STARK_BACKFILL_CHECK_START", "2025-12-01").strip()
+    stark_cmd = [
+        sys.executable,
+        str(SCRIPT_DIR / "stark_daily_sync.py"),
+        "--start", start_str,
+        "--end", end_str,
+    ]
+    if backfill_check_start:
+        stark_cmd += ["--backfill-check-start", backfill_check_start]
     ok, elapsed = run_step(
         f"Step {step}/{total_steps}: Stark HH generation -> Notion",
-        [sys.executable, str(SCRIPT_DIR / "stark_daily_sync.py"),
-         "--start", start_str, "--end", end_str],
+        stark_cmd,
         cwd=SCRIPT_DIR,
         timeout=600,
     )
