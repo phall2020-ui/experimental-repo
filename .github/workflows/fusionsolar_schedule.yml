@@ -72,6 +72,20 @@ jobs:
             exit 1
           fi
 
+      - name: Validate Stark secret shape
+        run: |
+          python - << 'PY'
+          import os
+          u = os.environ.get("STARK_USERNAME", "")
+          p = os.environ.get("STARK_PASSWORD", "")
+          print(f"STARK_USERNAME len={len(u)} trimmed_len={len(u.strip())} has_at={'@' in u}")
+          print(f"STARK_PASSWORD len={len(p)} trimmed_len={len(p.strip())}")
+          if len(u.strip()) == 0 or len(p.strip()) == 0:
+              raise SystemExit("Stark credentials are empty after trimming whitespace")
+          if "@" not in u.strip():
+              raise SystemExit("STARK_USERNAME does not look like an email. Check repo secret value.")
+          PY
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:

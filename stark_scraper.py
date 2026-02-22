@@ -97,6 +97,57 @@ def _env_headless(default=True):
     return str(raw).strip().lower() not in {"0", "false", "no", "off"}
 
 
+def _normalize_secret(value):
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
+def _set_input_value(page, selector, value, timeout_ms=15000):
+    field = page.locator(selector).first
+    field.wait_for(state="visible", timeout=timeout_ms)
+    try:
+        field.click(timeout=3000)
+    except Exception:
+        pass
+    try:
+        field.press("Control+A", timeout=2000)
+        field.press("Delete", timeout=2000)
+    except Exception:
+        pass
+    try:
+        field.fill(value, timeout=5000)
+    except Exception:
+        pass
+
+    try:
+        current = field.input_value(timeout=2000)
+    except Exception:
+        current = ""
+    if current == value:
+        return True
+
+    try:
+        page.eval_on_selector(
+            selector,
+            """(el, val) => {
+                el.value = val;
+                el.dispatchEvent(new Event("input", { bubbles: true }));
+                el.dispatchEvent(new Event("change", { bubbles: true }));
+                return el.value;
+            }""",
+            value,
+        )
+    except Exception:
+        return False
+
+    try:
+        current = field.input_value(timeout=2000)
+    except Exception:
+        current = ""
+    return current == value
+
+
 def _login(page, username, password, attempts=2):
     for attempt in range(1, attempts + 1):
         print(f"Logging in... (attempt {attempt}/{attempts})")
@@ -108,25 +159,49 @@ def _login(page, username, password, attempts=2):
         except Exception:
             pass
 
-        page.wait_for_selector("#inputUsernameOrEmail", state="visible", timeout=15000)
-        page.fill("#inputUsernameOrEmail", "")
-        page.type("#inputUsernameOrEmail", username, delay=35)
-        page.fill("#inputPassword", "")
-        page.type("#inputPassword", password, delay=35)
-        page.keyboard.press("Enter")
+        username_ok = _set_input_value(page, "#inputUsernameOrEmail", username)
+        password_ok = _set_input_value(page, "#inputPassword", password)
+        user_len = 0
+        pass_len = 0
+        try:
+            user_len = len(page.locator("#inputUsernameOrEmail").first.input_value())
+            pass_len = len(page.locator("#inputPassword").first.input_value())
+        except Exception:
+            pass
+        print(
+            "Credential fields set: "
+            f"username_ok={username_ok}, password_ok={password_ok}, "
+            f"username_len={user_len}, password_len={pass_len}"
+        )
+        if pass_len == 0:
+            print("Password field is empty before submit; retrying input.")
+            time.sleep(1)
+            continue
+
+        submitted = False
+        try:
+            submit_btn = page.locator("button[type='submit']").first
+            if submit_btn.count() > 0 and submit_btn.is_visible():
+                submit_btn.click(timeout=5000)
+                submitted = True
+        except Exception:
+            pass
+        if not submitted:
+            page.keyboard.press("Enter")
 
         # Wait a moment to see if "Enter" triggered navigation
         time.sleep(1)
         if not _on_signin_page(page):
              return True
 
-        # Fallback to click if enter isn't intercepted and we're still on the signin page
-        try:
-            submit_btn = page.locator("button[type='submit']").first
-            if submit_btn.count() > 0 and submit_btn.is_visible():
-                submit_btn.click(timeout=5000)
-        except Exception:
-            pass
+        # Fallback to click again if we're still on the signin page.
+        if not submitted:
+            try:
+                submit_btn = page.locator("button[type='submit']").first
+                if submit_btn.count() > 0 and submit_btn.is_visible():
+                    submit_btn.click(timeout=5000)
+            except Exception:
+                pass
 
         deadline = time.time() + 30
         while time.time() < deadline:
@@ -219,13 +294,13 @@ def run(
     output_dir=None,
     headless=None,
 ):
-    username = username or os.environ.get("STARK_USERNAME")
-    password = password or os.environ.get("STARK_PASSWORD")
-    site_name = site_name or os.environ.get("STARK_SITE_NAME") or "Point Lane"
+    username = _normalize_secret(username or os.environ.get("STARK_USERNAME"))
+    password = _normalize_secret(password or os.environ.get("STARK_PASSWORD"))
+    site_name = _normalize_secret(site_name or os.environ.get("STARK_SITE_NAME") or "Point Lane")
     search_text = (
-        search_text
-        or os.environ.get("STARK_SEARCH_TEXT")
-        or os.environ.get("STARK_EXPORT_MPAN")
+        _normalize_secret(search_text)
+        or _normalize_secret(os.environ.get("STARK_SEARCH_TEXT"))
+        or _normalize_secret(os.environ.get("STARK_EXPORT_MPAN"))
         or "2100042103940"
     )
     meter_id = os.environ.get("STARK_METER_ID") or "K21W001099"
