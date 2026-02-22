@@ -308,7 +308,7 @@ def scrape_generation(cfg, d):
         site_name  = stark_cfg.get("site_name"),
         search_text= stark_cfg.get("search_text"),
         output_dir = str(GEN_DIR),
-        headless   = True,
+        headless   = None,
     )
     if result:
         return Path(result)

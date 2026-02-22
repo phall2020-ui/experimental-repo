@@ -90,6 +90,13 @@ def _on_signin_page(page):
     return "starkid/signin" in page.url.lower()
 
 
+def _env_headless(default=True):
+    raw = os.environ.get("STARK_HEADLESS")
+    if raw is None:
+        return default
+    return str(raw).strip().lower() not in {"0", "false", "no", "off"}
+
+
 def _login(page, username, password, attempts=2):
     for attempt in range(1, attempts + 1):
         print(f"Logging in... (attempt {attempt}/{attempts})")
@@ -210,7 +217,7 @@ def run(
     site_name=None,
     search_text=None,
     output_dir=None,
-    headless=True,
+    headless=None,
 ):
     username = username or os.environ.get("STARK_USERNAME")
     password = password or os.environ.get("STARK_PASSWORD")
@@ -235,13 +242,21 @@ def run(
     out_dir = Path(output_dir) if output_dir else Path.cwd()
     out_dir.mkdir(parents=True, exist_ok=True)
     output_path = out_dir / f"stark_hh_data_{file_date}.csv"
+    if headless is None:
+        headless = _env_headless(default=True)
     print(f"Goal: Scrape HH data for {site_name} (Search: {search_text}) on {formatted_date}")
     print(f"Output: {output_path}")
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=headless)
+        browser = p.chromium.launch(
+            headless=headless,
+            args=["--disable-blink-features=AutomationControlled"],
+        )
         context = browser.new_context(
             viewport={"width": 1920, "height": 1080},
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        )
+        context.add_init_script(
+            "Object.defineProperty(navigator, 'webdriver', {get: () => undefined});"
         )
         page = context.new_page()
         try:

@@ -51,6 +51,7 @@ jobs:
       STARK_PASSWORD: ${{ secrets.STARK_PASSWORD }}
       STARK_SITE_NAME: ${{ secrets.STARK_SITE_NAME }}
       STARK_SEARCH_TEXT: ${{ secrets.STARK_SEARCH_TEXT }}
+      STARK_HEADLESS: "false"
 
     steps:
       - name: Checkout repository
@@ -76,6 +77,13 @@ jobs:
         with:
           python-version: '3.12'
           cache: 'pip'
+
+      - name: Ensure Xvfb
+        run: |
+          if ! command -v xvfb-run >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y xvfb
+          fi
 
       - name: Cache Playwright browsers
         uses: actions/cache@v4
@@ -178,23 +186,29 @@ jobs:
         run: |
           CMD="${{ steps.task.outputs.command }}"
           EXIT_CODE=0
+          PYTHON_CMD=(python)
+          if [ "${STARK_HEADLESS}" = "false" ] && command -v xvfb-run >/dev/null 2>&1; then
+            PYTHON_CMD=(xvfb-run -a python)
+          fi
+          echo "Python runner: ${PYTHON_CMD[*]}"
+
           if [[ "$CMD" == "--nightly-sync" ]]; then
             echo "::group::Running Nightly Sync (Elexon + Stark)"
-            python nightly_sync.py || EXIT_CODE=$?
+            "${PYTHON_CMD[@]}" nightly_sync.py || EXIT_CODE=$?
             echo "::endgroup::"
           elif [[ "$CMD" == *"--backfill"* ]]; then
             echo "::group::Running Backfill"
-            echo "Command: python notion_sync.py $CMD"
-            python notion_sync.py $CMD || EXIT_CODE=$?
+            echo "Command: ${PYTHON_CMD[*]} notion_sync.py $CMD"
+            "${PYTHON_CMD[@]}" notion_sync.py $CMD || EXIT_CODE=$?
             echo "::endgroup::"
           elif [[ "$CMD" == *"--test-login"* ]]; then
             echo "::group::Testing Login"
-            python fusionsolar_monitor.py --test-login || EXIT_CODE=$?
+            "${PYTHON_CMD[@]}" fusionsolar_monitor.py --test-login || EXIT_CODE=$?
             echo "::endgroup::"
           else
             echo "::group::Running Monitor"
-            echo "Command: python fusionsolar_monitor.py $CMD"
-            python fusionsolar_monitor.py $CMD || EXIT_CODE=$?
+            echo "Command: ${PYTHON_CMD[*]} fusionsolar_monitor.py $CMD"
+            "${PYTHON_CMD[@]}" fusionsolar_monitor.py $CMD || EXIT_CODE=$?
             echo "::endgroup::"
           fi
 
