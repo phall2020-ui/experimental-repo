@@ -30,6 +30,10 @@
         "report_time": "22:00",
         "nightly_sync_time": "23:00"
     },
+    "monitoring": {
+        "ignore_offline_device_types": [],
+        "ignore_offline_name_patterns": []
+    },
     "logging": {
         "log_dir": "logs",
         "inverter_csv": "logs/inverter_checks.csv",

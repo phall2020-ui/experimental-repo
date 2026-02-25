@@ -1,6 +1,8 @@
 name: Deploy Solar Dashboard (GitHub Pages)
 
 on:
+  schedule:
+    - cron: "15 6 * * *"
   push:
     branches: ["main"]
     paths:

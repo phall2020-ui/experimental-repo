@@ -66,6 +66,37 @@ def load_config():
     with open(CONFIG_PATH, "r") as f:
         return json.load(f)
 
+
+def _build_offline_ignore_config(cfg):
+    """Return normalized ignore lists for offline-device alerting."""
+    monitoring = cfg.get("monitoring", {})
+    ignore_types = {
+        str(t).strip().lower()
+        for t in monitoring.get("ignore_offline_device_types", [])
+        if str(t).strip()
+    }
+    raw_patterns = monitoring.get("ignore_offline_name_patterns", [])
+    ignore_name_patterns = []
+    for pattern in raw_patterns:
+        if not str(pattern).strip():
+            continue
+        try:
+            ignore_name_patterns.append(re.compile(str(pattern), re.IGNORECASE))
+        except re.error:
+            log.warning("Invalid ignore_offline_name_patterns regex skipped: %s", pattern)
+    return ignore_types, ignore_name_patterns
+
+
+def _is_ignored_offline_device(device, ignore_types, ignore_name_patterns):
+    dev_type = str(device.get("type", "")).strip().lower()
+    name = str(device.get("name", ""))
+    if dev_type and dev_type in ignore_types:
+        return True
+    for pattern in ignore_name_patterns:
+        if pattern.search(name):
+            return True
+    return False
+
 # ---------------------------------------------------------------------------
 # Browser automation helpers
 # ---------------------------------------------------------------------------
@@ -737,6 +768,16 @@ def run_inverter_check(cfg, dry_run=False):
                        or "disconnect" in (d.get("status", "") + d.get("statusClass", "")).lower()
                        or "fault" in (d.get("status", "") + d.get("statusClass", "")).lower()]
 
+            ignore_types, ignore_name_patterns = _build_offline_ignore_config(cfg)
+            actionable_offline = [
+                d for d in offline
+                if not _is_ignored_offline_device(d, ignore_types, ignore_name_patterns)
+            ]
+            ignored_offline = [
+                d for d in offline
+                if _is_ignored_offline_device(d, ignore_types, ignore_name_patterns)
+            ]
+
             # Print summary
             print("\n" + "=" * 50)
             print(f"  INVERTER CHECK -- {datetime.now().strftime('%Y-%m-%d %H:%M')}")
@@ -744,23 +785,31 @@ def run_inverter_check(cfg, dry_run=False):
             print("=" * 50)
             print(f"  Total devices found: {len(devices)}")
             print(f"  Offline/Faulted:     {len(offline)}")
-            if offline:
+            if actionable_offline:
                 print("\n  [!] OFFLINE DEVICES:")
-                for d in offline:
+                for d in actionable_offline:
                     print(f"     - {d['name']} ({d.get('type','')}) -- {d.get('status','')}")
             else:
                 print("\n  [OK] All devices appear online")
+            if ignored_offline:
+                print(f"\n  [i] Ignored offline devices: {len(ignored_offline)}")
+                for d in ignored_offline:
+                    print(f"     - {d['name']} ({d.get('type','')})")
             print("=" * 50 + "\n")
 
             # Log results
             log_inverter_check(devices, dry_run=dry_run)
 
-            if offline:
+            if actionable_offline:
                 log.warning("[!] %d DEVICE(S) OFFLINE: %s",
-                            len(offline),
-                            ", ".join(d["name"] for d in offline))
+                            len(actionable_offline),
+                            ", ".join(d["name"] for d in actionable_offline))
             else:
                 log.info("[OK] All %d devices online", len(devices))
+            if ignored_offline:
+                log.info("Ignored offline devices (%d): %s",
+                         len(ignored_offline),
+                         ", ".join(d["name"] for d in ignored_offline))
 
             # Calculate and log availability
             online_count = len(devices) - len(offline)
@@ -769,7 +818,7 @@ def run_inverter_check(cfg, dry_run=False):
                 log.info("Inverter availability: %.1f%% (%d/%d online)",
                          avail, online_count, len(devices))
 
-            return len(offline) == 0
+            return len(actionable_offline) == 0
 
         except Exception as e:
             log.exception("Error during inverter check: %s", e)
