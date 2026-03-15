@@ -56,3 +56,4 @@ latest_failure_logs/
 latest_run.log
 github_failed_run.log
 error_debug_*.png
+stark_login_page.html
