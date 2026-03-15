@@ -43,3 +43,16 @@ Thumbs.db
 
 # Unrelated files
 spyware_scanner.py
+
+# Dated AI artefact files
+20[0-9][0-9]-[0-9][0-9]-*
+
+# Runtime/data outputs
+stark_data/
+stark_gen_data/
+stark_hh_data_*.csv
+diagnostics_logs/
+latest_failure_logs/
+latest_run.log
+github_failed_run.log
+error_debug_*.png
