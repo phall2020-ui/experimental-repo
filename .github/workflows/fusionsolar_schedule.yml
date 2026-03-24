@@ -43,6 +43,9 @@ jobs:
   monitor:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      contents: read
+      issues: write
     env:
       NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
       FUSIONSOLAR_USERNAME: ${{ secrets.FUSIONSOLAR_USERNAME }}

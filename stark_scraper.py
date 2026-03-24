@@ -421,6 +421,11 @@ def run(
                 return None
 
             print(f"Selecting meter using search term: {search_text}...")
+            # Wait for KnockoutJS reportLoading/treeLoading to clear before clicking
+            page.wait_for_function(
+                "() => { const btn = document.querySelector('#btnOpenGroupTreeSearch'); return btn && !btn.disabled; }",
+                timeout=60000,
+            )
             page.click("#btnOpenGroupTreeSearch")
             page.wait_for_selector("#groupSearchInput", state="visible")
             page.fill("#groupSearchInput", search_text)
