@@ -139,7 +139,7 @@ def main():
         f"Step {step}/{total_steps}: Stark HH generation -> Notion",
         stark_cmd,
         cwd=SCRIPT_DIR,
-        timeout=600,
+        timeout=1800,
     )
     results.append(("Stark HH sync", ok, elapsed))
 

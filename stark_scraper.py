@@ -539,6 +539,188 @@ def run(
             return None
         finally:
             browser.close()
+def run_batch(
+    dates,
+    username=None,
+    password=None,
+    site_name=None,
+    search_text=None,
+    output_dir=None,
+    headless=None,
+):
+    """
+    Scrape multiple dates in a single browser session.
+    Logs in and selects the meter once, then iterates over dates.
+
+    Args:
+        dates: list of date strings in YYYY-MM-DD format
+        All other args: same as run()
+
+    Returns:
+        dict mapping date_str -> output path (str) or None on failure for that date
+    """
+    username = _normalize_secret(username or os.environ.get("STARK_USERNAME"))
+    password = _normalize_secret(password or os.environ.get("STARK_PASSWORD"))
+    site_name = _normalize_secret(site_name or os.environ.get("STARK_SITE_NAME") or "Point Lane")
+    search_text = (
+        _normalize_secret(search_text)
+        or _normalize_secret(os.environ.get("STARK_SEARCH_TEXT"))
+        or _normalize_secret(os.environ.get("STARK_EXPORT_MPAN"))
+        or "2100042103940"
+    )
+    meter_id = os.environ.get("STARK_METER_ID") or "K21W001099"
+    if not username or not password:
+        print("Missing Stark credentials.")
+        return {d: None for d in dates}
+    if headless is None:
+        headless = _env_headless(default=True)
+    out_dir = Path(output_dir) if output_dir else Path.cwd()
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    results = {}
+    with sync_playwright() as p:
+        browser = p.chromium.launch(
+            headless=headless,
+            args=["--disable-blink-features=AutomationControlled"],
+        )
+        context = browser.new_context(
+            viewport={"width": 1920, "height": 1080},
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        )
+        context.add_init_script(
+            "Object.defineProperty(navigator, 'webdriver', {get: () => undefined});"
+        )
+        page = context.new_page()
+        try:
+            # --- One-time setup: login, navigate to timeline, select meter ---
+            print("Navigating to login page...")
+            if not _login(page, username, password):
+                print("Login failed.")
+                browser.close()
+                return {d: None for d in dates}
+            print("Login successful.")
+            page.wait_for_load_state("networkidle")
+            print("Navigating to Dynamic Reports > Timeline...")
+            if not _open_timeline(page):
+                print("Could not open Timeline view.")
+                browser.close()
+                return {d: None for d in dates}
+
+            # Dismiss splash modal once
+            try:
+                splash = page.locator("#splashModal")
+                if splash.count() > 0 and splash.first.is_visible(timeout=3000):
+                    print("Dismissing splash modal...")
+                    close_btn = splash.locator("button.close, button[data-dismiss='modal'], button[aria-label='Close'], .btn-close")
+                    if close_btn.count() > 0:
+                        close_btn.first.click(timeout=3000)
+                    else:
+                        page.keyboard.press("Escape")
+                    splash.first.wait_for(state="hidden", timeout=5000)
+                    print("Splash modal dismissed.")
+            except Exception as e:
+                print(f"Splash modal dismiss skipped: {e}")
+
+            print(f"Selecting meter: {search_text}...")
+            page.wait_for_function(
+                "() => { const btn = document.querySelector('#btnOpenGroupTreeSearch'); return btn && !btn.disabled; }",
+                timeout=60000,
+            )
+            page.click("#btnOpenGroupTreeSearch")
+            page.wait_for_selector("#groupSearchInput", state="visible")
+            page.fill("#groupSearchInput", search_text)
+            page.press("#groupSearchInput", "Enter")
+            search_result, search_label, search_score = _pick_best_candidate(
+                page.locator("#groupSearchResults button, .groupSearchResult button, .searchItemName"),
+                search_text=search_text,
+                meter_id=meter_id,
+                timeout_ms=12000,
+            )
+            if not search_result:
+                print(f"MPAN search result not found for '{search_text}'. Aborting batch.")
+                browser.close()
+                return {d: None for d in dates}
+            print(f"Clicking MPAN search result (score={search_score}): {search_label}")
+            search_result.click()
+            page.wait_for_timeout(1000)
+
+            tree_item, tree_label, tree_score = _pick_best_candidate(
+                page.locator(".treeItemName"),
+                search_text=search_text,
+                meter_id=meter_id,
+                timeout_ms=12000,
+            )
+            if not tree_item:
+                print(f"Could not locate generation meter tree item. Aborting batch.")
+                browser.close()
+                return {d: None for d in dates}
+            print(f"Double-clicking tree item (score={tree_score}): {tree_label}")
+            time.sleep(1)
+            tree_item.dblclick()
+            time.sleep(1)
+            try:
+                modal = page.locator(".modalCurtain")
+                if modal.count() > 0 and modal.first.is_visible():
+                    page.keyboard.press("Escape")
+                page.locator(".modalCurtain").first.wait_for(state="hidden", timeout=5000)
+            except Exception:
+                pass
+            if not _timeline_ready(page, timeout_ms=3000):
+                if not _open_timeline(page):
+                    print("Could not reopen Timeline after meter selection. Aborting batch.")
+                    browser.close()
+                    return {d: None for d in dates}
+
+            # --- Per-date loop: just change date, run, download ---
+            for date_str in dates:
+                try:
+                    target_date = datetime.strptime(date_str, "%Y-%m-%d")
+                    formatted_date = target_date.strftime("%d/%m/%Y")
+                except ValueError:
+                    results[date_str] = None
+                    continue
+                output_path = out_dir / f"stark_hh_data_{date_str}.csv"
+                print(f"Setting date to {formatted_date}...")
+                try:
+                    page.wait_for_selector("#StartDate", state="attached", timeout=15000)
+                    page.evaluate(f"document.getElementById('StartDate').value = '{formatted_date}'")
+                    page.evaluate(f"document.getElementById('EndDate').value = '{formatted_date}'")
+                    page.evaluate("document.getElementById('StartDate').dispatchEvent(new Event('change'))")
+                    page.evaluate("document.getElementById('EndDate').dispatchEvent(new Event('change'))")
+                    try:
+                        page.select_option("#energyType", label="Power")
+                        page.select_option("#powerType", label="Active Power (kW)")
+                        page.select_option("#Interval", label="Half Hourly")
+                    except Exception:
+                        pass
+                    print("Running report...")
+                    time.sleep(2)
+                    page.click("#buttonRunReport")
+                    print("Waiting for report generation...")
+                    download_menu_btn = page.locator("#btnOpenGraphicDownloadMenu")
+                    download_menu_btn.wait_for(state="visible", timeout=60000)
+                    print("Initiating download...")
+                    download_menu_btn.click()
+                    with page.expect_download(timeout=60000) as download_info:
+                        page.wait_for_selector("text=CSV", state="visible")
+                        page.click("text=CSV")
+                    download_info.value.save_as(str(output_path))
+                    print(f"Success: {output_path.name}")
+                    results[date_str] = str(output_path)
+                except Exception as e:
+                    print(f"Error on {date_str}: {e}")
+                    try:
+                        page.screenshot(path=f"error_batch_{date_str}_{int(time.time())}.png")
+                    except Exception:
+                        pass
+                    results[date_str] = None
+        except Exception as e:
+            print(f"Batch session error: {e}")
+        finally:
+            browser.close()
+    return results
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Scrape Stark HH Data")
     parser.add_argument("--date", type=str, required=True, help="Date in YYYY-MM-DD format")

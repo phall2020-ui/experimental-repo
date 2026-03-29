@@ -495,24 +495,52 @@ def load_ssp(date_str):
 
 
 # ---------------------------------------------------------------------------
-# Scrape one date fresh from Stark → stark_gen_data/
+# Scrape dates from Stark → stark_gen_data/
 # ---------------------------------------------------------------------------
-def scrape_generation(cfg, d):
-    """
-    Call stark_scraper.run() for date d, saving into stark_gen_data/.
-    Returns Path to CSV or None on failure.
-    """
+def _load_scraper():
     import importlib.util
     scraper_path = SCRIPT_DIR / "stark_scraper.py"
     if not scraper_path.exists():
-        print("  [SCRAPE] stark_scraper.py not found")
         return None
-
-    spec   = importlib.util.spec_from_file_location("stark_scraper", str(scraper_path))
+    spec = importlib.util.spec_from_file_location("stark_scraper", str(scraper_path))
     scraper = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(scraper)
+    return scraper
 
-    stark_cfg  = cfg.get("stark", {})
+
+def scrape_generation_batch(cfg, date_list):
+    """
+    Scrape multiple dates in a single browser session using stark_scraper.run_batch().
+    Returns dict mapping date_str -> Path or None.
+    """
+    scraper = _load_scraper()
+    if not scraper or not hasattr(scraper, "run_batch"):
+        print("  [SCRAPE] stark_scraper.run_batch not available; falling back to per-date scrape")
+        return {d.isoformat(): scrape_generation(cfg, d) for d in date_list}
+
+    stark_cfg = cfg.get("stark", {})
+    results_raw = scraper.run_batch(
+        dates      = [d.isoformat() for d in date_list],
+        username   = stark_cfg.get("username"),
+        password   = stark_cfg.get("password"),
+        site_name  = stark_cfg.get("site_name"),
+        search_text= stark_cfg.get("search_text"),
+        output_dir = str(GEN_DIR),
+        headless   = None,
+    )
+    return {k: Path(v) if v else None for k, v in results_raw.items()}
+
+
+def scrape_generation(cfg, d):
+    """
+    Call stark_scraper.run() for a single date d, saving into stark_gen_data/.
+    Returns Path to CSV or None on failure.
+    """
+    scraper = _load_scraper()
+    if not scraper:
+        print("  [SCRAPE] stark_scraper.py not found")
+        return None
+    stark_cfg = cfg.get("stark", {})
     result = scraper.run(
         date_str   = d.isoformat(),
         username   = stark_cfg.get("username"),
@@ -754,6 +782,11 @@ def main():
 
     print(f"[SYNC] {len(dates)} dates to process\n")
 
+    # Scrape all dates in a single browser session to avoid per-date login overhead
+    print("[SCRAPE] Starting batch scrape of all dates in one browser session...")
+    scraped = scrape_generation_batch(cfg, dates)
+    print(f"[SCRAPE] Batch complete: {sum(1 for v in scraped.values() if v)} / {len(dates)} succeeded\n")
+
     ok_count = 0
     fail_count = 0
     scrape_fail = 0
@@ -764,8 +797,8 @@ def main():
         prefix   = f"  [{i:>3}/{len(dates)}] {date_str}"
         existing_stark_total = stark_totals.get(date_str)
 
-        # 1. Scrape fresh generation data from Stark (always — never use old CSVs)
-        csv_path = scrape_generation(cfg, d)
+        # 1. Use pre-scraped CSV from batch scrape
+        csv_path = scraped.get(date_str)
         if not csv_path:
             print(f"{prefix}  SCRAPE-FAIL")
             sys.stdout.flush()
