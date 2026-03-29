@@ -74,10 +74,21 @@ def main():
         "--no-fusion", action="store_true",
         help="Skip FusionSolar notion sync (run Elexon + Stark only)"
     )
+    parser.add_argument(
+        "--start", default=None,
+        help="Override start date YYYY-MM-DD (overrides --days)"
+    )
+    parser.add_argument(
+        "--end", default=None,
+        help="Override end date YYYY-MM-DD (default: today)"
+    )
     args = parser.parse_args()
 
-    end_date = date.today()
-    start_date = end_date - timedelta(days=args.days - 1)
+    end_date = date.fromisoformat(args.end) if args.end else date.today()
+    if args.start:
+        start_date = date.fromisoformat(args.start)
+    else:
+        start_date = end_date - timedelta(days=args.days - 1)
     start_str = start_date.isoformat()
     end_str = end_date.isoformat()
 

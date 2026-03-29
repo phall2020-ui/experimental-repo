@@ -33,6 +33,7 @@ on:
           - '--test-login'
           - '--nightly-sync'
           - '--nightly-sync --no-fusion'
+          - '--nightly-sync --no-fusion --start 2026-03-16 --end 2026-03-28'
           - '--backfill'
           - '--backfill --start-date 2025-12-01'
 
