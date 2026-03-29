@@ -421,6 +421,21 @@ def run(
                 return None
 
             print(f"Selecting meter using search term: {search_text}...")
+            # Dismiss any splash/upsell modal that may intercept clicks (e.g. "Cost Reporting" splash)
+            try:
+                splash = page.locator("#splashModal")
+                if splash.count() > 0 and splash.first.is_visible(timeout=3000):
+                    print("Dismissing splash modal...")
+                    # Try the close button first, then Escape key as fallback
+                    close_btn = splash.locator("button.close, button[data-dismiss='modal'], button[aria-label='Close'], .btn-close")
+                    if close_btn.count() > 0:
+                        close_btn.first.click(timeout=3000)
+                    else:
+                        page.keyboard.press("Escape")
+                    splash.first.wait_for(state="hidden", timeout=5000)
+                    print("Splash modal dismissed.")
+            except Exception as e:
+                print(f"Splash modal dismiss skipped: {e}")
             # Wait for KnockoutJS reportLoading/treeLoading to clear before clicking
             page.wait_for_function(
                 "() => { const btn = document.querySelector('#btnOpenGroupTreeSearch'); return btn && !btn.disabled; }",
