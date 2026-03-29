@@ -111,14 +111,17 @@ def main():
 
     # ------------------------------------------------------------------
     # Step 2: Fetch Elexon SSP data
+    # Covers the full backfill range so SSP is available for all Stark dates.
     # ------------------------------------------------------------------
     step += 1
+    backfill_check_start = os.environ.get("STARK_BACKFILL_CHECK_START", "2025-12-01").strip()
+    elexon_start = min(start_str, backfill_check_start) if backfill_check_start else start_str
     ok, elapsed = run_step(
         f"Step {step}/{total_steps}: Fetch Elexon SSP data",
         [sys.executable, str(SCRIPT_DIR / "Elexon_Data" / "fetch_elexon_data.py"),
-         "--start", start_str, "--end", end_str],
+         "--start", elexon_start, "--end", end_str],
         cwd=SCRIPT_DIR / "Elexon_Data",
-        timeout=120,
+        timeout=300,
     )
     results.append(("Elexon SSP fetch", ok, elapsed))
 
