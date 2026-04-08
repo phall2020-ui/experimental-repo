@@ -31,6 +31,18 @@ import requests
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
+from market_data.epex_gb_da_eod_sftp import EpexGbDaEodSftpProvider
+from market_data.nordpool_n2ex_api import NordPoolN2exApiProvider
+from market_data.models import MarketDataError
+from services.n2ex_reference_price import derive_reference_price
+from services.point_lane_revenue import (
+    InvalidRevenueInputError,
+    PointLaneRevenueConfig,
+    build_notion_properties,
+    compute_point_lane_revenue,
+    contract_regime_for_date,
+)
+
 # ---------------------------------------------------------------------------
 # Paths & config
 # ---------------------------------------------------------------------------
@@ -51,6 +63,8 @@ SP_LABELS = [f"SP{i:02d}" for i in range(1, 49)]   # SP01 … SP48
 
 
 def load_config():
+    if not CONFIG_PATH.exists():
+        return {}
     with open(CONFIG_PATH) as f:
         return json.load(f)
 
@@ -67,8 +81,33 @@ def headers(token):
 # Notion DB: find or create
 # ---------------------------------------------------------------------------
 def _db_schema_props():
-    """Return the full properties dict for DB creation (98 fields)."""
-    props = {"Date": {"title": {}}, "Total kWh": {"number": {"format": "number"}}}
+    """Return the properties dict for the Stark HH daily database."""
+    props = {
+        "Date": {"title": {}},
+        "Total kWh": {"number": {"format": "number"}},
+        "Day": {"date": {}},
+        "Gen MWh": {"number": {"format": "number"}},
+        "Rev £k": {"number": {"format": "number"}},
+        "Contract Regime": {
+            "select": {
+                "options": [
+                    {"name": "Pre-VPPA", "color": "gray"},
+                    {"name": "VPPA+Export", "color": "blue"},
+                ]
+            }
+        },
+        "N2EX Avg (£/MWh)": {"number": {"format": "pound"}},
+        "Export PPA Discount (£/MWh)": {"number": {"format": "pound"}},
+        "VPPA Strike (£/MWh)": {"number": {"format": "pound"}},
+        "VPPA Floor (£/MWh)": {"number": {"format": "pound"}},
+        "REGO Revenue (£)": {"number": {"format": "pound"}},
+        "Negative Export Adjustment (£)": {"number": {"format": "pound"}},
+        "Volume for Settlement (MWh)": {"number": {"format": "number"}},
+        "Physical Export Revenue (£)": {"number": {"format": "pound"}},
+        "VPPA Settlement (£)": {"number": {"format": "pound"}},
+        "Total Contract Revenue (£)": {"number": {"format": "pound"}},
+        "Contract Price (£/MWh)": {"number": {"format": "pound"}},
+    }
     for sp in SP_LABELS:
         props[f"{sp}_kWh"] = {"number": {"format": "number"}}
         props[f"{sp}_SSP"] = {"number": {"format": "number"}}
@@ -119,29 +158,6 @@ def find_or_create_db(token, parent_page_id):
     return db_id
 
 
-def ensure_schema(token, db_id):
-    """Add any SP columns missing from an existing DB (safe to call every run)."""
-    h = headers(token)
-    r = requests.get(f"https://api.notion.com/v1/databases/{db_id}", headers=h)
-    r.raise_for_status()
-    existing = set(r.json().get("properties", {}).keys())
-    missing = {}
-    for sp in SP_LABELS:
-        for suffix in ("_kWh", "_SSP"):
-            name = f"{sp}{suffix}"
-            if name not in existing:
-                missing[name] = {"number": {"format": "number"}}
-    if "Total kWh" not in existing:
-        missing["Total kWh"] = {"number": {"format": "number"}}
-    if missing:
-        print(f"[DB] Adding {len(missing)} missing columns…")
-        requests.patch(
-            f"https://api.notion.com/v1/databases/{db_id}",
-            headers=h,
-            json={"properties": missing},
-        )
-
-
 def get_db_property_types(token, db_id):
     """Return {property_name: notion_type} for the target DB."""
     h = headers(token)
@@ -154,16 +170,6 @@ def get_db_property_types(token, db_id):
 # ---------------------------------------------------------------------------
 # Notion row upsert
 # ---------------------------------------------------------------------------
-def query_page_id(token, db_id, date_str):
-    h = headers(token)
-    r = requests.post(
-        f"https://api.notion.com/v1/databases/{db_id}/query", headers=h,
-        json={"filter": {"property": "Date", "title": {"equals": date_str}}},
-    )
-    results = r.json().get("results", [])
-    return results[0]["id"] if results else None
-
-
 def _safe_float(value):
     try:
         if value is None:
@@ -366,45 +372,78 @@ def find_missing_dates(existing_date_titles, start, end):
     return missing, existing, checked
 
 
-def upsert_day(token, db_id, date_str, sp_kwh, sp_ssp, set_total_kwh=True, set_settlement_date=False):
-    """
-    sp_kwh: dict {1: 0.0, …, 48: 1.23}
-    sp_ssp: dict {1: 75.66, …, 48: 80.1}  (partial OK)
-    """
+class DuplicateNotionRowError(RuntimeError):
+    """Raised when multiple Notion pages exist for the same Date title."""
+
+
+def ensure_schema(token, db_id):
+    """Add any missing columns required by the Point Lane revenue model."""
+    h = headers(token)
+    r = requests.get(f"https://api.notion.com/v1/databases/{db_id}", headers=h)
+    r.raise_for_status()
+    existing = set(r.json().get("properties", {}).keys())
+    missing = {}
+    for name, spec in _db_schema_props().items():
+        if name not in existing:
+            missing[name] = spec
+    if missing:
+        print(f"[DB] Adding {len(missing)} missing columns...")
+        r = requests.patch(
+            f"https://api.notion.com/v1/databases/{db_id}",
+            headers=h,
+            json={"properties": missing},
+        )
+        r.raise_for_status()
+
+
+def query_page_ids(token, db_id, date_str):
+    """Return all page IDs already present for the given settlement date."""
+    h = headers(token)
+    r = requests.post(
+        f"https://api.notion.com/v1/databases/{db_id}/query",
+        headers=h,
+        json={"filter": {"property": "Date", "title": {"equals": date_str}}},
+    )
+    r.raise_for_status()
+    return [row["id"] for row in r.json().get("results", [])]
+
+
+def upsert_day(token, db_id, date_str, sp_kwh, sp_ssp, revenue_result, prop_types):
+    """Insert or update one Notion daily row using regime-aware revenue fields."""
     h = headers(token)
     total = round(sum(sp_kwh.values()), 4)
-
-    props = {"Date": {"title": [{"text": {"content": date_str}}]}}
-    if set_total_kwh:
-        props["Total kWh"] = {"number": total}
-    if set_settlement_date:
-        props["Settlement Date"] = {"date": {"start": date_str}}
-    for i in range(1, 49):
-        sp_key = f"SP{i:02d}"
-        kwh = sp_kwh.get(i)
-        ssp = sp_ssp.get(i)
-        if kwh is not None:
-            props[f"{sp_key}_kWh"] = {"number": round(kwh, 5)}
-        if ssp is not None:
-            props[f"{sp_key}_SSP"] = {"number": round(ssp, 4)}
+    props = build_notion_properties(
+        date_str=date_str,
+        sp_kwh=sp_kwh,
+        sp_ssp=sp_ssp,
+        revenue=revenue_result,
+        prop_types=prop_types,
+    )
 
     for attempt in range(4):
-        page_id = query_page_id(token, db_id, date_str)
+        page_ids = query_page_ids(token, db_id, date_str)
+        if len(page_ids) > 1:
+            raise DuplicateNotionRowError(
+                f"Notion contains duplicate rows for {date_str}: {len(page_ids)} pages found."
+            )
+        page_id = page_ids[0] if page_ids else None
         if page_id:
             r = requests.patch(
-                f"https://api.notion.com/v1/pages/{page_id}", headers=h,
+                f"https://api.notion.com/v1/pages/{page_id}",
+                headers=h,
                 json={"properties": props},
             )
         else:
             r = requests.post(
-                "https://api.notion.com/v1/pages", headers=h,
+                "https://api.notion.com/v1/pages",
+                headers=h,
                 json={"parent": {"database_id": db_id}, "properties": props},
             )
         if r.status_code in (200, 201):
             return True, total
         if r.status_code == 429:
             wait = 3.0 * (attempt + 1)
-            print(f"    Rate-limited – sleeping {wait:.0f}s…")
+            print(f"    Rate-limited - sleeping {wait:.0f}s...")
             time.sleep(wait)
         else:
             print(f"    WARN Notion {r.status_code}: {r.text[:200]}")
@@ -582,6 +621,108 @@ def compute_exit_code(ok_count, fail_count, scrape_fail, fail_on_scrape_fail=Tru
     return 0
 
 
+def resolve_notion_db_id(token, cfg):
+    """Prefer an explicit database ID, fall back to the legacy discovery flow."""
+    explicit_db_id = (
+        os.environ.get("NOTION_DATABASE_ID")
+        or cfg.get("notion_database_id")
+        or cfg.get("notion_stark_daily_db_id")
+    )
+    if explicit_db_id:
+        h = headers(token)
+        r = requests.get(f"https://api.notion.com/v1/databases/{explicit_db_id}", headers=h)
+        if r.status_code != 200:
+            raise RuntimeError(
+                f"Configured NOTION_DATABASE_ID is invalid or inaccessible: {explicit_db_id}"
+            )
+        DB_ID_FILE.write_text(explicit_db_id)
+        return explicit_db_id
+
+    parent_page_id = cfg.get("notion_parent_page_id")
+    return find_or_create_db(token, parent_page_id)
+
+
+def build_market_data_provider(cfg):
+    """Construct the configured market-data provider for post-VPPA reference pricing."""
+    point_lane_cfg = cfg.get("point_lane", {}) if isinstance(cfg.get("point_lane"), dict) else {}
+    provider_name = (
+        os.environ.get("POINT_LANE_MARKET_DATA_PROVIDER")
+        or point_lane_cfg.get("market_data_provider")
+        or (
+            "nordpool_n2ex_api"
+            if any(
+                os.environ.get(name)
+                for name in (
+                    "NORDPOOL_USERNAME",
+                    "NORDPOOL_PASSWORD",
+                    "NORDPOOL_CLIENT_ID",
+                    "NORDPOOL_CLIENT_SECRET",
+                )
+            )
+            else "epex_gb_da_eod_sftp"
+        )
+    )
+
+    if provider_name == "nordpool_n2ex_api":
+        return provider_name, NordPoolN2exApiProvider()
+    if provider_name == "epex_gb_da_eod_sftp":
+        return provider_name, EpexGbDaEodSftpProvider()
+    raise RuntimeError(
+        f"Unsupported POINT_LANE_MARKET_DATA_PROVIDER '{provider_name}'. "
+        "Expected 'nordpool_n2ex_api' or 'epex_gb_da_eod_sftp'."
+    )
+
+
+def process_sync_date(
+    token,
+    db_id,
+    target_date,
+    csv_path,
+    prop_types,
+    revenue_config,
+    market_data_provider,
+):
+    """Process one Stark CSV into regime-aware daily Notion properties."""
+    sp_kwh = parse_stark_csv(csv_path)
+    if not sp_kwh:
+        raise ValueError(f"No Stark settlement-period data parsed from {csv_path}.")
+
+    date_str = target_date.isoformat()
+    sp_ssp = load_ssp(date_str)
+    reference = None
+
+    if contract_regime_for_date(target_date, revenue_config.vppa_start_date) == "VPPA+Export":
+        market_day = market_data_provider.fetch_for_delivery_date(target_date)
+        reference = derive_reference_price(market_day, site_export_kwh_by_sp=sp_kwh)
+
+    revenue_result = compute_point_lane_revenue(
+        target_date=target_date,
+        sp_kwh=sp_kwh,
+        sp_ssp=sp_ssp,
+        reference_price_gbp_mwh=reference.chosen_value_gbp_mwh if reference else None,
+        reference_method=reference.chosen_method if reference else None,
+        revenue_config=revenue_config,
+    )
+
+    ok, total = upsert_day(
+        token=token,
+        db_id=db_id,
+        date_str=date_str,
+        sp_kwh=sp_kwh,
+        sp_ssp=sp_ssp,
+        revenue_result=revenue_result,
+        prop_types=prop_types,
+    )
+    return {
+        "ok": ok,
+        "total_kwh": total,
+        "sp_kwh": sp_kwh,
+        "sp_ssp": sp_ssp,
+        "reference": reference,
+        "revenue_result": revenue_result,
+    }
+
+
 def main():
     parser = argparse.ArgumentParser(description="Sync Stark HH generation → Notion (one row per day)")
     parser.add_argument("--start", default="2025-12-01", help="Start date YYYY-MM-DD")
@@ -628,19 +769,17 @@ def main():
         sys.exit("ERROR: No notion_token in config.json or NOTION_TOKEN env var")
     fusion_db_id = cfg.get("notion_fusionsolar_db_id") or os.environ.get("NOTION_FUSIONSOLAR_DB_ID")
 
-    parent_page_id = cfg.get("notion_parent_page_id")
-
     # ---- DB setup ----------------------------------------------------------
-    db_id = find_or_create_db(token, parent_page_id)
+    db_id = resolve_notion_db_id(token, cfg)
     ensure_schema(token, db_id)
     prop_types = get_db_property_types(token, db_id)
-    set_total_kwh = prop_types.get("Total kWh") == "number"
-    set_settlement_date = prop_types.get("Settlement Date") == "date"
-    if set_settlement_date:
-        print("[DB] Settlement Date property detected; rows will be grouped by date correctly.")
+    revenue_config = PointLaneRevenueConfig.from_sources(cfg)
+    market_data_provider_name, market_data_provider = build_market_data_provider(cfg)
     print(f"[DB] DB ID  : {db_id}")
     print(f"[DB] Range  : {start} → {end}")
     print(f"[DB] GenDir : {GEN_DIR}")
+    print(f"[REV] VPPA start date : {revenue_config.vppa_start_date.isoformat()}")
+    print(f"[MKT] Provider : {market_data_provider_name}")
     print()
 
     requested_dates = all_dates(start, end)
@@ -806,41 +945,58 @@ def main():
             fail_count  += 1
             continue
 
-        # 2. Parse Active Power CSV into SP kWh
-        sp_kwh = parse_stark_csv(csv_path)
-        if not sp_kwh:
-            print(f"{prefix}  PARSE-FAIL  ({csv_path.name})")
+        try:
+            result = process_sync_date(
+                token=token,
+                db_id=db_id,
+                target_date=d,
+                csv_path=csv_path,
+                prop_types=prop_types,
+                revenue_config=revenue_config,
+                market_data_provider=market_data_provider,
+            )
+        except (ValueError, InvalidRevenueInputError, MarketDataError, DuplicateNotionRowError) as exc:
+            print(f"{prefix}  FAIL  {exc}")
             sys.stdout.flush()
             fail_count += 1
             continue
-        new_stark_total = round(sum(sp_kwh.values()), 4)
+        except requests.RequestException as exc:
+            print(f"{prefix}  FAIL  Notion request failed: {exc}")
+            sys.stdout.flush()
+            fail_count += 1
+            continue
+
+        total = result["total_kwh"]
+        revenue_result = result["revenue_result"]
+        reference = result["reference"]
+        sp_ssp = result["sp_ssp"]
+
         if existing_stark_total is not None:
-            if abs(new_stark_total - existing_stark_total) > 0.01:
+            if abs(total - existing_stark_total) > 0.01:
                 print(
                     f"{prefix}  OVERWRITE  old={existing_stark_total:.2f} kWh -> "
-                    f"new={new_stark_total:.2f} kWh"
+                    f"new={total:.2f} kWh"
                 )
             else:
-                print(f"{prefix}  NO-CHANGE  Stark total still {new_stark_total:.2f} kWh")
+                print(f"{prefix}  NO-CHANGE  Stark total still {total:.2f} kWh")
 
-        # 3. Load SSP
-        sp_ssp   = load_ssp(date_str)
-        has_ssp  = bool(sp_ssp)
-
-        # 4. Upsert to Notion
-        ok, total = upsert_day(
-            token, db_id, date_str, sp_kwh, sp_ssp,
-            set_total_kwh=set_total_kwh,
-            set_settlement_date=set_settlement_date,
+        status = "OK  " if result["ok"] else "FAIL"
+        ssp_note = f"SSP={len(sp_ssp)}/48SPs" if sp_ssp else "SSP=none"
+        if reference:
+            reference_note = (
+                f"N2EX={reference.chosen_value_gbp_mwh:.2f} £/MWh "
+                f"({reference.chosen_method})"
+            )
+        else:
+            reference_note = "N2EX=legacy-merchant"
+        print(
+            f"{prefix}  {status}  gen={total:.2f} kWh  {ssp_note}  "
+            f"{reference_note}  regime={revenue_result.contract_regime}"
         )
-
-        status   = "OK  " if ok else "FAIL"
-        ssp_note = f"SSP={len(sp_ssp)}/48SPs" if has_ssp else "SSP=none"
-        print(f"{prefix}  {status}  gen={total:.2f} kWh  {ssp_note}")
         sys.stdout.flush()
 
-        if ok:
-            ok_count      += 1
+        if result["ok"]:
+            ok_count += 1
             total_kwh_all += total
             stark_totals[date_str] = total
         else:

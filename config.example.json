@@ -37,6 +37,14 @@
         "log_file": "logs/monitor.log"
     },
     "notion_parent_page_id": "YOUR_NOTION_PARENT_PAGE_ID",
+    "notion_database_id": "YOUR_STARK_HH_DAILY_DATA_DB_ID",
     "notion_fusionsolar_parent_page_id": "YOUR_FUSIONSOLAR_PARENT_PAGE_ID",
-    "notion_fusionsolar_db_id": "YOUR_FUSIONSOLAR_HOURLY_GENERATION_DB_ID"
+    "notion_fusionsolar_db_id": "YOUR_FUSIONSOLAR_HOURLY_GENERATION_DB_ID",
+    "point_lane": {
+        "market_data_provider": "nordpool_n2ex_api",
+        "vppa_start_date": "2026-04-01",
+        "default_strike_price": 91.4,
+        "default_vppa_floor": 0.0,
+        "default_export_discount": 0.0
+    }
 }

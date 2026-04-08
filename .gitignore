@@ -27,6 +27,7 @@ logs/
 # Config contains credentials - do NOT commit
 config.json
 .notion_db_id
+.notion_stark_daily_db_id
 
 # IDE
 .vscode/
@@ -57,3 +58,4 @@ latest_run.log
 github_failed_run.log
 error_debug_*.png
 stark_login_page.html
+market_data_cache/
