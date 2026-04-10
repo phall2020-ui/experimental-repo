@@ -82,25 +82,46 @@ jobs:
         with:
           submodules: false
 
+      - name: Determine task
+        id: task
+        run: |
+          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            echo "command=--nightly-sync" >> $GITHUB_OUTPUT
+            echo "Triggered via repository_dispatch (solar-platform cross-repo)"
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "command=${{ github.event.inputs.task }}" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event.schedule }}" = "0 22 * * *" ]; then
+            echo "command=--report" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event.schedule }}" = "30 22 * * *" ]; then
+            echo "command=--nightly-sync" >> $GITHUB_OUTPUT
+          else
+            echo "command=--check" >> $GITHUB_OUTPUT
+          fi
+          echo "Task: $(cat $GITHUB_OUTPUT)"
+
       - name: Validate secrets
         run: |
+          CMD="${{ steps.task.outputs.command }}"
           missing=""
           if [ -z "${FUSIONSOLAR_USERNAME}" ]; then missing="$missing FUSIONSOLAR_USERNAME"; fi
           if [ -z "${FUSIONSOLAR_PASSWORD}" ]; then missing="$missing FUSIONSOLAR_PASSWORD"; fi
           if [ -z "${NOTION_TOKEN}" ]; then missing="$missing NOTION_TOKEN"; fi
           if [ -z "${STARK_USERNAME}" ]; then missing="$missing STARK_USERNAME"; fi
           if [ -z "${STARK_PASSWORD}" ]; then missing="$missing STARK_PASSWORD"; fi
-          if [ "${POINT_LANE_MARKET_DATA_PROVIDER}" = "nordpool_n2ex_api" ]; then
-            if [ -z "${NORDPOOL_USERNAME}" ]; then missing="$missing NORDPOOL_USERNAME"; fi
-            if [ -z "${NORDPOOL_PASSWORD}" ]; then missing="$missing NORDPOOL_PASSWORD"; fi
-            if [ -z "${NORDPOOL_CLIENT_ID}" ]; then missing="$missing NORDPOOL_CLIENT_ID"; fi
-            if [ -z "${NORDPOOL_CLIENT_SECRET}" ]; then missing="$missing NORDPOOL_CLIENT_SECRET"; fi
-          else
-            if [ -z "${EPEX_SFTP_HOST}" ]; then missing="$missing EPEX_SFTP_HOST"; fi
-            if [ -z "${EPEX_SFTP_USERNAME}" ]; then missing="$missing EPEX_SFTP_USERNAME"; fi
-            if [ -z "${EPEX_SFTP_PASSWORD}" ]; then missing="$missing EPEX_SFTP_PASSWORD"; fi
+          # Nordpool credentials are only required for nightly-sync (market data ingestion)
+          if [[ "$CMD" == *"--nightly-sync"* ]]; then
+            if [ "${POINT_LANE_MARKET_DATA_PROVIDER}" = "nordpool_n2ex_api" ]; then
+              if [ -z "${NORDPOOL_USERNAME}" ]; then missing="$missing NORDPOOL_USERNAME"; fi
+              if [ -z "${NORDPOOL_PASSWORD}" ]; then missing="$missing NORDPOOL_PASSWORD"; fi
+              if [ -z "${NORDPOOL_CLIENT_ID}" ]; then missing="$missing NORDPOOL_CLIENT_ID"; fi
+              if [ -z "${NORDPOOL_CLIENT_SECRET}" ]; then missing="$missing NORDPOOL_CLIENT_SECRET"; fi
+            else
+              if [ -z "${EPEX_SFTP_HOST}" ]; then missing="$missing EPEX_SFTP_HOST"; fi
+              if [ -z "${EPEX_SFTP_USERNAME}" ]; then missing="$missing EPEX_SFTP_USERNAME"; fi
+              if [ -z "${EPEX_SFTP_PASSWORD}" ]; then missing="$missing EPEX_SFTP_PASSWORD"; fi
+            fi
           fi
-          if [ -z "${POINT_LANE_DEFAULT_EXPORT_DISCOUNT}" ]; then missing="$missing POINT_LANE_DEFAULT_EXPORT_DISCOUNT"; fi
+          # POINT_LANE_DEFAULT_EXPORT_DISCOUNT is optional — defaults to 0.00 in config
           if [ -n "$missing" ]; then
             echo "::error::Missing required secrets:$missing"
             exit 1
@@ -208,7 +229,7 @@ jobs:
              --arg vstart "$POINT_LANE_VPPA_START_DATE" \
              --arg strike "$POINT_LANE_DEFAULT_STRIKE_PRICE" \
              --arg floor "$POINT_LANE_DEFAULT_VPPA_FLOOR" \
-             --arg discount "$POINT_LANE_DEFAULT_EXPORT_DISCOUNT" \
+             --arg discount "${POINT_LANE_DEFAULT_EXPORT_DISCOUNT:-0.00}" \
              '.credentials.username = $u
               | .credentials.password = $p
               | .notion_token = $t
@@ -230,23 +251,6 @@ jobs:
 
       - name: Create logs directory
         run: mkdir -p logs
-
-      - name: Determine task
-        id: task
-        run: |
-          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
-            echo "command=--nightly-sync" >> $GITHUB_OUTPUT
-            echo "Triggered via repository_dispatch (solar-platform cross-repo)"
-          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "command=${{ github.event.inputs.task }}" >> $GITHUB_OUTPUT
-          elif [ "${{ github.event.schedule }}" = "0 22 * * *" ]; then
-            echo "command=--report" >> $GITHUB_OUTPUT
-          elif [ "${{ github.event.schedule }}" = "30 22 * * *" ]; then
-            echo "command=--nightly-sync" >> $GITHUB_OUTPUT
-          else
-            echo "command=--check" >> $GITHUB_OUTPUT
-          fi
-          echo "Task: $(cat $GITHUB_OUTPUT)"
 
       - name: Run FusionSolar Task
         id: run_task
@@ -306,15 +310,22 @@ jobs:
         run: |
           EXIT_CODE="${{ steps.run_task.outputs.exit_code }}"
           CMD="${{ steps.task.outputs.command }}"
-          if [ "$EXIT_CODE" != "0" ] && [ -n "$EXIT_CODE" ]; then
+          if [ -z "$EXIT_CODE" ] || [ "$EXIT_CODE" = "0" ]; then
+            echo "FusionSolar task '$CMD' completed successfully."
+          elif [[ "$CMD" == *"--check"* ]] && [ "$EXIT_CODE" = "1" ]; then
+            # Exit code 1 from --check means one or more devices are offline.
+            # This is an alert condition, not a code error — the CI run is marked as a warning.
+            # The offline alert is raised by the 'Notify on failure' step below.
+            echo "::warning::Inverter check reported offline devices (exit code 1). See logs and the failure notification for details."
+          else
             echo "::error::FusionSolar task '$CMD' failed (exit code: $EXIT_CODE). Check logs artifact for details."
             exit 1
-          else
-            echo "FusionSolar task '$CMD' completed successfully."
           fi
 
       - name: Notify on failure
-        if: failure()
+        if: |
+          failure() ||
+          (steps.run_task.outputs.exit_code == '1' && contains(steps.task.outputs.command, '--check'))
         env:
           GH_TOKEN: ${{ github.token }}
           WEBHOOK_URL: ${{ secrets.NOTIFICATION_WEBHOOK_URL }}
