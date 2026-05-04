@@ -59,3 +59,5 @@ github_failed_run.log
 error_debug_*.png
 stark_login_page.html
 market_data_cache/
+
+._*
