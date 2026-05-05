@@ -228,6 +228,8 @@ def _set_input_value(page, selector, value, timeout_ms=15000):
 
 
 def _login(page, username, password, attempts=2):
+    username_selector = "#inputUsernameOrEmail, input[name='email'], input[type='email'], input[type='text']"
+    password_selector = "#inputPassword, input[type='password']"
     for attempt in range(1, attempts + 1):
         print(f"Logging in... (attempt {attempt}/{attempts})")
         page.goto("https://id.stark.co.uk/StarkID/SignIn", wait_until="domcontentloaded")
@@ -238,13 +240,13 @@ def _login(page, username, password, attempts=2):
         except Exception:
             pass
 
-        username_ok = _set_input_value(page, "#inputUsernameOrEmail", username)
-        password_ok = _set_input_value(page, "#inputPassword", password)
+        username_ok = _set_input_value(page, username_selector, username)
+        password_ok = _set_input_value(page, password_selector, password)
         user_len = 0
         pass_len = 0
         try:
-            user_len = len(page.locator("#inputUsernameOrEmail").first.input_value())
-            pass_len = len(page.locator("#inputPassword").first.input_value())
+            user_len = len(page.locator(username_selector).first.input_value())
+            pass_len = len(page.locator(password_selector).first.input_value())
         except Exception:
             pass
         print(

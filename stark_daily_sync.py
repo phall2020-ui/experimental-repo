@@ -28,6 +28,7 @@ import os
 import sys
 import time
 import requests
+from dataclasses import replace
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
@@ -758,6 +759,14 @@ def main():
         action="store_true",
         help="Do not return non-zero exit when scraping fails (not recommended for CI).",
     )
+    parser.add_argument(
+        "--skip-market-data",
+        action="store_true",
+        help=(
+            "Skip N2EX/VPPA market-data enrichment and compute this run from "
+            "Stark generation plus Elexon SSP only."
+        ),
+    )
     args = parser.parse_args()
 
     start = date.fromisoformat(args.start)
@@ -774,12 +783,19 @@ def main():
     ensure_schema(token, db_id)
     prop_types = get_db_property_types(token, db_id)
     revenue_config = PointLaneRevenueConfig.from_sources(cfg)
-    market_data_provider_name, market_data_provider = build_market_data_provider(cfg)
+    if args.skip_market_data:
+        revenue_config = replace(revenue_config, vppa_start_date=end + timedelta(days=1))
+        market_data_provider_name = "disabled (--skip-market-data)"
+        market_data_provider = None
+    else:
+        market_data_provider_name, market_data_provider = build_market_data_provider(cfg)
     print(f"[DB] DB ID  : {db_id}")
     print(f"[DB] Range  : {start} → {end}")
     print(f"[DB] GenDir : {GEN_DIR}")
     print(f"[REV] VPPA start date : {revenue_config.vppa_start_date.isoformat()}")
     print(f"[MKT] Provider : {market_data_provider_name}")
+    if args.skip_market_data:
+        print("[MKT] N2EX/VPPA enrichment disabled; writing Stark + Elexon SSP merchant rows.")
     print()
 
     requested_dates = all_dates(start, end)

@@ -17,6 +17,7 @@ Usage:
     python nightly_sync.py                   # yesterday + today (default)
     python nightly_sync.py --days 3          # last 3 days + today
     python nightly_sync.py --no-fusion       # skip FusionSolar sync (Elexon + Stark only)
+    python nightly_sync.py --skip-market-data # skip N2EX/VPPA enrichment
 """
 
 import argparse
@@ -81,6 +82,10 @@ def main():
     parser.add_argument(
         "--end", default=None,
         help="Override end date YYYY-MM-DD (default: today)"
+    )
+    parser.add_argument(
+        "--skip-market-data", action="store_true",
+        help="Skip N2EX/market-data enrichment and run Stark + Elexon SSP only"
     )
     args = parser.parse_args()
 
@@ -149,6 +154,8 @@ def main():
     ]
     if backfill_check_start:
         stark_cmd += ["--backfill-check-start", backfill_check_start]
+    if args.skip_market_data:
+        stark_cmd += ["--skip-market-data"]
     ok, elapsed = run_step(
         f"Step {step}/{total_steps}: Stark HH generation -> Notion",
         stark_cmd,

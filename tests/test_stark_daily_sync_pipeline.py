@@ -85,6 +85,38 @@ class StarkDailySyncPipelineTests(unittest.TestCase):
         self.assertAlmostEqual(result["reference"].chosen_value_gbp_mwh, 60.0)
         mock_upsert.assert_called_once()
 
+    def test_process_sync_date_can_skip_market_data_when_run_is_merchant_only(self):
+        class UnexpectedProvider:
+            def fetch_for_delivery_date(self, delivery_date):
+                raise AssertionError("market provider should not be called")
+
+        merchant_only_config = PointLaneRevenueConfig(
+            vppa_start_date=date(2026, 5, 1),
+            default_strike_price_gbp_mwh=91.40,
+            default_vppa_floor_gbp_mwh=0.0,
+            default_export_discount_gbp_mwh=5.0,
+        )
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            csv_path = Path(tempdir) / "stark.csv"
+            _write_stark_csv(csv_path, active_power_kw=200.0)
+
+            with mock.patch.object(stark_daily_sync, "load_ssp", return_value={sp: 50.0 for sp in range(1, 49)}):
+                with mock.patch.object(stark_daily_sync, "upsert_day", return_value=(True, 4800.0)):
+                    result = stark_daily_sync.process_sync_date(
+                        token="token",
+                        db_id="db-id",
+                        target_date=date(2026, 4, 2),
+                        csv_path=csv_path,
+                        prop_types={},
+                        revenue_config=merchant_only_config,
+                        market_data_provider=UnexpectedProvider(),
+                    )
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["revenue_result"].contract_regime, "Pre-VPPA")
+        self.assertIsNone(result["reference"])
+
     def test_build_market_data_provider_prefers_explicit_nordpool_setting(self):
         cfg = {"point_lane": {"market_data_provider": "nordpool_n2ex_api"}}
         with mock.patch.object(stark_daily_sync, "NordPoolN2exApiProvider", return_value="nordpool-provider"):

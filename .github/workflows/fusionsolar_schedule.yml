@@ -35,6 +35,7 @@ on:
           - '--nightly-sync --no-fusion'
           - '--nightly-sync --no-fusion --start 2026-03-16 --end 2026-03-28'
           - '--nightly-sync --no-fusion --start 2026-04-01 --end 2026-04-30'
+          - '--nightly-sync --no-fusion --skip-market-data --start 2026-04-01 --end 2026-04-30'
           - '--backfill'
           - '--backfill --start-date 2025-12-01'
 
@@ -110,7 +111,7 @@ jobs:
           if [ -z "${STARK_USERNAME}" ]; then missing="$missing STARK_USERNAME"; fi
           if [ -z "${STARK_PASSWORD}" ]; then missing="$missing STARK_PASSWORD"; fi
           # Nordpool credentials are only required for nightly-sync (market data ingestion)
-          if [[ "$CMD" == *"--nightly-sync"* ]]; then
+          if [[ "$CMD" == *"--nightly-sync"* && "$CMD" != *"--skip-market-data"* ]]; then
             if [ "${POINT_LANE_MARKET_DATA_PROVIDER}" = "nordpool_n2ex_api" ]; then
               if [ -z "${NORDPOOL_USERNAME}" ]; then missing="$missing NORDPOOL_USERNAME"; fi
               if [ -z "${NORDPOOL_PASSWORD}" ]; then missing="$missing NORDPOOL_PASSWORD"; fi
